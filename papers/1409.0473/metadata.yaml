@@ -1,0 +1,72 @@
+input_type: arxiv
+arxiv_id: '1409.0473'
+doi: null
+source_url: https://arxiv.org/abs/1409.0473
+pdf_url: https://arxiv.org/pdf/1409.0473.pdf
+title: Neural Machine Translation by Jointly Learning to Align and Translate
+authors:
+- Dzmitry Bahdanau
+- Kyunghyun Cho
+- Yoshua Bengio
+year: 2014
+venue: arXiv preprint
+categories:
+- cs.CL
+- cs.LG
+- cs.NE
+- stat.ML
+abstract: Neural machine translation is a recently proposed approach to machine translation. Unlike the
+  traditional statistical machine translation, the neural machine translation aims at building a single
+  neural network that can be jointly tuned to maximize the translation performance. The models proposed
+  recently for neural machine translation often belong to a family of encoder-decoders and consists of
+  an encoder that encodes a source sentence into a fixed-length vector from which a decoder generates
+  a translation. In this paper, we conjecture that the use of a fixed-length vector is a bottleneck in
+  improving the performance of this basic encoder-decoder architecture, and propose to extend this by
+  allowing a model to automatically (soft-)search for parts of a source sentence that are relevant to
+  predicting a target word, without having to form these parts as a hard segment explicitly. With this
+  new approach, we achieve a translation performance comparable to the existing state-of-the-art phrase-based
+  system on the task of English-to-French translation. Furthermore, qualitative analysis reveals that
+  the (soft-)alignments found by the model agree well with our intuition.
+claude_summary: null
+ingested_at: '2026-07-16T08:09:56+00:00'
+extraction_method: heuristic-regex
+sections:
+- name: Abstract
+  found: true
+  start_line: 8
+  end_line: 23
+- name: Introduction
+  found: true
+  start_line: 24
+  end_line: 256
+- name: Related Work
+  found: true
+  start_line: 511
+  end_line: 547
+- name: Method
+  found: true
+  start_line: 299
+  end_line: 316
+- name: Experiments
+  found: true
+  start_line: 257
+  end_line: 298
+- name: Results
+  found: true
+  start_line: 317
+  end_line: 438
+- name: Discussion
+  found: true
+  start_line: 439
+  end_line: 510
+- name: Conclusion
+  found: true
+  start_line: 548
+  end_line: 586
+- name: References
+  found: true
+  start_line: 587
+  end_line: 963
+files:
+  pdf: paper.pdf
+  markdown: paper.md

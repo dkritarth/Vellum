@@ -1,0 +1,72 @@
+input_type: doi
+arxiv_id: null
+doi: 10.1371/journal.pone.0130140
+source_url: https://doi.org/10.1371/journal.pone.0130140
+pdf_url: null
+title: On Pixel-Wise Explanations for Non-Linear Classifier Decisions by Layer-Wise Relevance Propagation
+authors:
+- Sebastian Bach
+- Alexander Binder
+- Grégoire Montavon
+- Frederick Klauschen
+- Klaus-Robert Müller
+- Wojciech Samek
+year: 2015
+venue: PLOS ONE
+categories: []
+abstract: Paper propose general framework, layer-wise relevance propagation (LRP), for pixel-wise decomposition
+  of nonlinear classifier decisions in image classification. Method assign relevance score each pixel
+  by backward pass through classifier layers, conserving total relevance layer to layer, applicable both
+  Bag-of-Words kernel classifiers and multilayer neural networks. Alternative Taylor-type decomposition
+  also introduced as related approximation. Evaluated on PASCAL VOC, synthetic polygon/circle images,
+  MNIST digits, and pretrained ImageNet Caffe network, producing heatmaps highlighting pixels driving
+  classification decisions, validated qualitatively and via pixel-flipping experiments.
+claude_summary: Paper propose general framework, layer-wise relevance propagation (LRP), for pixel-wise
+  decomposition of nonlinear classifier decisions in image classification. Method assign relevance score
+  each pixel by backward pass through classifier layers, conserving total relevance layer to layer, applicable
+  both Bag-of-Words kernel classifiers and multilayer neural networks. Alternative Taylor-type decomposition
+  also introduced as related approximation. Evaluated on PASCAL VOC, synthetic polygon/circle images,
+  MNIST digits, and pretrained ImageNet Caffe network, producing heatmaps highlighting pixels driving
+  classification decisions, validated qualitatively and via pixel-flipping experiments.
+ingested_at: '2026-07-16T08:09:49+00:00'
+extraction_method: claude-cli
+sections:
+- name: Abstract
+  found: true
+  start_line: 15
+  end_line: 46
+- name: Introduction
+  found: true
+  start_line: 46
+  end_line: 114
+- name: Related Work
+  found: true
+  start_line: 546
+  end_line: 617
+- name: Method
+  found: true
+  start_line: 114
+  end_line: 1382
+- name: Experiments
+  found: true
+  start_line: 1382
+  end_line: 1933
+- name: Results
+  found: false
+  start_line: null
+  end_line: null
+- name: Discussion
+  found: true
+  start_line: 1933
+  end_line: 2022
+- name: Conclusion
+  found: false
+  start_line: null
+  end_line: null
+- name: References
+  found: true
+  start_line: 2036
+  end_line: 2188
+files:
+  pdf: paper.pdf
+  markdown: paper.md

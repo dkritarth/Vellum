@@ -1,0 +1,864 @@
+paper_slug: '1409.0473'
+title: Neural Machine Translation by Jointly Learning to Align and Translate
+generated_at: '2026-07-16T11:49:52+00:00'
+parse_method: claude-cli
+references_parsed: 28
+references:
+- raw: Axelrod, He, Gao (2011). Domain adaptation via pseudo-in-domain data selection. EMNLP.
+  title: Domain adaptation via pseudo-in-domain data selection
+  authors:
+  - Axelrod, A.
+  - He, X.
+  - Gao, J.
+  year: 2011
+- raw: 'Bastien, Lamblin, Pascanu, Bergstra, Goodfellow, Bergeron, Bouchard, Bengio (2012). Theano: new
+    features and speed improvements.'
+  title: 'Theano: new features and speed improvements'
+  authors:
+  - Bastien, F.
+  - Lamblin, P.
+  - Pascanu, R.
+  - Bergstra, J.
+  - Goodfellow, I. J.
+  - Bergeron, A.
+  - Bouchard, N.
+  - Bengio, Y.
+  year: 2012
+- raw: Bengio, Simard, Frasconi (1994). Learning long-term dependencies with gradient descent is difficult.
+    IEEE Transactions on Neural Networks.
+  title: Learning long-term dependencies with gradient descent is difficult
+  authors:
+  - Bengio, Y.
+  - Simard, P.
+  - Frasconi, P.
+  year: 1994
+- raw: Bengio, Ducharme, Vincent, Janvin (2003). A neural probabilistic language model. JMLR.
+  title: A neural probabilistic language model
+  authors:
+  - Bengio, Y.
+  - Ducharme, R.
+  - Vincent, P.
+  - Janvin, C.
+  year: 2003
+- raw: 'Bergstra, Breuleux, Bastien, Lamblin, Pascanu, Desjardins, Turian, Warde-Farley, Bengio (2010).
+    Theano: a CPU and GPU math expression compiler. SciPy.'
+  title: 'Theano: a CPU and GPU math expression compiler'
+  authors:
+  - Bergstra, J.
+  - Breuleux, O.
+  - Bastien, F.
+  - Lamblin, P.
+  - Pascanu, R.
+  - Desjardins, G.
+  - Turian, J.
+  - Warde-Farley, D.
+  - Bengio, Y.
+  year: 2010
+- raw: Boulanger-Lewandowski, Bengio, Vincent (2013). Audio chord recognition with recurrent neural networks.
+    ISMIR.
+  title: Audio chord recognition with recurrent neural networks
+  authors:
+  - Boulanger-Lewandowski, N.
+  - Bengio, Y.
+  - Vincent, P.
+  year: 2013
+- raw: Cho, van Merrienboer, Gulcehre, Bougares, Schwenk, Bengio (2014a). Learning phrase representations
+    using RNN encoder-decoder for statistical machine translation. EMNLP 2014.
+  title: Learning phrase representations using RNN encoder-decoder for statistical machine translation
+  authors:
+  - Cho, K.
+  - van Merrienboer, B.
+  - Gulcehre, C.
+  - Bougares, F.
+  - Schwenk, H.
+  - Bengio, Y.
+  year: 2014
+- raw: 'Cho, van Merrienboer, Bahdanau, Bengio (2014b). On the properties of neural machine translation:
+    Encoder-Decoder approaches.'
+  title: 'On the properties of neural machine translation: Encoder-Decoder approaches'
+  authors:
+  - Cho, K.
+  - van Merrienboer, B.
+  - Bahdanau, D.
+  - Bengio, Y.
+  year: 2014
+- raw: Devlin, Zbib, Huang, Lamar, Schwartz, Makhoul (2014). Fast and robust neural network joint models
+    for statistical machine translation. ACL.
+  title: Fast and robust neural network joint models for statistical machine translation
+  authors:
+  - Devlin, J.
+  - Zbib, R.
+  - Huang, Z.
+  - Lamar, T.
+  - Schwartz, R.
+  - Makhoul, J.
+  year: 2014
+- raw: Forcada, Neco (1997). Recursive hetero-associative memories for translation. Biological and Artificial
+    Computation.
+  title: Recursive hetero-associative memories for translation
+  authors:
+  - Forcada, M. L.
+  - Neco, R. P.
+  year: 1997
+- raw: Goodfellow, Warde-Farley, Mirza, Courville, Bengio (2013). Maxout networks. ICML.
+  title: Maxout networks
+  authors:
+  - Goodfellow, I.
+  - Warde-Farley, D.
+  - Mirza, M.
+  - Courville, A.
+  - Bengio, Y.
+  year: 2013
+- raw: Graves (2012). Sequence transduction with recurrent neural networks. ICML 2012.
+  title: Sequence transduction with recurrent neural networks
+  authors:
+  - Graves, A.
+  year: 2012
+- raw: Graves (2013). Generating sequences with recurrent neural networks. arXiv:1308.0850.
+  title: Generating sequences with recurrent neural networks
+  authors:
+  - Graves, A.
+  year: 2013
+- raw: Graves, Jaitly, Mohamed (2013). Hybrid speech recognition with deep bidirectional LSTM. ASRU 2013.
+  title: Hybrid speech recognition with deep bidirectional LSTM
+  authors:
+  - Graves, A.
+  - Jaitly, N.
+  - Mohamed, A.-R.
+  year: 2013
+- raw: Hermann, K. and Blunsom, P. (2014). Multilingual distributed representations without word alignment.
+    ICLR 2014.
+  title: Multilingual distributed representations without word alignment
+  authors:
+  - Hermann, K.
+  - Blunsom, P.
+  year: 2014
+- raw: Hochreiter, S. (1991). Untersuchungen zu dynamischen neuronalen Netzen. Diplom thesis, TU München.
+  title: Untersuchungen zu dynamischen neuronalen Netzen
+  authors:
+  - Hochreiter, S.
+  year: 1991
+- raw: Hochreiter, S. and Schmidhuber, J. (1997). Long short-term memory. Neural Computation, 9(8), 1735-1780.
+  title: Long short-term memory
+  authors:
+  - Hochreiter, S.
+  - Schmidhuber, J.
+  year: 1997
+- raw: Kalchbrenner, N. and Blunsom, P. (2013). Recurrent continuous translation models. EMNLP, pages
+    1700-1709.
+  title: Recurrent continuous translation models
+  authors:
+  - Kalchbrenner, N.
+  - Blunsom, P.
+  year: 2013
+- raw: Koehn, P. (2010). Statistical Machine Translation. Cambridge University Press.
+  title: Statistical Machine Translation
+  authors:
+  - Koehn, P.
+  year: 2010
+- raw: Koehn, P., Och, F. J., and Marcu, D. (2003). Statistical phrase-based translation. NAACL'03, pages
+    48-54.
+  title: Statistical phrase-based translation
+  authors:
+  - Koehn, P.
+  - Och, F. J.
+  - Marcu, D.
+  year: 2003
+- raw: Pascanu, R., Mikolov, T., and Bengio, Y. (2013a). On the difficulty of training recurrent neural
+    networks. ICML 2013.
+  title: On the difficulty of training recurrent neural networks
+  authors:
+  - Pascanu, R.
+  - Mikolov, T.
+  - Bengio, Y.
+  year: 2013
+- raw: Pascanu, R., Gulcehre, C., Cho, K., and Bengio, Y. (2014). How to construct deep recurrent neural
+    networks. ICLR 2014.
+  title: How to construct deep recurrent neural networks
+  authors:
+  - Pascanu, R.
+  - Gulcehre, C.
+  - Cho, K.
+  - Bengio, Y.
+  year: 2014
+- raw: Pouget-Abadie, J., Bahdanau, D., van Merrienboer, B., Cho, K., and Bengio, Y. (2014). Overcoming
+    curse of sentence length for neural machine translation using automatic segmentation. Eighth Workshop
+    on Syntax, Semantics and Structure in Statistical Translation.
+  title: Overcoming the curse of sentence length for neural machine translation using automatic segmentation
+  authors:
+  - Pouget-Abadie, J.
+  - Bahdanau, D.
+  - van Merrienboer, B.
+  - Cho, K.
+  - Bengio, Y.
+  year: 2014
+- raw: Schuster, M. and Paliwal, K. K. (1997). Bidirectional recurrent neural networks. Signal Processing,
+    IEEE Transactions on, 45(11), 2673-2681.
+  title: Bidirectional recurrent neural networks
+  authors:
+  - Schuster, M.
+  - Paliwal, K. K.
+  year: 1997
+- raw: Schwenk, H. (2012). Continuous space translation models for phrase-based statistical machine translation.
+    COLING, pages 1071-1080.
+  title: Continuous space translation models for phrase-based statistical machine translation
+  authors:
+  - Schwenk, H.
+  year: 2012
+- raw: Schwenk, H., Dchelotte, D., and Gauvain, J.-L. (2006). Continuous space language models for statistical
+    machine translation. COLING/ACL poster sessions, pages 723-730.
+  title: Continuous space language models for statistical machine translation
+  authors:
+  - Schwenk, H.
+  - Dchelotte, D.
+  - Gauvain, J.-L.
+  year: 2006
+- raw: Sutskever, I., Vinyals, O., and Le, Q. (2014). Sequence to sequence learning with neural networks.
+    NIPS 2014.
+  title: Sequence to sequence learning with neural networks
+  authors:
+  - Sutskever, I.
+  - Vinyals, O.
+  - Le, Q.
+  year: 2014
+- raw: 'Zeiler, M. D. (2012). ADADELTA: An adaptive learning rate method. arXiv:1212.5701 [cs.LG].'
+  title: 'ADADELTA: An adaptive learning rate method'
+  authors:
+  - Zeiler, M. D.
+  year: 2012
+cites: []
+semantic_scholar:
+  lookup_status: ok
+  paper_id: fa72afa9b2cbc8f0d7b05d52548906610ffbb9c5
+  matched_title: Neural Machine Translation by Jointly Learning to Align and Translate
+  citation_count: 29678
+  citing_lookup_status: ok
+cited_by_external:
+- title: Physics-guided residual learning framework for aftershock time history prediction using mainshock
+    acceleration data
+  year: 2026
+  authors:
+  - Mengdie Chen
+  - N Time
+  - Jong‐Su Jeon
+  paperId: c5e16fa71e48e149b0fc6380bc4c5778cbe0447d
+  external_ids:
+    DBLP: journals/eaai/ChenMJ26
+    DOI: 10.1016/j.engappai.2026.115399
+    CorpusId: 289297817
+- title: Modeling stack voltage and remaining useful life of proton exchange membrane fuel cells using
+    deep neural networks
+  year: 2026
+  authors:
+  - Gürkan Doğan
+  - Andaç Imak
+  paperId: 45b060e7a42a9c8ed1c020f6279bbd57efb85814
+  external_ids:
+    DOI: 10.1016/j.jpowsour.2026.240842
+    CorpusId: 289819391
+- title: Early risk warning model of hydraulic fracturing screen-out risk based on deep learning method
+  year: 2026
+  authors:
+  - Yufeng Li
+  - Mao Sheng
+  - Xiaoying Zhuang
+  - Shuai Zhang
+  - S. Tian
+  - Zhongwei Huang
+  - Gensheng Li
+  paperId: 901f921696f8d5ae65b1f41b4b00cc8f58a49935
+  external_ids:
+    DBLP: journals/aei/LiSZZTHL26
+    DOI: 10.1016/j.aei.2026.104789
+    CorpusId: 288252197
+- title: Improving zero-shot translation with the navigation ability-enhanced language tags
+  year: 2026
+  authors:
+  - Changtong Zan
+  - Liang Ding
+  - Li Shen
+  - Yibin Lei
+  - Yibing Zhan
+  - Weifeng Liu
+  paperId: 9114532cb270ba7164dc848f3b005453c8cf5448
+  external_ids:
+    DBLP: journals/eaai/ZanDSLZL26
+    DOI: 10.1016/j.engappai.2026.115149
+    CorpusId: 288682686
+- title: 'OfflineRealtimeTranslator: A fully offline android application for Russian-to-Chinese simultaneous
+    interpretation using on-device LLM inference'
+  year: 2026
+  authors:
+  - Bohan Li
+  - Xin He
+  - D. A. Golosov
+  - Pavel A. Alexandrovitch
+  paperId: c1b9ebc6068e1b133c89ca52aae20426c1c45a8c
+  external_ids:
+    DBLP: journals/softx/LiHGA26
+    DOI: 10.1016/j.softx.2026.102764
+    CorpusId: 288952055
+- title: Research on an intelligent optimization algorithm for P-wave azimuth determination at single
+    stations in high-speed rail earthquake early warning systems
+  year: 2026
+  authors:
+  - Changwei Yang
+  - Xinqiu Ouyang
+  - Xinyu Liang
+  - Jing Lian
+  - Baorui Hou
+  - Zhifang Zhang
+  paperId: bc138155cbc7ff6a5414c4356a55cf3baa2869b4
+  external_ids:
+    DOI: 10.1016/j.soildyn.2026.110294
+    CorpusId: 287338287
+- title: Chaotic time series prediction based on attention-enhanced asynchronous optoelectronic reservoir
+    computing
+  year: 2026
+  authors:
+  - Lin Jiang
+  - P. Yu
+  - Xin Yuan
+  - Hairong Lin
+  - A. Yi
+  - W. Pan
+  - Lianshan Yan
+  paperId: 7df5e788169094e3dcd5e1738599530ceb7a1218
+  external_ids:
+    DOI: 10.1016/j.chaos.2026.118491
+    CorpusId: 288215901
+- title: 'Reason4Rec: Deliberative User Preference Alignment of Large Language Models for Recommendation'
+  year: 2026
+  authors:
+  - Yi Fang
+  - Wenjie Wang
+  - Yang Zhang
+  - Fengbin Zhu
+  - Qifan Wang
+  - Fuli Feng
+  - Xiangnan He
+  paperId: 008620d1ccc2afc23c55b79d96c05d72bfc5cf50
+  external_ids:
+    DOI: 10.1109/TKDE.2026.3699701
+    CorpusId: 288935819
+- title: Positional Attention-based Graph Neural Network for Learning Permutation Non-equivariant Wireless
+    Policies
+  year: 2026
+  authors:
+  - Baichuan Zhao
+  - Chenyang Yang
+  - Jianyu Zhao
+  - Di Zhang
+  paperId: f8a2d33fbf5c4636d05bb5bf5528d0ba62b7f401
+  external_ids:
+    ArXiv: '2607.12744'
+    CorpusId: 290178521
+- title: Understanding before Naming! Enhancing LLM-based Method Name Prediction with Code Summarization
+  year: 2026
+  authors:
+  - Wei Liu
+  - Weisong Sun
+  - Tingting Xu
+  - Hanwei Qian
+  - Yi Zhao
+  - Chunrong Fang
+  - Xia Feng
+  paperId: a6c665c65893ec5dcbe8e50bb762809d5165c680
+  external_ids:
+    ArXiv: '2607.12467'
+    CorpusId: 290148997
+- title: Heuristic Learning for Active Flow Control Using Coding Agents
+  year: 2026
+  authors:
+  - Paul Garnier
+  - J. Viquerat
+  - E. Hachem
+  paperId: 87d42cac61344acffc9ec80340773f63108b5206
+  external_ids:
+    ArXiv: '2607.11565'
+    CorpusId: 290142722
+- title: 'Detangled: A Framework for Creating, Editing, and Inferencing Feature Rich Hair Strands'
+  year: 2026
+  authors:
+  - Sarah Jobalia
+  - Yitong Deng
+  - Carolyn Smith
+  - Ronald Fedkiw
+  paperId: b5b7447bb2011feb34a17640708068591a573645
+  external_ids:
+    ArXiv: '2607.09811'
+    CorpusId: 290135940
+- title: 'COALA: Robust Contextualized Speech-augmented Language Modeling for ASR via Contrastive Regularizer
+    and Biasing Score Estimation'
+  year: 2026
+  authors:
+  - Jhih-Rong Guo
+  - Bi-Cheng Yan
+  - Tien-Hong Lo
+  - Berlin Chen
+  paperId: 4dd74a7510f4012ee415328011efe32e46390fdd
+  external_ids:
+    ArXiv: '2607.08117'
+    CorpusId: 290009485
+- title: Learning to Unify Deformable Shape and Texture Representations for Cardiac Video Classification
+  year: 2026
+  authors:
+  - Tonmoy Hossain
+  - Miaomiao Zhang
+  paperId: 257c3db806df75abc675e4a9e89c3a3cc6323b09
+  external_ids:
+    ArXiv: '2607.07518'
+    CorpusId: 289978709
+- title: 'How Data Shapes RoPE Frequency Usage: From Positional Scale Matching to Length Generalization'
+  year: 2026
+  authors:
+  - Xinyi Wu
+  - Siyuan Liu
+  - A. Jadbabaie
+  paperId: 05572a9502fe5098c24850fe79f597b0d1565373
+  external_ids:
+    ArXiv: '2607.07678'
+    CorpusId: 289978907
+- title: A Hybrid Transformer-Based System for Multilingual Translation with Domain-Specific Terminology
+    Explanation
+  year: 2026
+  authors:
+  - Oyebamiji Micheal Tomiwa
+  paperId: f74937faad07c1a4d2cc18a25e2ea856385050f1
+  external_ids:
+    DOI: 10.34148/teknika.v15i2.1506
+    CorpusId: 290044992
+- title: 'ZACP: enhancing skin lesion classification ability using zero attention and complete perception'
+  year: 2026
+  authors:
+  - Hailong Zuo
+  - Zhi Weng
+  - Zhenshuai Fu
+  - Fangfang Ding
+  - Jun Chai
+  - Liru Chen
+  - Caili Gong
+  - Zhiqiang Zheng
+  paperId: 134fa2c3aecda9de5525ba6848024baa399a4fbe
+  external_ids:
+    PubMedCentral: '13337999'
+    DOI: 10.1186/s42492-026-00223-3
+    CorpusId: 289909071
+    PubMed: '42406199'
+- title: 'HALO-WA: Hybrid-Attention Latent-Guided Online Reinforcement Learning for World-Action Models'
+  year: 2026
+  authors:
+  - Angen Ye
+  - Weijie Ke
+  - Xiaofeng Wang
+  - Xinze Chen
+  - Chaojun Ni
+  - Guosheng Zhao
+  - Boyuan Wang
+  - Zheng Zhu
+  - Junjie Xie
+  - Dapeng Zhang
+  paperId: 9a7128f2c42b32390fc554206de4e344b585fb2e
+  external_ids:
+    ArXiv: '2607.04265'
+    CorpusId: 289933427
+- title: Explainable Reinforcement Learning for Adaptive Traffic Signal Control
+  year: 2026
+  authors:
+  - Dickens Kwesiga
+  - Nishu Choudhary
+  - Angshuman Guin
+  - Michael Hunter
+  paperId: fc2518a730e9c83afb32036037b26380cbccf97f
+  external_ids:
+    ArXiv: '2607.03703'
+    CorpusId: 289934469
+- title: Self-Improving Diffusion Classifiers with Minority Preference Optimization
+  year: 2026
+  authors:
+  - Hyunsoo Kim
+  - Jungmyung Wi
+  - Soobin Um
+  - Donghyun Kim
+  - Suhyun Kim
+  paperId: 109ab85a5c572dcdb2a27ebfa12cff1bf9ce4a7d
+  external_ids:
+    ArXiv: '2607.03770'
+    CorpusId: 289934529
+- title: 'CNNKSCEC: a deep learning-based framework for chromatin loop prediction with multi-source feature
+    integration'
+  year: 2026
+  authors:
+  - Junfeng Wang
+  - Bingzi Zheng
+  - Lili Wu
+  - Xiaoyan Liu
+  - Haixia Zhai
+  - Junwei Luo
+  paperId: fe75222032b81cb0614b0c3abb4515feb4c38e5e
+  external_ids:
+    DOI: 10.3389/fgene.2026.1850219
+    CorpusId: 289891785
+- title: 'Advancing sustainable development goals through multilingual text summarization: A transformer-based
+    approach'
+  year: 2026
+  authors:
+  - Atul Kumar
+  - Shashi Kant Gupta
+  - R. S. Yadav
+  - U. Yadav
+  - Shekhar Saroj
+  - Vivek Kumar
+  paperId: 4f50d1dca626fa31f38bea1a6a436b181ee4b912
+  external_ids:
+    DOI: 10.29333/ejosdr/18328
+    CorpusId: 287393719
+- title: 'Attention mechanisms in UNet variants for medical/non-medical image segmentation: A comprehensive
+    and state-of-the-art narrative review'
+  year: 2026
+  authors:
+  - Siddharth Gupta
+  - Yogendra Chhetri
+  - Amit Pandey
+  - Akansha Singh
+  - Mrinalini Bhagawati
+  - S. Gupta
+  - Neha Gupta
+  - Surbhi Verma
+  - E. Tiwari
+  - Mustafa Al-Maini
+  - Mostafa M. Fouda
+  - Gavino Faa
+  - E. Isenovic
+  - Andrew Laine
+  - L. Saba
+  - J. Suri
+  paperId: f1eaebb0236fa43880c1250548b8f1692c049036
+  external_ids:
+    DBLP: journals/cbm/GuptaCPSBGGVTAFFILSS26
+    DOI: 10.1016/j.compbiomed.2026.111703
+    CorpusId: 288030077
+    PubMed: '42085886'
+- title: Rare earth elements in the age of energy transformation. Fly ash recovery profitability analysis
+  year: 2026
+  authors:
+  - A. Rybak
+  - A. Rybak
+  paperId: 730dc6bb8f9a50099dd00bd2cf2343681e79c773
+  external_ids:
+    DOI: 10.1016/j.resourpol.2026.105953
+    CorpusId: 288754772
+- title: Dependency-constrained selective knowledge distillation with self-attention for neural machine
+    translation
+  year: 2026
+  authors:
+  - EnLiang Liu
+  - Zhenhan Wang
+  - Shengxiang Gao
+  - Zhengtao Yu
+  - Junjun Guo
+  paperId: 34e78811863f67dc8b11117b96147f79e02e5483
+  external_ids:
+    DOI: 10.1007/s13042-026-03187-1
+    CorpusId: 289695356
+- title: The State-Prediction Separation Hypothesis
+  year: 2026
+  authors:
+  - Giovanni Monea
+  - Nathan Godey
+  - Kianté Brantley
+  - Yoav Artzi
+  paperId: e333c50dfb78de1061e6e1a2b98e2379d6f3b1dd
+  external_ids:
+    ArXiv: '2607.01218'
+    CorpusId: 289706301
+- title: 'Agent4cs: A Multi-agent System for Code Summarization in Large Hierarchical Codebases'
+  year: 2026
+  authors:
+  - Yongjian Tang
+  - Ezgi Sarikayak
+  - Doruk Tuncel
+  - Jie M. Zhang
+  - Thomas A. Runkler
+  paperId: 0ea3160339bd731ab6375c418671ea9fe5ae64f6
+  external_ids:
+    ArXiv: '2607.01425'
+    CorpusId: 289749408
+- title: Wind-Aware Reinforcement Learning Control of a Small Quadrotor Using Learned Onboard Wind Estimation
+    in Simulated Atmospheric Turbulence
+  year: 2026
+  authors:
+  - A. Tasim
+  - Wei Sun
+  paperId: afd10838b4f51e4d70b76a6f9899cf06a418d1bf
+  external_ids:
+    ArXiv: '2607.01528'
+    CorpusId: 289749161
+- title: 'Unveiling spatiotemporal mechanisms of urban traffic: Multi-scale determinants and explainable
+    street-level dynamics of a graph neural network in Berlin'
+  year: 2026
+  authors:
+  - Shiyu Tang
+  - Jin Rui
+  - S. Lautenbach
+  - C. Ludwig
+  - Sukanya Randhawa
+  - Steffen Knoblauch
+  - Alexander Zipf
+  paperId: 15a71af5448bd3d89b04db9d9896b9c667746059
+  external_ids:
+    DOI: 10.1016/j.jtrangeo.2026.104754
+    CorpusId: 289784014
+- title: Underwater Dynamic Tracking Control of AUV Based on Complex Environment Simulation and ACL-SAC
+    Deep Reinforcement Learning
+  year: 2026
+  authors:
+  - Dan Liang
+  - Jiale Chu
+  - Yuguo Cui
+  - Dongtai Liang
+  - Yongfei Feng
+  paperId: eed526c2e14720a672dedf54ece986c5b41ce73d
+  external_ids:
+    DOI: 10.1109/TIV.2024.3443393
+    CorpusId: 272161830
+- title: Studentų atsiliepimų vertinimas pasitelkiant sentimentų analizę ir BERT transformerių modelius
+  year: 2026
+  authors:
+  - A. Usovaitė
+  paperId: 1c2d6375b625bcb37a2e570b96c66d7a7eb9cbdc
+  external_ids:
+    DOI: 10.59476/mtt2026.v1i22.771
+    CorpusId: 289781313
+- title: Physics-Informed Data-Driven Aerodynamic Modeling of Distributed Propulsion Wing with Extremely
+    Tiny Datasets
+  year: 2026
+  authors:
+  - Kelei Wang
+  - Zhou Zhou
+  - Yilin Dou
+  paperId: 902e3661720dfc3a1a4aa7bff5dda54b352cbd0a
+  external_ids:
+    DOI: 10.1016/j.ast.2026.113144
+    CorpusId: 289930734
+- title: A Hybrid Framework for Dynamic Inertia Estimation of Power Grid Considering Virtual Inertia Support
+    From Wind Farms
+  year: 2026
+  authors:
+  - Priyesh Saini
+  - Abhineet Prakash
+  - S. K. Parida
+  - M. E. Moursi
+  paperId: d9292536544e53914e699ef67bb35735ad39491c
+  external_ids:
+    DOI: 10.1109/TII.2026.3675556
+    CorpusId: 287373688
+- title: T-cell receptor alpha to beta chains binding prediction
+  year: 2026
+  authors:
+  - Devora Siminovsky
+  - Y. Louzoun
+  paperId: 1fd3ae951e8669ac4f1641fc7df16622eb25ca64
+  external_ids:
+    PubMedCentral: '13345391'
+    DOI: 10.1093/bib/bbag358
+    CorpusId: 290011393
+    PubMed: '42418829'
+- title: 'Attention mechanisms in deep learning for surface lesion diagnosis: a comprehensive review'
+  year: 2026
+  authors:
+  - Jun Chen
+  - Qiaoying Teng
+  - Chongshang Zhong
+  - Jinyao Zhu
+  - Lingling Yan
+  - Weixiong Liu
+  - Ruijie Li
+  - Xinyi Qiu
+  - Lei Yao
+  - Ke Xu
+  - Kai Han
+  - Yi Liu
+  - Zhe Liu
+  paperId: 059d86d50bdc724fab2971c5d348e80c7ca4f679
+  external_ids:
+    DOI: 10.1007/s00530-026-02482-9
+    CorpusId: 290086168
+- title: A Multisource Hardware Sensing Signal Fusion Network for Robust State Prediction and Anomaly
+    Perception
+  year: 2026
+  authors:
+  - Yufei Li
+  - Junxian Zhao
+  - Yi Wei
+  - Xichen Wang
+  - Yaqing Yang
+  - Yang Yang
+  - Yan Zhan
+  paperId: e894ae036ca25eda3480fb6d69e78e6253bf85d1
+  external_ids:
+    PubMedCentral: '13363717'
+    DOI: 10.3390/s26134234
+    CorpusId: 289885936
+    PubMed: '42451474'
+- title: Temporal multivariate mixture density networks for enhanced portfolio optimization
+  year: 2026
+  authors:
+  - Fong Lam
+  - J. Chan
+  - Boris Choy
+  paperId: 095e579419f7074b7610e79059f218e6b80c5e6b
+  external_ids:
+    DOI: 10.1016/j.iswa.2026.200700
+    CorpusId: 290150713
+- title: SAE-VSP:Table-to-text generation with semantic association encoder and variational sequential
+    planning
+  year: 2026
+  authors:
+  - Qi Qi
+  - Yajun Du
+  - Jia Liu
+  - Xianyong Li
+  - Xiaoliang Chen
+  - Yanli Lee
+  paperId: 97a03137fbbfb9d6cb9113809416dc9212a4448c
+  external_ids:
+    DOI: 10.1016/j.ins.2026.123900
+    CorpusId: 290165826
+- title: Evaluating the effectiveness of neural machine translation from Nyishi-to-English
+  year: 2026
+  authors:
+  - Nabam Kakum
+  - R. Kri
+  - Koj Sambyo
+  paperId: d39fdd10c7198d6fc1d6ad89d36586066d555e7f
+  external_ids:
+    DOI: 10.1007/s12046-026-03139-z
+    CorpusId: 289683016
+- title: Integrating Traditional Grammar Rules with AI for Enhanced Sandhi Split in Sanskrit
+  year: 2026
+  authors:
+  - Sharayu Mirasdar
+  - Mangesh V. Bedekar
+  - Balaji Magar
+  paperId: 1a952779c2c15a898c0920e770691d07148eff2f
+  external_ids:
+    DOI: 10.59543/jidmis.v3.462
+    CorpusId: 289782961
+- title: 'Relevance Is Not Permission: Warranted Attention for Value Contributions'
+  year: 2026
+  authors:
+  - Minwoo Yu
+  - Young-guk Ha
+  paperId: 82e5e095545b0f80e142698b7a4255d345d8c76f
+  external_ids:
+    ArXiv: '2606.30139'
+    CorpusId: 289684286
+- title: Evaluating the Efficiency of Transformer-Based Chatbot Systems in Real-Time Conversational Environments
+  year: 2026
+  authors:
+  - Ankita Kishor Dhoble
+  - Rahul Bandekar
+  - M. Ingole
+  paperId: 199a0b37a7b613cc8c5b1dc2c4d33d5e77ec26a8
+  external_ids:
+    DOI: 10.25258/ijddt.16.59s.157
+    CorpusId: 289787659
+- title: 'Listening Between the Lines: Joint Learning of ASR Embeddings and LLM-Augmented Linguistics
+    for Dementia Detection'
+  year: 2026
+  authors:
+  - Olivier Jiyoun Jung
+  - Jonghyeon Park
+  - Myungwoo Oh
+  paperId: 6119b2a6fddf3f6e0fda0258c80f968d7a8b20cd
+  external_ids:
+    ArXiv: '2606.30675'
+    CorpusId: 289691038
+- title: 'FV-PCBA Net: a fault diagnosis model for rolling bearings with hybrid preprocessing, parallel
+    feature extraction and cross-attention mechanism'
+  year: 2026
+  authors:
+  - Danwen Li
+  - Xuejing Wu
+  - Yali Wu
+  - Yanxi Yang
+  - Jianwen Wu
+  - Hui Zhao
+  paperId: 2633934c41a3345416b26e6da642617e4eeba875
+  external_ids:
+    DOI: 10.1088/2631-8695/ae6e1c
+    CorpusId: 289579829
+- title: 'Human Decision-Making and Editing Behavior in AI-Supported Translation: Evidence from EFL Student
+    Translators'
+  year: 2026
+  authors:
+  - Truong Sa Nguyen
+  - P. Le
+  - Nhat Sinh Vo
+  - T. Le
+  - N. Nguyen
+  paperId: 3e4530533799d794fe47c5b077928301fe4a422a
+  external_ids:
+    DOI: 10.54855/callej.262726
+    CorpusId: 289646140
+- title: 'Evaluating TabPFN: a transformer-based foundation model for explainable health insurance claim
+    prediction'
+  year: 2026
+  authors:
+  - Mazen Shawosh
+  - Haseeb Nisar
+  - Saleh Alwahaishi
+  paperId: 1dc5b3924b2eded75661b74129e73cfa5649f1fa
+  external_ids:
+    PubMedCentral: '13352762'
+    DOI: 10.3389/fpubh.2026.1880390
+    CorpusId: 289636544
+    PubMed: '42433402'
+- title: 'DnA: Denoising Attention for Visual Tasks'
+  year: 2026
+  authors:
+  - R. Campos
+  - Subhajit Maity
+  - Xin Li
+  - Srijan Das
+  - Aritra Dutta
+  paperId: 7a3db57ed138532e3fe55bfac07cfa144d539525
+  external_ids:
+    ArXiv: '2606.27372'
+    CorpusId: 289629604
+- title: Advancing enterprise credit rating through multi-head self-attention and transfer learning
+  year: 2026
+  authors:
+  - Rui Zhang
+  - Qing Li
+  - Jiangchuan Chen
+  - Jie Li
+  - R. Sakdanuphab
+  - Hualin Li
+  paperId: 2ddecb27f21ae412f21719c2dd4679a049e57434
+  external_ids:
+    DOI: 10.7717/peerj-cs.3920
+    CorpusId: 289562345
+- title: 'LARGE LANGUAGE MODELS AND SMALL LANGUAGE MODELS: ARCHITECTURE, EFFICIENCY, AND EMERGING APPLICATIONS'
+  year: 2026
+  authors:
+  - Ashoka S B
+  - E. Prasad
+  - Priya Vinod
+  paperId: ef41f1399688f2a4898070ab5a7dfb1af4259a78
+  external_ids:
+    DOI: 10.36948/ijfmr.2026.v08i03.82103
+    CorpusId: 289565032
+- title: What's in an Earth Embedding? An Explainability Analysis of Location Encoders
+  year: 2026
+  authors:
+  - Livia Betti
+  - Sebastian Ricke
+  - Ivica Obadic
+  - Adam J. Stewart
+  - Esther Rolf
+  paperId: c18a7f637067a83b9bd3b2182f07f9f988530a48
+  external_ids:
+    ArXiv: '2606.24997'
+    CorpusId: 289630036

@@ -1,0 +1,557 @@
+paper_slug: '1810.04805'
+title: 'BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding'
+generated_at: '2026-07-16T11:45:28+00:00'
+parse_method: claude-cli
+references_parsed: 62
+references:
+- raw: Alan Akbik, Duncan Blythe, Roland Vollgraf. 2018. Contextual string embeddings for sequence labeling.
+  title: Contextual string embeddings for sequence labeling
+  authors:
+  - Alan Akbik
+  - Duncan Blythe
+  - Roland Vollgraf
+  year: 2018
+- raw: Kevin Clark, Minh-Thang Luong, Christopher D Manning, Quoc Le. 2018. Semi-supervised sequence modeling
+    with cross-view training.
+  title: Semi-supervised sequence modeling with cross-view training
+  authors:
+  - Kevin Clark
+  - Minh-Thang Luong
+  - Christopher D Manning
+  - Quoc Le
+  year: 2018
+- raw: Rami Al-Rfou, Dokook Choe, Noah Constant, Mandy Guo, Llion Jones. 2018. Character-level language
+    modeling with deeper self-attention.
+  title: Character-level language modeling with deeper self-attention
+  authors:
+  - Rami Al-Rfou
+  - Dokook Choe
+  - Noah Constant
+  - Mandy Guo
+  - Llion Jones
+  year: 2018
+- raw: 'Ronan Collobert, Jason Weston. 2008. A unified architecture for natural language processing: Deep
+    neural networks with multitask learning.'
+  title: 'A unified architecture for natural language processing: Deep neural networks with multitask
+    learning'
+  authors:
+  - Ronan Collobert
+  - Jason Weston
+  year: 2008
+- raw: Rie Kubota Ando, Tong Zhang. 2005. A framework for learning predictive structures from multiple
+    tasks and unlabeled data.
+  title: A framework for learning predictive structures from multiple tasks and unlabeled data
+  authors:
+  - Rie Kubota Ando
+  - Tong Zhang
+  year: 2005
+- raw: Alexis Conneau, Douwe Kiela, Holger Schwenk, Loïc Barrault, Antoine Bordes. 2017. Supervised learning
+    of universal sentence representations from natural language inference data.
+  title: Supervised learning of universal sentence representations from natural language inference data
+  authors:
+  - Alexis Conneau
+  - Douwe Kiela
+  - Holger Schwenk
+  - Loïc Barrault
+  - Antoine Bordes
+  year: 2017
+- raw: Luisa Bentivogli, Bernardo Magnini, Ido Dagan, Hoa Trang Dang, Danilo Giampiccolo. 2009. The fifth...
+    (title cut off)
+  title: null
+  authors:
+  - Luisa Bentivogli
+  - Bernardo Magnini
+  - Ido Dagan
+  - Hoa Trang Dang
+  - Danilo Giampiccolo
+  year: 2009
+- raw: AndrewMDaiandQuocVLe. 2015. Semi-supervised sequence learning. In Advances in neural information
+    processing systems, pages 3079–3087.
+  title: Semi-supervised sequence learning
+  authors:
+  - Andrew M Dai
+  - Quoc V Le
+  year: 2015
+- raw: John Blitzer, Ryan McDonald, and Fernando Pereira. 2006. Domain adaptation with structural correspondence
+    learning. In Proceedings of the 2006 conference on empirical methods in natural language processing,
+    pages 120–128. Association for Computational Linguistics.
+  title: Domain adaptation with structural correspondence learning
+  authors:
+  - John Blitzer
+  - Ryan McDonald
+  - Fernando Pereira
+  year: 2006
+- raw: 'J. Deng, W. Dong, R. Socher, L.-J. Li, K. Li, and L. Fei-Fei. 2009. ImageNet: A Large-Scale Hierarchical
+    Image Database. In CVPR09.'
+  title: 'ImageNet: A Large-Scale Hierarchical Image Database'
+  authors:
+  - J. Deng
+  - W. Dong
+  - R. Socher
+  - L.-J. Li
+  - K. Li
+  - L. Fei-Fei
+  year: 2009
+- raw: William B Dolan and Chris Brockett. 2005. Automatically constructing a corpus of sentential paraphrases.
+    In Proceedings of the Third International Workshop on Paraphrasing (IWP2005).
+  title: Automatically constructing a corpus of sentential paraphrases
+  authors:
+  - William B Dolan
+  - Chris Brockett
+  year: 2005
+- raw: Samuel R. Bowman, Gabor Angeli, Christopher Potts, and Christopher D. Manning. 2015. A large annotated
+    corpus for learning natural language inference. In EMNLP. Association for Computational Linguistics.
+  title: A large annotated corpus for learning natural language inference
+  authors:
+  - Samuel R. Bowman
+  - Gabor Angeli
+  - Christopher Potts
+  - Christopher D. Manning
+  year: 2015
+- raw: 'William Fedus, Ian Goodfellow, and Andrew M Dai. 2018. Maskgan: Better text generation via filling
+    in the . arXiv preprint arXiv:1801.07736.'
+  title: 'Maskgan: Better text generation via filling in the'
+  authors:
+  - William Fedus
+  - Ian Goodfellow
+  - Andrew M Dai
+  year: 2018
+- raw: Peter F Brown, Peter V Desouza, Robert L Mercer, Vincent J Della Pietra, and Jenifer C Lai. 1992.
+    Class-based n-gram models of natural language. Computational linguistics, 18(4):467–479.
+  title: Class-based n-gram models of natural language
+  authors:
+  - Peter F Brown
+  - Peter V Desouza
+  - Robert L Mercer
+  - Vincent J Della Pietra
+  - Jenifer C Lai
+  year: 1992
+- raw: Dan Hendrycks and Kevin Gimpel. 2016. Bridging nonlinearities and stochastic regularizers with
+    gaussian error linear units. CoRR, abs/1606.08415.
+  title: Bridging nonlinearities and stochastic regularizers with gaussian error linear units
+  authors:
+  - Dan Hendrycks
+  - Kevin Gimpel
+  year: 2016
+- raw: 'Daniel Cer, Mona Diab, Eneko Agirre, Inigo Lopez-Gazpio, and Lucia Specia. 2017. Semeval-2017
+    task1: Semantic ... FelixHill, KyunghyunCho, and Anna Korhonen. 2016. Learning distributed representations
+    of sentences'
+  title: 'Semeval-2017 task 1: Semantic textual similarity'
+  authors:
+  - Daniel Cer
+  - Mona Diab
+  - Eneko Agirre
+  - Inigo Lopez-Gazpio
+  - Lucia Specia
+  year: 2017
+- raw: Textual similarity multilingual and crosslingual focused evaluation. SemEval-2017, Vancouver, Canada.
+    ACL.
+  title: 'SemEval-2017 Task: Textual Similarity Multilingual and Crosslingual Focused Evaluation'
+  authors: []
+  year: 2017
+- raw: Jeremy Howard and Sebastian Ruder. 2018. Universal language model fine-tuning for text classification.
+    In ACL.
+  title: Universal Language Model Fine-tuning for Text Classification
+  authors:
+  - Jeremy Howard
+  - Sebastian Ruder
+  year: 2018
+- raw: Ciprian Chelba, Tomas Mikolov, Mike Schuster, Qi Ge, Thorsten Brants, Phillipp Koehn, and Tony
+    Robinson. 2013. One billion word benchmark for measuring progress in statistical language modeling.
+    arXiv:1312.3005.
+  title: One Billion Word Benchmark for Measuring Progress in Statistical Language Modeling
+  authors:
+  - Ciprian Chelba
+  - Tomas Mikolov
+  - Mike Schuster
+  - Qi Ge
+  - Thorsten Brants
+  - Phillipp Koehn
+  - Tony Robinson
+  year: 2013
+- raw: Minghao Hu, Yuxing Peng, Zhen Huang, Xipeng Qiu, Furu Wei, and Ming Zhou. 2018. Reinforced mnemonic
+    reader for machine reading comprehension. In IJCAI.
+  title: Reinforced Mnemonic Reader for Machine Reading Comprehension
+  authors:
+  - Minghao Hu
+  - Yuxing Peng
+  - Zhen Huang
+  - Xipeng Qiu
+  - Furu Wei
+  - Ming Zhou
+  year: 2018
+- raw: Z. Chen, H. Zhang, X. Zhang, and L. Zhao. 2018. Quora question pairs.
+  title: Quora Question Pairs
+  authors:
+  - Z. Chen
+  - H. Zhang
+  - X. Zhang
+  - L. Zhao
+  year: 2018
+- raw: Yacine Jernite, Samuel R. Bowman, and David Sontag. 2017. Discourse-based objectives for fast unsupervised
+    sentence representation learning. CoRR, abs/1705.00557.
+  title: Discourse-Based Objectives for Fast Unsupervised Sentence Representation Learning
+  authors:
+  - Yacine Jernite
+  - Samuel R. Bowman
+  - David Sontag
+  year: 2017
+- raw: Christopher Clark and Matt Gardner. 2018. Simple and effective multi-paragraph reading comprehension.
+    In ACL.
+  title: Simple and Effective Multi-Paragraph Reading Comprehension
+  authors:
+  - Christopher Clark
+  - Matt Gardner
+  year: 2018
+- raw: 'Mandar Joshi, Eunsol Choi, Daniel S Weld, Luke Zettlemoyer. 2017. Triviaqa: A large scale distantly
+    supervised challenge dataset for reading comprehension. ACL.'
+  title: 'Triviaqa: A large scale distantly supervised challenge dataset for reading comprehension'
+  authors:
+  - Mandar Joshi
+  - Eunsol Choi
+  - Daniel S Weld
+  - Luke Zettlemoyer
+  year: 2017
+- raw: 'Matthew Peters, Mark Neumann, Luke Zettlemoyer, Wen-tau Yih. 2018. Dissecting contextual word
+    embeddings: Architecture and representation. EMNLP 2018, pages 1499-1509.'
+  title: 'Dissecting contextual word embeddings: Architecture and representation'
+  authors:
+  - Matthew Peters
+  - Mark Neumann
+  - Luke Zettlemoyer
+  - Wen-tau Yih
+  year: 2018
+- raw: Ryan Kiros, Yukun Zhu, Ruslan R Salakhutdinov, Richard Zemel, Raquel Urtasun, Antonio Torralba,
+    Sanja Fidler. 2015. Skip-thought vectors. Advances in neural information processing systems, pages
+    3294-3302.
+  title: Skip-thought vectors
+  authors:
+  - Ryan Kiros
+  - Yukun Zhu
+  - Ruslan R Salakhutdinov
+  - Richard Zemel
+  - Raquel Urtasun
+  - Antonio Torralba
+  - Sanja Fidler
+  year: 2015
+- raw: Alec Radford, Karthik Narasimhan, Tim Salimans, Ilya Sutskever. 2018. Improving language understanding
+    with unsupervised learning. Technical report, OpenAI.
+  title: Improving language understanding with unsupervised learning
+  authors:
+  - Alec Radford
+  - Karthik Narasimhan
+  - Tim Salimans
+  - Ilya Sutskever
+  year: 2018
+- raw: Quoc Le, Tomas Mikolov. 2014. Distributed representations of sentences and documents. International
+    Conference on Machine Learning, pages 1188-1196.
+  title: Distributed representations of sentences and documents
+  authors:
+  - Quoc Le
+  - Tomas Mikolov
+  year: 2014
+- raw: 'Pranav Rajpurkar, Jian Zhang, Konstantin Lopyrev, Percy Liang. 2016. Squad: 100,000+ questions
+    for machine comprehension of text. EMNLP 2016, pages 2383-2392.'
+  title: 'Squad: 100,000+ questions for machine comprehension of text'
+  authors:
+  - Pranav Rajpurkar
+  - Jian Zhang
+  - Konstantin Lopyrev
+  - Percy Liang
+  year: 2016
+- raw: 'Hector J Levesque, Ernest Davis, Leora Morgenstern. 2011. The winograd schema challenge. Aaai
+    spring symposium: Logical formalizations of commonsense reasoning, volume 46, page 47.'
+  title: The winograd schema challenge
+  authors:
+  - Hector J Levesque
+  - Ernest Davis
+  - Leora Morgenstern
+  year: 2011
+- raw: Minjoon Seo, Aniruddha Kembhavi, Ali Farhadi, Hannaneh Hajishirzi. 2017. Bidirectional attention
+    flow for machine comprehension. ICLR.
+  title: Bidirectional attention flow for machine comprehension
+  authors:
+  - Minjoon Seo
+  - Aniruddha Kembhavi
+  - Ali Farhadi
+  - Hannaneh Hajishirzi
+  year: 2017
+- raw: Lajanugen Logeswaran, Honglak Lee. 2018. An efficient framework for learning sentence representations.
+    International Conference on Learning Representations.
+  title: An efficient framework for learning sentence representations
+  authors:
+  - Lajanugen Logeswaran
+  - Honglak Lee
+  year: 2018
+- raw: Richard Socher, Alex Perelygin, Jean Wu, Jason Chuang, Christopher D Manning, Andrew Ng, Christopher
+    Potts. 2013. Recursive deep models...
+  title: null
+  authors:
+  - Richard Socher
+  - Alex Perelygin
+  - Jean Wu
+  - Jason Chuang
+  - Christopher D Manning
+  - Andrew Ng
+  - Christopher Potts
+  year: 2013
+- raw: 'Bryan McCann, James Bradbury, Caiming Xiong, Richard Socher. 2017. Learned in translation: Contextualized
+    word vectors. In NIPS.'
+  title: 'Learned in translation: Contextualized word vectors'
+  authors:
+  - Bryan McCann
+  - James Bradbury
+  - Caiming Xiong
+  - Richard Socher
+  year: 2017
+- raw: 'Oren Melamud, Jacob Goldberger, Ido Dagan. 2016. context2vec: Learning generic context embedding
+    with bidirectional LSTM. In CoNLL.'
+  title: 'context2vec: Learning generic context embedding with bidirectional LSTM'
+  authors:
+  - Oren Melamud
+  - Jacob Goldberger
+  - Ido Dagan
+  year: 2016
+- raw: 'Fu Sun, Linyang Li, Xipeng Qiu, Yang Liu. 2018. U-net: Machine reading comprehension with unanswerable
+    questions. arXiv preprint arXiv:1810.06638.'
+  title: 'U-net: Machine reading comprehension with unanswerable questions'
+  authors:
+  - Fu Sun
+  - Linyang Li
+  - Xipeng Qiu
+  - Yang Liu
+  year: 2018
+- raw: Tomas Mikolov, Ilya Sutskever, Kai Chen, Greg S Corrado, Jeff Dean. 2013. Distributed representations
+    of words and phrases and their compositionality. In Advances in Neural Information Processing Systems
+    26, pages 3111-3119. Curran Associates, Inc.
+  title: Distributed representations of words and phrases and their compositionality
+  authors:
+  - Tomas Mikolov
+  - Ilya Sutskever
+  - Kai Chen
+  - Greg S Corrado
+  - Jeff Dean
+  year: 2013
+- raw: 'Wilson L Taylor. 1953. Cloze procedure: A new tool for measuring readability. Journalism Bulletin,
+    30(4):415-433.'
+  title: 'Cloze procedure: A new tool for measuring readability'
+  authors:
+  - Wilson L Taylor
+  year: 1953
+- raw: Erik F Tjong Kim Sang and Fien De Meulder. 2003. Introduction to the conll-2003 shared task.
+  title: Introduction to the conll-2003 shared task
+  authors:
+  - Erik F Tjong Kim Sang
+  - Fien De Meulder
+  year: 2003
+- raw: Language-independent named entity recognition. In CoNLL.
+  title: Language-independent named entity recognition
+  authors: []
+  year: null
+- raw: '...a scalable hierarchical distributed language model. In CoNLL.'
+  title: A scalable hierarchical distributed language model
+  authors: []
+  year: null
+- raw: D. Koller, D. Schuurmans, Y. Bengio, and L. Bottou, editors, Advances in Neural Information Processing
+    Systems 21, pages 1081-1088. Curran Associates, Inc.
+  title: Advances in Neural Information Processing Systems 21
+  authors:
+  - D. Koller
+  - D. Schuurmans
+  - Y. Bengio
+  - L. Bottou
+  year: null
+- raw: 'Joseph Turian, Lev Ratinov, and Yoshua Bengio. 2010. Word representations: A simple and general
+    method for semi-supervised learning. In ACL''10, pages 384-394.'
+  title: 'Word representations: A simple and general method for semi-supervised learning'
+  authors:
+  - Joseph Turian
+  - Lev Ratinov
+  - Yoshua Bengio
+  year: 2010
+- raw: Ankur P Parikh, Oscar Täckström, Dipanjan Das, and Jakob Uszkoreit. 2016. A decomposable attention
+    model for natural language inference. In EMNLP.
+  title: A decomposable attention model for natural language inference
+  authors:
+  - Ankur P Parikh
+  - Oscar Täckström
+  - Dipanjan Das
+  - Jakob Uszkoreit
+  year: 2016
+- raw: 'Jeffrey Pennington, Richard Socher, and Christopher D. Manning. 2014. Glove: Global vectors for
+    word representation. In EMNLP, pages 1532-1543.'
+  title: 'Glove: Global vectors for word representation'
+  authors:
+  - Jeffrey Pennington
+  - Richard Socher
+  - Christopher D. Manning
+  year: 2014
+- raw: Matthew Peters, Waleed Ammar, Chandra Bhagavatula, and Russell Power. 2017. Semi-supervised sequence
+    tagging with bidirectional language models. In ACL.
+  title: Semi-supervised sequence tagging with bidirectional language models
+  authors:
+  - Matthew Peters
+  - Waleed Ammar
+  - Chandra Bhagavatula
+  - Russell Power
+  year: 2017
+- raw: Matthew Peters, Mark Neumann, Mohit Iyyer, Matt Gardner, Christopher Clark, Kenton Lee, and Luke
+    Zettlemoyer. 2018a. Deep contextualized word representations. In NAACL.
+  title: Deep contextualized word representations
+  authors:
+  - Matthew Peters
+  - Mark Neumann
+  - Mohit Iyyer
+  - Matt Gardner
+  - Christopher Clark
+  - Kenton Lee
+  - Luke Zettlemoyer
+  year: 2018
+- raw: Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N Gomez, Lukasz
+    Kaiser, and Illia Polosukhin. 2017. Attention is all you need. In NeurIPS, pages 6000-6010.
+  title: Attention is all you need
+  authors:
+  - Ashish Vaswani
+  - Noam Shazeer
+  - Niki Parmar
+  - Jakob Uszkoreit
+  - Llion Jones
+  - Aidan N Gomez
+  - Lukasz Kaiser
+  - Illia Polosukhin
+  year: 2017
+- raw: Pascal Vincent, Hugo Larochelle, Yoshua Bengio, and Pierre-Antoine Manzagol. 2008. Extracting and
+    composing robust features with denoising autoencoders. In ICML, pages 1096-1103. ACM.
+  title: Extracting and composing robust features with denoising autoencoders
+  authors:
+  - Pascal Vincent
+  - Hugo Larochelle
+  - Yoshua Bengio
+  - Pierre-Antoine Manzagol
+  year: 2008
+- raw: 'Alex Wang, Amanpreet Singh, Julian Michael, Felix Hill, Omer Levy, and Samuel Bowman. 2018a. Glue:
+    A multi-task benchmark and analysis platform...'
+  title: 'Glue: A multi-task benchmark and analysis platform for natural language understanding'
+  authors:
+  - Alex Wang
+  - Amanpreet Singh
+  - Julian Michael
+  - Felix Hill
+  - Omer Levy
+  - Samuel Bowman
+  year: 2018
+- raw: Wei Wang, Ming Yan, Chen Wu. 2018. Multi-granularity hierarchical attention fusion networks for
+    reading comprehension and question answering. ACL 2018.
+  title: Multi-granularity hierarchical attention fusion networks for reading comprehension and question
+    answering
+  authors:
+  - Wei Wang
+  - Ming Yan
+  - Chen Wu
+  year: 2018
+- raw: Alex Warstadt, Amanpreet Singh, Samuel R Bowman. 2018. Neural network acceptability judgments.
+    arXiv:1805.12471.
+  title: Neural network acceptability judgments
+  authors:
+  - Alex Warstadt
+  - Amanpreet Singh
+  - Samuel R Bowman
+  year: 2018
+- raw: Adina Williams, Nikita Nangia, Samuel R Bowman. 2018. A broad-coverage challenge corpus for sentence
+    understanding through inference. NAACL.
+  title: A broad-coverage challenge corpus for sentence understanding through inference
+  authors:
+  - Adina Williams
+  - Nikita Nangia
+  - Samuel R Bowman
+  year: 2018
+- raw: 'Yonghui Wu, Mike Schuster, Zhifeng Chen, Quoc V Le, Mohammad Norouzi, Wolfgang Macherey, Maxim
+    Krikun, Yuan Cao, Qin Gao, Klaus Macherey, et al. 2016. Google''s neural machine translation system:
+    Bridging the gap between human and machine translation. arXiv:1609.08144.'
+  title: 'Google''s neural machine translation system: Bridging the gap between human and machine translation'
+  authors:
+  - Yonghui Wu
+  - Mike Schuster
+  - Zhifeng Chen
+  - Quoc V Le
+  - Mohammad Norouzi
+  - Wolfgang Macherey
+  - Maxim Krikun
+  - Yuan Cao
+  - Qin Gao
+  - Klaus Macherey
+  year: 2016
+- raw: Jason Yosinski, Jeff Clune, Yoshua Bengio, Hod Lipson. 2014. How transferable are features in deep
+    neural networks? Advances in neural information processing systems, pages 3320-3328.
+  title: How transferable are features in deep neural networks?
+  authors:
+  - Jason Yosinski
+  - Jeff Clune
+  - Yoshua Bengio
+  - Hod Lipson
+  year: 2014
+- raw: 'Adams Wei Yu, David Dohan, Minh-Thang Luong, Rui Zhao, Kai Chen, Mohammad Norouzi, Quoc V Le.
+    2018. QANet: Combining local convolution with global self-attention for reading comprehension. ICLR.'
+  title: 'QANet: Combining local convolution with global self-attention for reading comprehension'
+  authors:
+  - Adams Wei Yu
+  - David Dohan
+  - Minh-Thang Luong
+  - Rui Zhao
+  - Kai Chen
+  - Mohammad Norouzi
+  - Quoc V Le
+  year: 2018
+- raw: 'Rowan Zellers, Yonatan Bisk, Roy Schwartz, Yejin Choi. 2018. Swag: A large-scale adversarial dataset
+    for grounded commonsense inference. EMNLP 2018.'
+  title: 'Swag: A large-scale adversarial dataset for grounded commonsense inference'
+  authors:
+  - Rowan Zellers
+  - Yonatan Bisk
+  - Roy Schwartz
+  - Yejin Choi
+  year: 2018
+- raw: 'Yukun Zhu, Ryan Kiros, Rich Zemel, Ruslan Salakhutdinov, Raquel Urtasun, Antonio Torralba, Sanja
+    Fidler. 2015. Aligning books and movies: Towards story-like visual explanations by watching movies
+    and reading books. ICCV, pages 19-27.'
+  title: 'Aligning books and movies: Towards story-like visual explanations by watching movies and reading
+    books'
+  authors:
+  - Yukun Zhu
+  - Ryan Kiros
+  - Rich Zemel
+  - Ruslan Salakhutdinov
+  - Raquel Urtasun
+  - Antonio Torralba
+  - Sanja Fidler
+  year: 2015
+- raw: Hendrycks and Gimpel, gelu activation paper, 2016
+  title: null
+  authors:
+  - Hendrycks
+  - Gimpel
+  year: 2016
+- raw: Wang et al. (2018a) - GLUE benchmark
+  title: GLUE benchmark
+  authors:
+  - Wang
+  year: 2018
+- raw: Williams et al. (2018) - MNLI
+  title: null
+  authors:
+  - Williams
+  year: 2018
+- raw: Chen et al. (2018) - QQP
+  title: null
+  authors:
+  - Chen
+  year: 2018
+cites:
+- slug: '1706.03762'
+  title: Attention Is All You Need
+  confidence: high
+semantic_scholar:
+  lookup_status: skipped
+  paper_id: null
+  matched_title: null
+cited_by_external: []

@@ -1,0 +1,355 @@
+paper_slug: '1706.03762'
+title: Attention Is All You Need
+generated_at: '2026-07-16T11:48:53+00:00'
+parse_method: claude-cli
+references_parsed: 40
+references:
+- raw: Jimmy Lei Ba, Jamie Ryan Kiros, Geoffrey E Hinton - Layer normalization
+  title: Layer normalization
+  authors:
+  - Jimmy Lei Ba
+  - Jamie Ryan Kiros
+  - Geoffrey E Hinton
+  year: 2016
+- raw: Dzmitry Bahdanau, Kyunghyun Cho, Yoshua Bengio - Neural machine translation by jointly learning
+    to align and translate
+  title: Neural machine translation by jointly learning to align and translate
+  authors:
+  - Dzmitry Bahdanau
+  - Kyunghyun Cho
+  - Yoshua Bengio
+  year: 2014
+- raw: Denny Britz, Anna Goldie, Minh-Thang Luong, Quoc V. Le - Massive exploration of neural machine
+    translation architectures
+  title: Massive exploration of neural machine translation architectures
+  authors:
+  - Denny Britz
+  - Anna Goldie
+  - Minh-Thang Luong
+  - Quoc V. Le
+  year: 2017
+- raw: Jianpeng Cheng, Li Dong, Mirella Lapata - Long short-term memory-networks for machine reading
+  title: Long short-term memory-networks for machine reading
+  authors:
+  - Jianpeng Cheng
+  - Li Dong
+  - Mirella Lapata
+  year: 2016
+- raw: Kyunghyun Cho, Bart van Merrienboer, Caglar Gulcehre, Fethi Bougares, Holger Schwenk, Yoshua Bengio
+    - Learning phrase representations using rnn encoder-decoder for statistical machine translation
+  title: Learning phrase representations using rnn encoder-decoder for statistical machine translation
+  authors:
+  - Kyunghyun Cho
+  - Bart van Merrienboer
+  - Caglar Gulcehre
+  - Fethi Bougares
+  - Holger Schwenk
+  - Yoshua Bengio
+  year: 2014
+- raw: 'Francois Chollet - Xception: Deep learning with depthwise separable convolutions'
+  title: 'Xception: Deep learning with depthwise separable convolutions'
+  authors:
+  - Francois Chollet
+  year: 2016
+- raw: Junyoung Chung, Çaglar Gülçehre, Kyunghyun Cho, Yoshua Bengio - Empirical evaluation of gated recurrent
+    neural networks on sequence modeling
+  title: Empirical evaluation of gated recurrent neural networks on sequence modeling
+  authors:
+  - Junyoung Chung
+  - Çaglar Gülçehre
+  - Kyunghyun Cho
+  - Yoshua Bengio
+  year: 2014
+- raw: Chris Dyer, Adhiguna Kuncoro, Miguel Ballesteros, Noah A. Smith - Recurrent neural network grammars
+  title: Recurrent neural network grammars
+  authors:
+  - Chris Dyer
+  - Adhiguna Kuncoro
+  - Miguel Ballesteros
+  - Noah A. Smith
+  year: 2016
+- raw: Jonas Gehring, Michael Auli, David Grangier, Denis Yarats, Yann N. Dauphin - Convolutional sequence
+    to sequence learning
+  title: Convolutional sequence to sequence learning
+  authors:
+  - Jonas Gehring
+  - Michael Auli
+  - David Grangier
+  - Denis Yarats
+  - Yann N. Dauphin
+  year: 2017
+- raw: Alex Graves - Generating sequences with recurrent neural networks
+  title: Generating sequences with recurrent neural networks
+  authors:
+  - Alex Graves
+  year: 2013
+- raw: Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun - Deep residual learning for image recognition
+  title: Deep residual learning for image recognition
+  authors:
+  - Kaiming He
+  - Xiangyu Zhang
+  - Shaoqing Ren
+  - Jian Sun
+  year: 2016
+- raw: 'Sepp Hochreiter, Yoshua Bengio, Paolo Frasconi, Jürgen Schmidhuber - Gradient flow in recurrent
+    nets: the difficulty of learning long-term dependencies'
+  title: 'Gradient flow in recurrent nets: the difficulty of learning long-term dependencies'
+  authors:
+  - Sepp Hochreiter
+  - Yoshua Bengio
+  - Paolo Frasconi
+  - Jürgen Schmidhuber
+  year: 2001
+- raw: Sepp Hochreiter, Jürgen Schmidhuber - Long short-term memory
+  title: Long short-term memory
+  authors:
+  - Sepp Hochreiter
+  - Jürgen Schmidhuber
+  year: 1997
+- raw: Zhongqiang Huang, Mary Harper - Self-training PCFG grammars with latent annotations across languages
+  title: Self-training PCFG grammars with latent annotations across languages
+  authors:
+  - Zhongqiang Huang
+  - Mary Harper
+  year: 2009
+- raw: Rafal Jozefowicz, Oriol Vinyals, Mike Schuster, Noam Shazeer, Yonghui Wu - Exploring the limits
+    of language modeling
+  title: Exploring the limits of language modeling
+  authors:
+  - Rafal Jozefowicz
+  - Oriol Vinyals
+  - Mike Schuster
+  - Noam Shazeer
+  - Yonghui Wu
+  year: 2016
+- raw: Łukasz Kaiser, Samy Bengio - Can active memory replace attention?
+  title: Can active memory replace attention?
+  authors:
+  - Łukasz Kaiser
+  - Samy Bengio
+  year: 2016
+- raw: Łukasz Kaiser, Ilya Sutskever - Neural GPUs learn algorithms
+  title: Neural GPUs learn algorithms
+  authors:
+  - Łukasz Kaiser
+  - Ilya Sutskever
+  year: 2016
+- raw: Nal Kalchbrenner, Lasse Espeholt, Karen Simonyan, Aaron van den Oord, Alex Graves, Koray Kavukcuoglu
+    - Neural machine translation in linear time
+  title: Neural machine translation in linear time
+  authors:
+  - Nal Kalchbrenner
+  - Lasse Espeholt
+  - Karen Simonyan
+  - Aaron van den Oord
+  - Alex Graves
+  - Koray Kavukcuoglu
+  year: 2017
+- raw: Yoon Kim, Carl Denton, Luong Hoang, Alexander M. Rush - Structured attention networks
+  title: Structured attention networks
+  authors:
+  - Yoon Kim
+  - Carl Denton
+  - Luong Hoang
+  - Alexander M. Rush
+  year: 2017
+- raw: 'Diederik Kingma, Jimmy Ba - Adam: A method for stochastic optimization'
+  title: 'Adam: A method for stochastic optimization'
+  authors:
+  - Diederik Kingma
+  - Jimmy Ba
+  year: 2015
+- raw: Oleksii Kuchaiev, Boris Ginsburg - Factorization tricks for LSTM networks
+  title: Factorization tricks for LSTM networks
+  authors:
+  - Oleksii Kuchaiev
+  - Boris Ginsburg
+  year: 2017
+- raw: Zhouhan Lin, Minwei Feng, Cicero Nogueira dos Santos, Mo Yu, Bing Xiang, Bowen Zhou, Yoshua Bengio
+    - A structured self-attentive sentence embedding
+  title: A structured self-attentive sentence embedding
+  authors:
+  - Zhouhan Lin
+  - Minwei Feng
+  - Cicero Nogueira dos Santos
+  - Mo Yu
+  - Bing Xiang
+  - Bowen Zhou
+  - Yoshua Bengio
+  year: 2017
+- raw: Minh-Thang Luong, Quoc V. Le, Ilya Sutskever, Oriol Vinyals, Lukasz Kaiser - Multi-task sequence
+    to sequence learning
+  title: Multi-task sequence to sequence learning
+  authors:
+  - Minh-Thang Luong
+  - Quoc V. Le
+  - Ilya Sutskever
+  - Oriol Vinyals
+  - Lukasz Kaiser
+  year: 2015
+- raw: Minh-Thang Luong, Hieu Pham, Christopher D Manning - Effective approaches to attention-based neural
+    machine translation
+  title: Effective approaches to attention-based neural machine translation
+  authors:
+  - Minh-Thang Luong
+  - Hieu Pham
+  - Christopher D Manning
+  year: 2015
+- raw: 'Mitchell P Marcus, Mary Ann Marcinkiewicz, Beatrice Santorini - Building a large annotated corpus
+    of english: the penn treebank'
+  title: 'Building a large annotated corpus of english: the penn treebank'
+  authors:
+  - Mitchell P Marcus
+  - Mary Ann Marcinkiewicz
+  - Beatrice Santorini
+  year: 1993
+- raw: David McClosky, Eugene Charniak, Mark Johnson - Effective self-training for parsing
+  title: Effective self-training for parsing
+  authors:
+  - David McClosky
+  - Eugene Charniak
+  - Mark Johnson
+  year: 2006
+- raw: Ankur Parikh, Oscar Täckström, Dipanjan Das, Jakob Uszkoreit - A decomposable attention model
+  title: A decomposable attention model
+  authors:
+  - Ankur Parikh
+  - Oscar Täckström
+  - Dipanjan Das
+  - Jakob Uszkoreit
+  year: 2016
+- raw: Romain Paulus, Caiming Xiong, Richard Socher - A deep reinforced model for abstractive summarization
+  title: A deep reinforced model for abstractive summarization
+  authors:
+  - Romain Paulus
+  - Caiming Xiong
+  - Richard Socher
+  year: 2017
+- raw: Slav Petrov, Leon Barrett, Romain Thibaux, Dan Klein - Learning accurate, compact, and interpretable
+    tree annotation
+  title: Learning accurate, compact, and interpretable tree annotation
+  authors:
+  - Slav Petrov
+  - Leon Barrett
+  - Romain Thibaux
+  - Dan Klein
+  year: 2006
+- raw: Ofir Press, Lior Wolf - Using the output embedding to improve language models
+  title: Using the output embedding to improve language models
+  authors:
+  - Ofir Press
+  - Lior Wolf
+  year: 2016
+- raw: Rico Sennrich, Barry Haddow, Alexandra Birch - Neural machine translation of rare words with subword
+    units
+  title: Neural machine translation of rare words with subword units
+  authors:
+  - Rico Sennrich
+  - Barry Haddow
+  - Alexandra Birch
+  year: 2015
+- raw: 'Noam Shazeer, Azalia Mirhoseini, Krzysztof Maziarz, Andy Davis, Quoc Le, Geoffrey Hinton, Jeff
+    Dean - Outrageously large neural networks: the sparsely-gated mixture-of-experts layer'
+  title: 'Outrageously large neural networks: the sparsely-gated mixture-of-experts layer'
+  authors:
+  - Noam Shazeer
+  - Azalia Mirhoseini
+  - Krzysztof Maziarz
+  - Andy Davis
+  - Quoc Le
+  - Geoffrey Hinton
+  - Jeff Dean
+  year: 2017
+- raw: 'Nitish Srivastava, Geoffrey E Hinton, Alex Krizhevsky, Ilya Sutskever, Ruslan Salakhutdinov -
+    Dropout: a simple way to prevent neural networks from overfitting'
+  title: 'Dropout: a simple way to prevent neural networks from overfitting'
+  authors:
+  - Nitish Srivastava
+  - Geoffrey E Hinton
+  - Alex Krizhevsky
+  - Ilya Sutskever
+  - Ruslan Salakhutdinov
+  year: 2014
+- raw: Sainbayar Sukhbaatar, Arthur Szlam, Jason Weston, Rob Fergus - End-to-end memory networks
+  title: End-to-end memory networks
+  authors:
+  - Sainbayar Sukhbaatar
+  - Arthur Szlam
+  - Jason Weston
+  - Rob Fergus
+  year: 2015
+- raw: Ilya Sutskever, Oriol Vinyals, Quoc V V Le - Sequence to sequence learning with neural networks
+  title: Sequence to sequence learning with neural networks
+  authors:
+  - Ilya Sutskever
+  - Oriol Vinyals
+  - Quoc V V Le
+  year: 2014
+- raw: Christian Szegedy, Vincent Vanhoucke, Sergey Ioffe, Jonathon Shlens, Zbigniew Wojna - Rethinking
+    the inception architecture for computer vision
+  title: Rethinking the inception architecture for computer vision
+  authors:
+  - Christian Szegedy
+  - Vincent Vanhoucke
+  - Sergey Ioffe
+  - Jonathon Shlens
+  - Zbigniew Wojna
+  year: 2015
+- raw: Vinyals & Kaiser, Koo, Petrov, Sutskever, Hinton - Grammar as a foreign language
+  title: Grammar as a foreign language
+  authors:
+  - Vinyals
+  - Kaiser
+  - Koo
+  - Petrov
+  - Sutskever
+  - Hinton
+  year: 2015
+- raw: 'Yonghui Wu, Mike Schuster, Zhifeng Chen, Quoc V Le, Mohammad Norouzi, Wolfgang Macherey, Maxim
+    Krikun, Yuan Cao, Qin Gao, Klaus Macherey, et al - Google''s neural machine translation system: bridging
+    the gap between human and machine translation'
+  title: 'Google''s neural machine translation system: bridging the gap between human and machine translation'
+  authors:
+  - Yonghui Wu
+  - Mike Schuster
+  - Zhifeng Chen
+  - Quoc V Le
+  - Mohammad Norouzi
+  - Wolfgang Macherey
+  - Maxim Krikun
+  - Yuan Cao
+  - Qin Gao
+  - Klaus Macherey
+  year: 2016
+- raw: Jie Zhou, Ying Cao, Xuguang Wang, Peng Li, Wei Xu - Deep recurrent models with fast-forward connections
+    for neural machine translation
+  title: Deep recurrent models with fast-forward connections for neural machine translation
+  authors:
+  - Jie Zhou
+  - Ying Cao
+  - Xuguang Wang
+  - Peng Li
+  - Wei Xu
+  year: 2016
+- raw: Muhua Zhu, Yue Zhang, Wenliang Chen, Min Zhang, Jingbo Zhu - Fast and accurate shift-reduce constituent
+    parsing
+  title: Fast and accurate shift-reduce constituent parsing
+  authors:
+  - Muhua Zhu
+  - Yue Zhang
+  - Wenliang Chen
+  - Min Zhang
+  - Jingbo Zhu
+  year: 2013
+cites:
+- slug: '1409.0473'
+  title: Neural Machine Translation by Jointly Learning to Align and Translate
+  confidence: high
+- slug: '1512.03385'
+  title: Deep Residual Learning for Image Recognition
+  confidence: high
+semantic_scholar:
+  lookup_status: not_found
+  paper_id: null
+  matched_title: null
+cited_by_external: []

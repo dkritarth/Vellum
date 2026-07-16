@@ -1,0 +1,521 @@
+paper_slug: 10-1371-journal-pone-0130140
+title: On Pixel-Wise Explanations for Non-Linear Classifier Decisions by Layer-Wise Relevance Propagation
+generated_at: '2026-07-16T11:46:42+00:00'
+parse_method: claude-cli
+references_parsed: 60
+references:
+- raw: Fei-Fei L., Perona P. A Bayesian Hierarchical Model for Learning Natural Scene Categories. CVPR
+    2005
+  title: A Bayesian Hierarchical Model for Learning Natural Scene Categories
+  authors:
+  - Fei-Fei L.
+  - Perona P.
+  year: 2005
+- raw: 'Dahlkamp H, Kaehler A, Stavens D, Thrun S, Bradski GR. Self-supervised Monocular Road Detection
+    in Desert Terrain. Robotics: Science and Systems'
+  title: Self-supervised Monocular Road Detection in Desert Terrain
+  authors:
+  - Dahlkamp H
+  - Kaehler A
+  - Stavens D
+  - Thrun S
+  - Bradski GR
+  year: 2006
+- raw: Walker R, Jackway P, Lovell B, Longstaff D. Classification Of Cervical Cell Nuclei Using Morphological
+    Segmentation And Textural Feature Extraction. Australian New Zealand Conference on Intelligent Information
+    Systems
+  title: Classification Of Cervical Cell Nuclei Using Morphological Segmentation And Textural Feature
+    Extraction
+  authors:
+  - Walker R
+  - Jackway P
+  - Lovell B
+  - Longstaff D
+  year: 1994
+- raw: Hänsch R, Hellwich O. Object Recognition from Polarimetric SAR Images. Radar Remote Sensing of
+    Urban Areas
+  title: Object Recognition from Polarimetric SAR Images
+  authors:
+  - Hänsch R
+  - Hellwich O
+  year: 2010
+- raw: Viola PA, Jones MJ. Rapid Object Detection using a Boosted Cascade of Simple Features. CVPR
+  title: Rapid Object Detection using a Boosted Cascade of Simple Features
+  authors:
+  - Viola PA
+  - Jones MJ
+  year: 2001
+- raw: Bishop CM. Neural Networks for Pattern Recognition. Oxford University Press
+  title: Neural Networks for Pattern Recognition
+  authors:
+  - Bishop CM
+  year: 1995
+- raw: Csurka G, Dance CR, Fan L, Willamowski J, Bray C. Visual categorization with bags of keypoints.
+    ECCV Workshop on Statistical Learning in Computer Vision
+  title: Visual categorization with bags of keypoints
+  authors:
+  - Csurka G
+  - Dance CR
+  - Fan L
+  - Willamowski J
+  - Bray C
+  year: 2004
+- raw: Deng J, Berg A, Satheesh S, Su H, Khosla A, Fei-Fei L. The ImageNet Large Scale Visual Recognition
+    Challenge 2012 (ILSVRC2012)
+  title: The ImageNet Large Scale Visual Recognition Challenge 2012 (ILSVRC2012)
+  authors:
+  - Deng J
+  - Berg A
+  - Satheesh S
+  - Su H
+  - Khosla A
+  - Fei-Fei L.
+  year: 2012
+- raw: Everingham M, Van Gool L, Williams CKI, Winn J, Zisserman A. The PASCAL Visual Object Classes Challenge
+    2012 (VOC2012) Results
+  title: The PASCAL Visual Object Classes Challenge 2012 (VOC2012) Results
+  authors:
+  - Everingham M
+  - Van Gool L
+  - Williams CKI
+  - Winn J
+  - Zisserman A
+  year: null
+- raw: 'Müller H, Clough P, Deselaers T, Caputo B. ImageCLEF: Experimental Evaluation in Visual Information
+    Retrieval. The Information Retrieval Series'
+  title: 'ImageCLEF: Experimental Evaluation in Visual Information Retrieval'
+  authors:
+  - Müller H
+  - Clough P
+  - Deselaers T
+  - Caputo B
+  year: 2010
+- raw: Perronnin F, Sánchez J, Mensink T. Improving the Fisher Kernel for Large-Scale Image Classification.
+    ECCV(4)
+  title: Improving the Fisher Kernel for Large-Scale Image Classification
+  authors:
+  - Perronnin F
+  - Sánchez J
+  - Mensink T
+  year: 2010
+- raw: Yang J, Yu K, Gong Y, Huang TS. Linear spatial pyramid matching using sparse coding for image classification.
+    CVPR
+  title: Linear spatial pyramid matching using sparse coding for image classification
+  authors:
+  - Yang J
+  - Yu K
+  - Gong Y
+  - Huang TS
+  year: 2009
+- raw: Yu K, Zhang T, Gong Y. Nonlinear Learning using Local Coordinate Coding. NIPS
+  title: Nonlinear Learning using Local Coordinate Coding
+  authors:
+  - Yu K
+  - Zhang T
+  - Gong Y
+  year: 2009
+- raw: Wang J, Yang J, Yu K, Lv F, Huang TS, Gong Y. Locality-constrained Linear Coding for image classification.
+    CVPR
+  title: Locality-constrained Linear Coding for image classification
+  authors:
+  - Wang J
+  - Yang J
+  - Yu K
+  - Lv F
+  - Huang TS
+  - Gong Y
+  year: 2010
+- raw: van Gemert J, Veenman CJ, Smeulders AWM, Geusebroek JM. Visual Word Ambiguity. IEEE Trans Pattern
+    Anal Mach Intell
+  title: Visual Word Ambiguity
+  authors:
+  - van Gemert J
+  - Veenman CJ
+  - Smeulders AWM
+  - Geusebroek JM
+  year: 2010
+- raw: 'Montavon G, Orr GB, Müller KR, editors. Neural Networks: Tricks of the Trade, Reloaded. LNCS'
+  title: 'Neural Networks: Tricks of the Trade, Reloaded'
+  authors:
+  - Montavon G
+  - Orr GB
+  - Müller KR
+  year: 2012
+- raw: Baehrens D, Schroeter T, Harmeling S, Kawanabe M, Hansen K, Müller KR. How to Explain Individual
+    Classification Decisions. Journal of Machine Learning Research
+  title: How to Explain Individual Classification Decisions
+  authors:
+  - Baehrens D
+  - Schroeter T
+  - Harmeling S
+  - Kawanabe M
+  - Hansen K
+  - Müller KR
+  year: 2010
+- raw: Rasmussen PM, Schmah T, Madsen KH, Lund TE, Yourganov G, Strother SC, et al. Visualization of Nonlinear
+    Classification Models in Neuroimaging – Signed Sensitivity Maps. BIOSIGNALS
+  title: Visualization of Nonlinear Classification Models in Neuroimaging – Signed Sensitivity Maps
+  authors:
+  - Rasmussen PM
+  - Schmah T
+  - Madsen KH
+  - Lund TE
+  - Yourganov G
+  - Strother SC
+  year: 2012
+- raw: Hansen K, Baehrens D, Schroeter T, Rupp M, Müller KR. Visual Interpretation of Kernel-Based Prediction
+    Models. Molecular Informatics
+  title: Visual Interpretation of Kernel-Based Prediction Models
+  authors:
+  - Hansen K
+  - Baehrens D
+  - Schroeter T
+  - Rupp M
+  - Müller KR
+  year: 2011
+- raw: Zeiler MD, Fergus R. Visualizing and Understanding Convolutional Networks. CoRR
+  title: Visualizing and Understanding Convolutional Networks
+  authors:
+  - Zeiler MD
+  - Fergus R
+  year: 2013
+- raw: Krizhevsky A, Sutskever I, Hinton GE. ImageNet Classification with Deep Convolutional Neural Networks.
+    NIPS
+  title: ImageNet Classification with Deep Convolutional Neural Networks
+  authors:
+  - Krizhevsky A
+  - Sutskever I
+  - Hinton GE
+  year: 2012
+- raw: 'Simonyan K, Vedaldi A, Zisserman A. Deep Inside Convolutional Networks: Visualising Image Classification
+    Models and Saliency Maps. CoRR'
+  title: 'Deep Inside Convolutional Networks: Visualising Image Classification Models and Saliency Maps'
+  authors:
+  - Simonyan K
+  - Vedaldi A
+  - Zisserman A
+  year: 2013
+- raw: Zeiler MD, Taylor GW, Fergus R. Adaptive deconvolutional networks for mid and high level fea...(cut
+    off)
+  title: Adaptive deconvolutional networks for mid and high level features
+  authors:
+  - Zeiler MD
+  - Taylor GW
+  - Fergus R
+  year: null
+- raw: Szegedy C, Zaremba W, Sutskever I, Bruna J, Erhan D, Goodfellow IJ, et al. Intriguing properties
+    of neural networks. CoRR. 2013;abs/1312.6199.
+  title: Intriguing properties of neural networks
+  authors:
+  - Szegedy C
+  - Zaremba W
+  - Sutskever I
+  - Bruna J
+  - Erhan D
+  - Goodfellow IJ
+  year: 2013
+- raw: Goodfellow IJ, Shlens J, Szegedy C. Explaining and Harnessing Adversarial Examples. CoRR. 2014;abs/1412.6572.
+  title: Explaining and Harnessing Adversarial Examples
+  authors:
+  - Goodfellow IJ
+  - Shlens J
+  - Szegedy C
+  year: 2014
+- raw: Chalupka K, Perona P, Eberhardt F. Visual Causal Feature Learning. CoRR. 2014;abs/1412.2309.
+  title: Visual Causal Feature Learning
+  authors:
+  - Chalupka K
+  - Perona P
+  - Eberhardt F
+  year: 2014
+- raw: Erhan D, Bengio Y, Courville A, Vincent P. Visualizing Higher-Layer Features of a Deep Network.
+    University of Montreal; 2009. 1341.
+  title: Visualizing Higher-Layer Features of a Deep Network
+  authors:
+  - Erhan D
+  - Bengio Y
+  - Courville A
+  - Vincent P
+  year: 2009
+- raw: 'Le QV. Building high-level features using large scale unsupervised learning. In: ICASSP; 2013.
+    p. 8595–8598.'
+  title: Building high-level features using large scale unsupervised learning
+  authors:
+  - Le QV
+  year: 2013
+- raw: Gevrey M, Dimopoulos I, Lek S. Review and comparison of methods to study the contribution of variables
+    in artificial neural network models. Ecological Modelling. 2003;160(3):249–264.
+  title: Review and comparison of methods to study the contribution of variables in artificial neural
+    network models
+  authors:
+  - Gevrey M
+  - Dimopoulos I
+  - Lek S
+  year: 2003
+- raw: Olden JD, Joy MK, Death RG. An accurate comparison of methods for quantifying variable importance
+    in artificial neural networks using simulated data. Ecological Modelling. 2004;178(3-4):389–397.
+  title: An accurate comparison of methods for quantifying variable importance in artificial neural networks
+    using simulated data
+  authors:
+  - Olden JD
+  - Joy MK
+  - Death RG
+  year: 2004
+- raw: 'Setiono R, Liu H. Understanding Neural Networks via Rule Extraction. In: IJCAI. Morgan Kaufmann;
+    1995. p. 480–487.'
+  title: Understanding Neural Networks via Rule Extraction
+  authors:
+  - Setiono R
+  - Liu H
+  year: 1995
+- raw: Rasmussen PM, Madsen KH, Lund TE, Hansen LK. Visualization of nonlinear kernel models in neuroimaging
+    by sensitivity maps. NeuroImage. 2011;55(3):1120–1131.
+  title: Visualization of nonlinear kernel models in neuroimaging by sensitivity maps
+  authors:
+  - Rasmussen PM
+  - Madsen KH
+  - Lund TE
+  - Hansen LK
+  year: 2011
+- raw: 'Liu L, Wang L. What has my classifier learned? Visualizing the classification rules of bag-of-feature
+    model by support region detection. In: CVPR. IEEE; 2012. p. 3586–3593.'
+  title: What has my classifier learned? Visualizing the classification rules of bag-of-feature model
+    by support region detection
+  authors:
+  - Liu L
+  - Wang L
+  year: 2012
+- raw: Uijlings JRR, Smeulders AWM, Scha RJH. The Visual Extent of an Object—Suppose We Know the Object
+    Locations. International Journal of Computer Vision. 2012;96(1):46–63.
+  title: The Visual Extent of an Object—Suppose We Know the Object Locations
+  authors:
+  - Uijlings JRR
+  - Smeulders AWM
+  - Scha RJH
+  year: 2012
+- raw: Everingham M, Van Gool L, Williams CKI, Winn J, Zisserman A. The PASCAL Visual Object Classes Challenge
+    2009, Part 2 — Classification Task.
+  title: The PASCAL Visual Object Classes Challenge 2009, Part 2 — Classification Task
+  authors:
+  - Everingham M
+  - Van Gool L
+  - Williams CKI
+  - Winn J
+  - Zisserman A
+  year: null
+- raw: Everingham M, Van Gool L, Williams CKI, Winn J, Zisserman A. The PASCAL Visual Object Classes Challenge
+    2010 (VOC2010) Results.
+  title: The PASCAL Visual Object Classes Challenge 2010 (VOC2010) Results
+  authors:
+  - Everingham M
+  - Van Gool L
+  - Williams CKI
+  - Winn J
+  - Zisserman A
+  year: null
+- raw: 'Nowak S, Nagel K, Liebetrau J. The CLEF 2011 Photo Annotation and Concept-based Retrieval Tasks.
+    In: CLEF2011 Labs and Workshop; 2011.'
+  title: The CLEF 2011 Photo Annotation and Concept-based Retrieval Tasks
+  authors:
+  - Nowak S
+  - Nagel K
+  - Liebetrau J
+  year: 2011
+- raw: Moosmann F, Nowak E, Jurie F. Randomized Clustering Forests for Image Classification. IEEE Trans
+    Pattern Anal Mach Intell. 2008;30(9):1632–1646.
+  title: Randomized Clustering Forests for Image Classification
+  authors:
+  - Moosmann F
+  - Nowak E
+  - Jurie F
+  year: 2008
+- raw: 'van Gemert J, Geusebroek JM, Veenman CJ, Smeulders AWM. Kernel Codebooks for Scene Categorization.
+    In: ECCV(3); 2008. p. 696–709.'
+  title: Kernel Codebooks for Scene Categorization
+  authors:
+  - van Gemert J
+  - Geusebroek JM
+  - Veenman CJ
+  - Smeulders AWM
+  year: 2008
+- raw: 'Liu L, Wang L, Liu X. In defense of soft-assignment coding. In: Metaxas DN, Quan L, Sanfeliu A,
+    Gool LJV, editors. ICCV. IEEE; 2011. p. 2486–2493.'
+  title: In defense of soft-assignment coding
+  authors:
+  - Liu L
+  - Wang L
+  - Liu X
+  year: 2011
+- raw: Binder A, Samek W, Müller KR, Kawanabe M. Enhanced representation and multi-task learning for image
+    annotation. Computer Vision and Image Understanding. 2013;117(5):466–478.
+  title: Enhanced representation and multi-task learning for image annotation
+  authors:
+  - Binder A
+  - Samek W
+  - Müller KR
+  - Kawanabe M
+  year: 2013
+- raw: Lowe DG. Distinctive Image Features from Scale-Invariant Keypoints. International Journal of Computer
+    Vision. 2004;60(2):91–110.
+  title: Distinctive Image Features from Scale-Invariant Keypoints
+  authors:
+  - Lowe DG
+  year: 2004
+- raw: van de Sande KEA, Gevers T, Snoek CGM. Evaluating Color Descriptors for Object and Scene Recognition.
+    IEEE Trans Pattern Anal Mach Intell. 2010;32(9):1582–1596.
+  title: Evaluating Color Descriptors for Object and Scene Recognition
+  authors:
+  - van de Sande KEA
+  - Gevers T
+  - Snoek CGM
+  year: 2010
+- raw: 'Sánchez J, Perronnin F, Mensink T, Verbeek JJ. Image Classification with the Fisher Vector: Theory
+    and Practice. International Journal of Computer Vision. 2013;105(3):222–245.'
+  title: 'Image Classification with the Fisher Vector: Theory and Practice'
+  authors:
+  - Sánchez J
+  - Perronnin F
+  - Mensink T
+  - Verbeek JJ
+  year: 2013
+- raw: Lanckriet GRG, Cristianini N, Bartlett PL, Ghaoui LE, Jordan MI. Learning the Kernel Matrix with
+    Semidefinite Programming. Journal of Machine Learning Research. 2004;5:27–72.
+  title: Learning the Kernel Matrix with Semidefinite Programming
+  authors:
+  - Lanckriet GRG
+  - Cristianini N
+  - Bartlett PL
+  - Ghaoui LE
+  - Jordan MI
+  year: 2004
+- raw: 'Bach FR, Lanckriet GRG, Jordan MI. Multiple kernel learning, conic duality, and the SMO algorithm.
+    In: ICML; 2004.'
+  title: Multiple kernel learning, conic duality, and the SMO algorithm
+  authors:
+  - Bach FR
+  - Lanckriet GRG
+  - Jordan MI
+  year: 2004
+- raw: Kloft M, Brefeld U, Sonnenburg S, Laskov P, Müller KR, Zien A. Efficient and Accurate Lp-norm Multiple
+    Kernel Learning. Advances in Neural Information Processing Systems. 2009;22(22):997–1005.
+  title: Efficient and Accurate Lp-norm Multiple Kernel Learning
+  authors:
+  - Kloft M
+  - Brefeld U
+  - Sonnenburg S
+  - Laskov P
+  - Müller KR
+  - Zien A
+  year: 2009
+- raw: Kloft M, Brefeld U, Sonnenburg S, Zien A. l-Norm Multiple Kernel Learning.
+  title: l-Norm Multiple Kernel Learning
+  authors:
+  - Kloft M
+  - Brefeld U
+  - Sonnenburg S
+  - Zien A
+  year: null
+- raw: Binder A, Nakajima S, Kloft M, Müller C, Samek W, Brefeld U, et al. Insights from Classifying Visual
+    Concepts with Multiple Kernel Learning. PLoS ONE. 2012;7(8)
+  title: Insights from Classifying Visual Concepts with Multiple Kernel Learning
+  authors:
+  - Binder A
+  - Nakajima S
+  - Kloft M
+  - Müller C
+  - Samek W
+  - Brefeld U
+  year: 2012
+- raw: 'Hwang SJ, Grauman K, Sha F. Semantic Kernel Forests from Multiple Taxonomies. In: NIPS; 2012.
+    p. 1727-1735'
+  title: Semantic Kernel Forests from Multiple Taxonomies
+  authors:
+  - Hwang SJ
+  - Grauman K
+  - Sha F
+  year: 2012
+- raw: Binder A, Müller KR, Kawanabe M. On Taxonomies for Multi-class Image Categorization. International
+    Journal of Computer Vision. 2012;99(3):281-301
+  title: On Taxonomies for Multi-class Image Categorization
+  authors:
+  - Binder A
+  - Müller KR
+  - Kawanabe M
+  year: 2012
+- raw: 'Blaschko MB, Zaremba W, Gretton A. Taxonomic Prediction with Tree-Structured Covariances. In:
+    ECML/PKDD(2); 2013. p. 304-319'
+  title: Taxonomic Prediction with Tree-Structured Covariances
+  authors:
+  - Blaschko MB
+  - Zaremba W
+  - Gretton A
+  year: 2013
+- raw: 'Cao L, Luo J, Liang F, Huang TS. Heterogeneous feature machines for visual recognition. In: ICCV.
+    IEEE; 2009. p. 1095-1102'
+  title: Heterogeneous feature machines for visual recognition
+  authors:
+  - Cao L
+  - Luo J
+  - Liang F
+  - Huang TS
+  year: 2009
+- raw: 'Zhang J, Marszalek M, Lazebnik S, Schmid C. Local Features and Kernels for Classification of Texture
+    and Object Categories: A Comprehensive Study. International Journal of Computer Vision. 2007;73(2):213-238'
+  title: 'Local Features and Kernels for Classification of Texture and Object Categories: A Comprehensive
+    Study'
+  authors:
+  - Zhang J
+  - Marszalek M
+  - Lazebnik S
+  - Schmid C
+  year: 2007
+- raw: 'Vedaldi A, Gulshan V, Varma M, Zisserman A. Multiple kernels for object detection. In: ICCV; 2009.
+    p. 606-613'
+  title: Multiple kernels for object detection
+  authors:
+  - Vedaldi A
+  - Gulshan V
+  - Varma M
+  - Zisserman A
+  year: 2009
+- raw: Rumelhart DE, Hinton GE, Williams RJ. Learning representations by back-propagating errors. Nature.
+    1986 Oct;323:533-536
+  title: Learning representations by back-propagating errors
+  authors:
+  - Rumelhart DE
+  - Hinton GE
+  - Williams RJ
+  year: 1986
+- raw: LeCun Y, Cortes C. The MNIST database of handwritten digits; 1998
+  title: The MNIST database of handwritten digits
+  authors:
+  - LeCun Y
+  - Cortes C
+  year: 1998
+- raw: Pinto N, Cox DD, DiCarlo JJ. Why is Real-World Visual Object Recognition Hard? PLoS Comput Biol.
+    2008;4(1):27
+  title: Why is Real-World Visual Object Recognition Hard?
+  authors:
+  - Pinto N
+  - Cox DD
+  - DiCarlo JJ
+  year: 2008
+- raw: 'LeCun Y, Kavukcuoglu K, Farabet C. Convolutional networks and applications in vision. In: ISCAS.
+    IEEE; 2010. p. 253-256'
+  title: Convolutional networks and applications in vision
+  authors:
+  - LeCun Y
+  - Kavukcuoglu K
+  - Farabet C
+  year: 2010
+- raw: 'Jia Y. Caffe: An Open Source Convolutional Architecture for Fast Feature Embedding; 2013'
+  title: 'Caffe: An Open Source Convolutional Architecture for Fast Feature Embedding'
+  authors:
+  - Jia Y
+  year: 2013
+cites: []
+semantic_scholar:
+  lookup_status: skipped
+  paper_id: null
+  matched_title: null
+cited_by_external: []

@@ -515,7 +515,587 @@ references:
   year: 2013
 cites: []
 semantic_scholar:
-  lookup_status: skipped
-  paper_id: null
-  matched_title: null
-cited_by_external: []
+  lookup_status: ok
+  paper_id: 17a273bbd4448083b01b5a9389b3c37f5425aac0
+  matched_title: On Pixel-Wise Explanations for Non-Linear Classifier Decisions by Layer-Wise Relevance
+    Propagation
+  citation_count: 4974
+  citing_lookup_status: ok
+cited_by_external:
+- title: A Qualitative Study on XAI Techniques for Software Defect Prediction
+  year: 2026
+  authors:
+  - Saumendu Roy
+  - Banani Roy
+  - C. Roy
+  - F. Khomh
+  paperId: b5f6f2e0a77d889e01cbdb846350b5d735ab52ee
+  external_ids:
+    DBLP: journals/infsof/RoyRRK26
+    DOI: 10.1016/j.infsof.2026.108234
+    CorpusId: 289522065
+- title: 'Visualization methods for explainable medical imaging diagnosis: A survey'
+  year: 2026
+  authors:
+  - Longzhen Yang
+  - Yihang Liu
+  - Lianghua He
+  - D. Hu
+  paperId: a6ff4375eeffe72fd0f10da098f2c9fc90b21921
+  external_ids:
+    DBLP: journals/csr/YangLHH26
+    DOI: 10.1016/j.cosrev.2026.100930
+    CorpusId: 286106007
+- title: 'Deepfakes: A comprehensive survey on techniques, challenges and future directions'
+  year: 2026
+  authors:
+  - Shaheen Usmani
+  - Sunil Kumar
+  - Debanjan Sadhya
+  paperId: f3f3f85e6edfcc4ac4a7d91b998ea068e275068b
+  external_ids:
+    DBLP: journals/cee/UsmaniKS26
+    DOI: 10.1016/j.compeleceng.2026.111210
+    CorpusId: 288048911
+- title: 'ImmersiveSHAP: Immersive analytics visualization system for XAI using SHAP scatter plot'
+  year: 2026
+  authors:
+  - Juliana Andrea Montilla López
+  - Daniel Valencia
+  - J. A. Jiménez Builes
+  - Gustavo Adolfo Ramírez González
+  paperId: b796873547c9454f89e49dc57a18d40b44113045
+  external_ids:
+    DOI: 10.1109/TLA.2026.11577663
+    CorpusId: 289493001
+- title: 'Anatomically Faithful but Temporally Blind: Auditing Attribution for Left-Ventricular Ejection-Fraction
+    Estimation from Echocardiography'
+  year: 2026
+  authors:
+  - Hyunkyung Han
+  - Min Jung Kim
+  paperId: 677d85e112dafbe1e63fcf2fbb9c99c8afd95fae
+  external_ids:
+    ArXiv: '2607.13738'
+    CorpusId: 290179396
+- title: 'AIME2: toward a unified algebraic theory of explainability via approximate inverse operators'
+  year: 2026
+  authors:
+  - Takafumi Nakanishi
+  paperId: f6a1af53659a0d8c841e53f8f252e348d536e3f8
+  external_ids:
+    DOI: 10.1038/s44488-026-00004-0
+    CorpusId: 290140629
+- title: Explaining Intrusion Alert Decisions of Deep Learning-based Network Intrusion Detection Systems
+    for Security Analysts
+  year: 2026
+  authors:
+  - Ayush Kumar
+  - V. Thing
+  paperId: cc9c710f6fd0bb4b39f070a92d9f98bc10b0bda0
+  external_ids:
+    ArXiv: '2607.12203'
+    CorpusId: 290149024
+- title: Gradient-Skipping Relevance Propagation for Efficient Explainability of Vision Transformers
+  year: 2026
+  authors:
+  - Christopher Buratti
+  - Michele Marchetti
+  - Federica Parlapiano
+  - Davide Traini
+  - Domenico Ursino
+  - L. Virgili
+  paperId: 2de15c175c6a53034d96584b284ed5df2f4e45cb
+  external_ids:
+    ArXiv: '2607.10365'
+    CorpusId: 290136016
+- title: 'What Pixels Are Enough? SEAMS: Sufficiency Saliency via MSE-Preservation Soft-Masks'
+  year: 2026
+  authors:
+  - Magdalena Trkedowicz
+  - Lukasz Struski
+  - Arkadiusz Lewicki
+  - Karolina Pachota
+  - A. Grudzień
+  - M. Jagła
+  - Jacek Tabor
+  paperId: f69541e9667b1c81f0cdd600710e8cbb186d5f4e
+  external_ids:
+    ArXiv: '2607.09164'
+    CorpusId: 290118890
+- title: 'ReMoDEx: A Local-to-Global Relevance-Based Model Decision Explainability Framework for large-Scale
+    Image Datasets'
+  year: 2026
+  authors:
+  - Abhay Kumar Pathak
+  - Mrityunjay Chaubey
+  - Manjari Gupta
+  paperId: 170def99b94b5230a38915328685c207c8677817
+  external_ids:
+    ArXiv: '2607.06889'
+    CorpusId: 289973194
+- title: Distributed Sparse Interventions in Language Models
+  year: 2026
+  authors:
+  - Maximilian S. Ernst
+  - L. Linhardt
+  - Aaron Peikert
+  - Oliver Eberle Max Planck School of Cognition Center for L Learning
+  - Data
+  paperId: b54a6469d4e46ab51adf4d2336a22a49210b63bf
+  external_ids:
+    ArXiv: '2607.07128'
+    CorpusId: 289973709
+- title: 'Driving the Wrong Way: Leveraging Interpretability in End2End Autonomous Driving Models'
+  year: 2026
+  authors:
+  - Franz Motzkus
+  - Sebastian Bernhard
+  paperId: 213bbf7df2fa90b4bfa62f6ae326e98c1332b4db
+  external_ids:
+    ArXiv: '2607.06328'
+    CorpusId: 289941362
+- title: A Good Initialization is All You Need for Faithful Visual Attribution
+  year: 2026
+  authors:
+  - Zihan Gu
+  - Jiayu Wang
+  - Hua Zhang
+  - Yue Hu
+  paperId: bed3309d50751218a361959a239c89c7adb4fdce
+  external_ids:
+    ArXiv: '2607.06726'
+    CorpusId: 289973343
+- title: 'Machine learning-enabled label-free SERS for microbial sensing: Toward robust, generalizable,
+    and deployable workflows.'
+  year: 2026
+  authors:
+  - S. Mahmud
+  - Md. Sakib Bin Islam
+  - M. Naznine
+  - Md. Shaheenur Islam Sumon
+  - S. Zughaier
+  - Yiping Zhao
+  - Muhammad E. H. Chowdhury
+  paperId: 37b16056c30297d97cf7572dfdd90c5f93949e3c
+  external_ids:
+    DOI: 10.1016/j.talanta.2026.130241
+    CorpusId: 289997626
+    PubMed: '42419011'
+- title: 'Faithfulness to Refusal: A Causal Audit of Neuron Selectors'
+  year: 2026
+  authors:
+  - Ananth Eswar
+  - Pratinav Seth
+  - Utsav Avaiya
+  - Vinay Kumar Sankarapu
+  paperId: 8aa4a67b13c17238ade8dc7ee052ea5a2db28352
+  external_ids:
+    ArXiv: '2607.05355'
+    CorpusId: 289933316
+- title: 'Measuring What Matters: A Unified Evaluation Framework for GNN Explainability'
+  year: 2026
+  authors:
+  - Francesco Paolo Nerini
+  - Mirko Zaffaroni
+  - Paolo Baracco
+  - Gabriele Ciravegna
+  - Alan Perotti
+  paperId: dae37f274022be7135eb16f85a2ccb6ee9ace195
+  external_ids:
+    ArXiv: '2607.04600'
+    CorpusId: 289935137
+- title: A temporal causal deep learning for real-time traffic risk prediction on freeway merging areas.
+  year: 2026
+  authors:
+  - Ziqiu Sun
+  - Weiwei Qi
+  - Hanlin Jiang
+  paperId: e011756bab6d92b9c2744c3a892bd216c0d60820
+  external_ids:
+    DOI: 10.1016/j.aap.2026.108669
+    CorpusId: 289936918
+    PubMed: '42407355'
+- title: Towards the Explainability of Temporal Graph Networks via Memory Backtracking and Topological
+    Attribution
+  year: 2026
+  authors:
+  - Yazheng Liu
+  - Xi Zhang
+  - Sihong Xie
+  - Hui Xiong
+  paperId: 188cb3eb13d5e44fd7088f0afd98472c5295e45f
+  external_ids:
+    ArXiv: '2607.07716'
+    CorpusId: 290009566
+- title: 'Artificial Intelligence Techniques for Diagnosis of Gynecological Malignancies: A Systematic
+    Review'
+  year: 2026
+  authors:
+  - M. Emam
+  - Doaa S. Ibrahim
+  - Essam H. Houssein
+  paperId: b26b6b217f359994775a4358258340a62830a4f2
+  external_ids:
+    DOI: 10.1007/s11831-026-10711-7
+    CorpusId: 289920076
+- title: An integrated explainable framework for multimodal deepfake detection across image, audio, and
+    video data
+  year: 2026
+  authors:
+  - Senanur Armağan
+  - Esra Gündoğan
+  - Mehmet Kaya
+  - Reda Alhajj
+  paperId: c5fb5d4503607b62fc79a78958cf291a9704c5fa
+  external_ids:
+    DOI: 10.1016/j.asej.2026.104233
+    CorpusId: 288081819
+- title: Classification-Driven Contribution Analysis with Median Calibration for fault class and variable
+    co-identification
+  year: 2026
+  authors:
+  - Lang Liu
+  - Ying Zheng
+  - Yincong Yang
+  paperId: 66b0378e1a08890ac1cc7cfc4aea84a5ce00570e
+  external_ids:
+    DOI: 10.1016/j.jprocont.2026.103729
+    CorpusId: 288853271
+- title: 'CPG-PAD: Concept-Informed Prompts Guided Presentation Attack Detection'
+  year: 2026
+  authors:
+  - Haoyuan Zhang
+  - Xiangyu Zhu
+  - Li Gao
+  - Ajian Liu
+  - Siran Peng
+  - Zhen Lei
+  paperId: 86a6e3262ced96d77f4f8acebcf353e908baacdd
+  external_ids:
+    ArXiv: '2607.01303'
+    DOI: 10.1109/tifs.2026.3711854
+    CorpusId: 289748932
+- title: General Type-2 Hierarchical Fuzzy Model-Agnostic Explanation of Image Classification for XAI
+  year: 2026
+  authors:
+  - Faliang Yin
+  - Hak-Keung Lam
+  - David Watson
+  paperId: 8252428e20b40119be0bd68c752b9194b252ae7e
+  external_ids:
+    DOI: 10.1109/TFUZZ.2026.3686974
+    CorpusId: 287749653
+- title: 'Explainable lightweight neural networks: A survey on methods, metrics, and challenges'
+  year: 2026
+  authors:
+  - Malaika Mushtaq
+  - Michael G. Madden
+  - Ihsan Ullah
+  paperId: 3ce987394559fb2fa29a7784d708ea3b51ce0d6f
+  external_ids:
+    DOI: 10.1016/j.neucom.2026.134504
+    CorpusId: 290191762
+- title: Who’s driving? Common evolutionary mechanism of activation of class A GPCRs
+  year: 2026
+  authors:
+  - A. Marciniak
+  - P. Kozielewicz
+  - Darko Mitrovic
+  - L. Delemotte
+  paperId: 97f761ffa37c5325ee358604b2ced90ca0eee335
+  external_ids:
+    DOI: 10.64898/2026.06.25.734477
+    CorpusId: 289748003
+- title: Explaining Temporal Graph Neural Networks via Feature-induced Information Flow
+  year: 2026
+  authors:
+  - Pin Xiong
+  - T. Schnake
+  - Klaus-Robert Muller
+  - Shinichi Nakajima
+  paperId: f0c8e62cb8fc480f5b89a8d872e515e98113e094
+  external_ids:
+    ArXiv: '2606.27201'
+    CorpusId: 289629732
+- title: Global Explanations for Multivariate Time Series Forecasting Models via $K$-Order Markov Approximations
+  year: 2026
+  authors:
+  - Amadeo Tunyi
+  paperId: 645b436407105966e122a1a9948993d955e4aa4a
+  external_ids:
+    ArXiv: '2606.27599'
+    CorpusId: 289669414
+- title: Feature Selection for Improving ANN and CNN Models for Attack Detection in Zeek Network Data
+  year: 2026
+  authors:
+  - S. Bagui
+  - Mohamed Elbatouty
+  - D. Mink
+  - S. Bagui
+  paperId: 0f1e9b92181871f91d2df740371dce1b28b86b77
+  external_ids:
+    DOI: 10.3390/fi18070333
+    CorpusId: 289596353
+- title: Does Aurora Encode Atmospheric Structure? Latent Regime Analysis and Attribution
+  year: 2026
+  authors:
+  - Emma Kasteleyn
+  - Ana Lucic
+  paperId: 92bc448649090bd5f44a9af5ccfb715c9bf0c230
+  external_ids:
+    ArXiv: '2606.26361'
+    CorpusId: 289624094
+- title: 'Structuring Sparsity: Block-Sparse Featurizers Capture Visual Concept Manifolds'
+  year: 2026
+  authors:
+  - Thomas Fel
+  - M. Kowal
+  - Mozes Jacobs
+  - Dron Hazra
+  - Usha Bhalla
+  - Lee Sharkey
+  - Lucius Bushnaq
+  - Satchel Grant
+  - Tal Haklay
+  - Thomas Icard
+  - Can Rager
+  - Michael T. Pearce
+  - Daniel Wurgaft
+  - Aiden Swann
+  - F. Doshi
+  - S. Boppana
+  - Curt Tigges
+  - Nick Cammarata
+  - T. Serre
+  - V. Shyam
+  - Owen Lewis
+  - Tom McGrath
+  - Jack Merullo
+  - E. Lubana
+  - Atticus Geiger
+  paperId: 87d9987efe54b101c0d2f5d30e0693d701b98264
+  external_ids:
+    ArXiv: '2606.25234'
+    CorpusId: 289628808
+- title: Re-emergence of orientation coding in primate IT cortex and deep networks reveals functional
+    hubs for visual processing
+  year: 2026
+  authors:
+  - Behnam Karami
+  - Tarana Nigam
+  - Sandrin S. Plewe
+  - C. Schwiedrzik
+  paperId: d442d83391c072053ee82ee3062a435750844d6c
+  external_ids:
+    PubMedCentral: '13320768'
+    DOI: 10.1101/2025.10.23.684240
+    CorpusId: 282387796
+    PubMed: '42395569'
+- title: 'LaserTag: A Tool for Autonomous XAI-Guided Physical Adversarial Perturbations in Industrial
+    Vision Pipelines'
+  year: 2026
+  authors:
+  - Gustavo Sánchez
+  - Li Wei
+  - V. Hagenmeyer
+  paperId: 58d4f2b6bbf4bf9827a5c5292c3012194c82ce00
+  external_ids:
+    DOI: 10.1109/DSN69566.2026.00063
+    CorpusId: 289979617
+- title: 'LIG: Layer-wise Integrated Gradients for Within-Layer Flow Analysis in Transformers'
+  year: 2026
+  authors:
+  - Eight Suzuki
+  - H. Hino
+  - N. Murata
+  paperId: 6cba014053fc2e575514791fe1d94357d147374f
+  external_ids:
+    ArXiv: '2606.21564'
+    CorpusId: 289621422
+- title: 'XAI2Brain: A Perspective on Mechanistic Interpretability for Brain–AI Alignment'
+  year: 2026
+  authors:
+  - R. Jiang
+  - Yongchen Zhou
+  - Boyuan Wang
+  - Plamen P. Angelov
+  - Qiang Ni
+  paperId: 4d300d69e3d70a48f2b2cda2d161148505754453
+  external_ids:
+    DOI: 10.3390/make8060167
+    CorpusId: 289406103
+- title: 'xServeNet: An Explainable Deep Neural Network for Web Services Classification'
+  year: 2026
+  authors:
+  - Yilong Yang
+  - Muhammad Ali Khan
+  - Zhaotian Li
+  - Weiru Wang
+  paperId: 4680eca5077cc28ee01055db6eab25a0ac1462a0
+  external_ids:
+    DOI: 10.3390/electronics15122711
+    CorpusId: 289444957
+- title: 'Activation- and Influence-Aware Ranks (AIR): Function-Preserving SVD Compression for LLMs'
+  year: 2026
+  authors:
+  - Nicole Harder
+  - Daniel Becking
+  - Karsten Mueller
+  - Wojciech Samek
+  paperId: 13a24323e3fef2d97321de86bb69188808abee10
+  external_ids:
+    ArXiv: '2606.19993'
+    CorpusId: 289623737
+- title: 'ArchiExplain: Multi-Level Evidence Chains for Precedent-Based Interpretability in Architectural
+    Image Understanding'
+  year: 2026
+  authors:
+  - Jun Yin
+  - Peilin Li
+  - Tianrui Li
+  - Jing Zhong
+  - Zhanxiang Jin
+  - Tianjing Feng
+  - Peter Russell
+  paperId: 5d40d8d807cac6bbe760ded010ce8939811f2090
+  external_ids:
+    DOI: 10.3390/buildings16122394
+    CorpusId: 289350642
+- title: 'PhaseWin: An Efficient Search Algorithm for Faithful Visual Attribution'
+  year: 2026
+  authors:
+  - Zihan Gu
+  - Junchi Zhang
+  - Li Liu
+  - Xiaochun Cao
+  - Hua Zhang
+  paperId: 1cad021ea82b364e09e11a2e153aa167a53de509
+  external_ids:
+    ArXiv: '2606.18008'
+    CorpusId: 289626002
+- title: 'SketchXplain: Intuitive Visual Explanations of Image Classifiers with Sketches'
+  year: 2026
+  authors:
+  - Wencan Zhang
+  - Mario Michelessa
+  - Xuejun Zhao
+  - Brian Y. Lim
+  paperId: 4326813daa953ff730d95c146a6e4bcbf1933387
+  external_ids:
+    ArXiv: '2606.17646'
+    CorpusId: 289624971
+- title: XAI energy benchmarking with multi-scale satellite and tabular fusion
+  year: 2026
+  authors:
+  - Tian Li
+  - D. Newton
+  - Yi Lu
+  - Shubham Saraf
+  paperId: 8ee14d2eab4352af8eb32ecfb38322b10bf25426
+  external_ids:
+    DOI: 10.1007/s12273-026-1437-9
+    CorpusId: 289358200
+- title: Input-Dependent Fisher Information for Local Sensitivity Analysis of Medical Image Classifiers
+  year: 2026
+  authors:
+  - Sourya Sengupta. Mark A. Anastasio
+  paperId: 6d2dcd74468a88d15413322502224d6f968b06d4
+  external_ids:
+    ArXiv: '2606.16362'
+    CorpusId: 289299726
+- title: 'Visualizing Uncertainty: Spatial Maps of Missing and Conflicting Evidence in Deep Learning'
+  year: 2026
+  authors:
+  - D. Jeong
+  - Feng Chen
+  - Jin-Hee Cho
+  - Lance M. Kaplan
+  - A. Jøsang
+  - Soo-Yeon Ji
+  paperId: 9b2a9fa23867784c4d702140e8d55d6fe1d2bef2
+  external_ids:
+    ArXiv: '2606.15767'
+    CorpusId: 289301856
+- title: 'The Perceived Fragility of Explanations in Audio Models: Manipulation of Attribution with Unchanged
+    Predictions'
+  year: 2026
+  authors:
+  - Piotr Kitlowski
+  - Dominik Wikacek
+  - Mateusz Modrzejewski
+  paperId: 2828c350718e79001959df28b413ece00706d08a
+  external_ids:
+    ArXiv: '2606.14466'
+    CorpusId: 289263959
+- title: 'Where Black-box Drug-Target Interaction Prediction Models Look: Cross-Method Explainability'
+  year: 2026
+  authors:
+  - Ali Vefghi
+  - Zahed Rahmati
+  - Mohammad Akbari
+  paperId: 3a2af2756aa669a55417b61255ec70cf0a9a0e28
+  external_ids:
+    ArXiv: '2606.14245'
+    CorpusId: 289209230
+- title: 'Rethinking Global Average Pooling: Your Classifier Is Secretly a Multi-Instance Learner'
+  year: 2026
+  authors:
+  - Aray Karjauv
+  paperId: 7a9d6455f8172e89f05b3e34d14046b1df7e59de
+  external_ids:
+    ArXiv: '2606.14555'
+    CorpusId: 289263987
+- title: Visualizing Image Segmentation Network Behavior Through the Lens of Scale Space Analysis
+  year: 2026
+  authors:
+  - A. C. Mikliss
+  - T. Schultz
+  paperId: 313377d1493f717757139c2b94474ccbd89a31c4
+  external_ids:
+    DOI: 10.1111/cgf.70470
+    CorpusId: 289198137
+- title: 'Explaining RhythmFormer: A Systematic XAI Analysis of Periodic Sparse Attention for Remote Photoplethysmography'
+  year: 2026
+  authors:
+  - Louis N Chen
+  - Torbjörn E. M. Nordling
+  paperId: b1046b4abf7e4d58da32ee31b893932eabc1497c
+  external_ids:
+    ArXiv: '2606.13839'
+    CorpusId: 289209523
+- title: 'REACH: Interpretability-Driven Feature Identification and Architecture Compression for Multi-Channel
+    Vehicular Channel Estimation'
+  year: 2026
+  authors:
+  - Simbarashe Aldrin Ngorima
+  - Albert Helberg
+  - M. Davel
+  paperId: 4cf4d554b236fa62fb59763908ac07c1840da59b
+  external_ids:
+    ArXiv: '2606.11857'
+    CorpusId: 289166937
+- title: 'XtrAIn: Training-Guided Occlusion for Feature Attribution'
+  year: 2026
+  authors:
+  - Thodoris Lymperopoulos
+  - Ioannis Kakogeorgiou
+  - Denia Kanellopoulou
+  paperId: e1f3eac777857c4a06ee4e51f14a96926c5429ef
+  external_ids:
+    ArXiv: '2606.10877'
+    CorpusId: 289131945
+- title: Fast&Faithful Function Vectors
+  year: 2026
+  authors:
+  - Minh-Quang Pham
+  - Anton Segeler
+  - Thomas Wiegand
+  - Wojciech Samek
+  - S. Lapuschkin
+  - Patrick Kahardipraja
+  - Reduan Achtibat
+  paperId: 0988ed6cae0ebca7b1597887950a54f3493716d9
+  external_ids:
+    ArXiv: '2606.05079'
+    CorpusId: 288976048

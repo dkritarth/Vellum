@@ -551,7 +551,639 @@ cites:
   title: Attention Is All You Need
   confidence: high
 semantic_scholar:
-  lookup_status: skipped
-  paper_id: null
-  matched_title: null
-cited_by_external: []
+  lookup_status: ok
+  paper_id: df2b0e26d0599ce3e70df8a9da02e51594e0e992
+  matched_title: 'BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding'
+  citation_count: 117528
+  citing_lookup_status: ok
+cited_by_external:
+- title: 'InterpLog: Interpretable log-based anomaly detection assisting troubleshooting for system reliability'
+  year: 2026
+  authors:
+  - Rui Xiao
+  - Yabo Wang
+  - Weilong Li
+  - Jiakun Sun
+  - Shuyuan Jin
+  paperId: 70a2a5a5431e85514656dfb31b874a695d7e89bd
+  external_ids:
+    DBLP: journals/jss/XiaoWLSJ26
+    DOI: 10.1016/j.jss.2026.112916
+    CorpusId: 288143561
+- title: 'Breaking context inertia: Adaptive context management for time series foundation models in non-stationary
+    environments'
+  year: 2026
+  authors:
+  - Yiming Du
+  - G. Tang
+  paperId: 6606c1c9a779a0e8dcf28b422ecb59ae3b569b45
+  external_ids:
+    DBLP: journals/ijon/DuT26
+    DOI: 10.1016/j.neucom.2026.134129
+    CorpusId: 288886616
+- title: 'EPSE: Event-level emotion and propagation sequence-enhanced method for detecting rumors on social
+    media'
+  year: 2026
+  authors:
+  - Hailan Wang
+  - Xiaoqin Wang
+  - Huiwei Su
+  - Qunyong Wu
+  paperId: 4948fbbefd09c6e8d1439e5127e6ee810ad5b7ff
+  external_ids:
+    DBLP: journals/ijon/WangWSW26
+    DOI: 10.1016/j.neucom.2026.134182
+    CorpusId: 288922272
+- title: 'MMLNB: Multi-Modal Learning for Neuroblastoma subtyping classification assisted with textual
+    description generation'
+  year: 2026
+  authors:
+  - Huangwei Chen
+  - Yifei Chen
+  - Zhenyu Yan
+  - Mingyang Ding
+  - Chenlei Li
+  - Feiwei Qin
+  - Daxing Zhang
+  - Zhu Zhu
+  paperId: 0a3aeeefbbf4d01dbe9d0366d57e0e27d76cf4b5
+  external_ids:
+    DOI: 10.1016/j.bspc.2026.110798
+    CorpusId: 289531627
+- title: 'ClauseMiner: Prompt-engineered large language model for accurate, scalable legal clause extraction'
+  year: 2026
+  authors:
+  - Puneet
+  - Neelesh Shankar Upadhye
+  paperId: 4a44fe1d120b4dfbe52359dc7168abb584a1bce8
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115400
+    CorpusId: 289727801
+- title: A lightweight machine learning method for real-time log anomaly detection
+  year: 2026
+  authors:
+  - Fan Deng
+  - Ruitao Yang
+  - Tao Liu
+  - Haibo Yu
+  - Yanfei Li
+  - An Han
+  paperId: 777ef1bb6d792df2e419cf3d6be41a318ee76514
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115577
+    CorpusId: 289798082
+- title: Standardization of breast radiotherapy structure nomenclature using transformer-based multi-modal
+    feature learning
+  year: 2026
+  authors:
+  - F. Alam
+  - M. Field
+  - D. A. Mouiee
+  - P. Chlap
+  - Geoff P. Delaney
+  - S. Vinod
+  - Shivani Kumar
+  - Janet Cui
+  - Ali Haidar
+  - Vicky Chin
+  - J. Sykes
+  - Simon Ashworth
+  - Verity Ahern
+  - Kirsty Stuart
+  - M. Bailey
+  - Senthilkumar Gandhidasan
+  - Prabhakar Ramachandran
+  - J. Selvaraj
+  - A. Rezo
+  - Nicholas Hardcastle
+  - Lois Holloway
+  paperId: 42d5882d534af1de99787df1f8ba42fc461072ff
+  external_ids:
+    DOI: 10.1016/j.bspc.2026.110906
+    CorpusId: 289801058
+- title: Masked irregular layout planning from partial input with fused modalities
+  year: 2026
+  authors:
+  - Hang Zhang
+  - Anton Savov
+  - Benjamin Dillenburger
+  paperId: 32fc3a77b29a0602a851f288499ba0cc4bd54f56
+  external_ids:
+    DOI: 10.1016/j.autcon.2026.107120
+    CorpusId: 289869252
+- title: Large language model-driven information extraction and causal chain reasoning from chemical accident
+    investigation reports for process safety intelligence
+  year: 2026
+  authors:
+  - Xin Li
+  - Leyao Wang
+  - Lulu Wang
+  - Ruipeng Tong
+  paperId: a0c6846a4bc87a3de1c4ed2358174116962fb66b
+  external_ids:
+    DOI: 10.1016/j.jlp.2026.106101
+    CorpusId: 289873736
+- title: Fusing MLLM-generated evidence for multimodal named entity recognition
+  year: 2026
+  authors:
+  - Kexin Jiang
+  - Bo Li
+  - Xiaoqin Xiao
+  paperId: 4cd752df6f88b6fd8bab9189e1776307d5e27767
+  external_ids:
+    DOI: 10.1016/j.neucom.2026.134440
+    CorpusId: 289966868
+- title: 'DARS: An algorithm-hardware co-design framework for accelerating sparse attention via dynamic
+    adaptive hierarchical Top-K pruning'
+  year: 2026
+  authors:
+  - Yi Zhang
+  - Junsheng Chang
+  - Yuxin Huang
+  - Yang Guo
+  - Sheng Liu
+  paperId: 71b6164ee82022bb3f8ab0c05e1305254a0c0692
+  external_ids:
+    DOI: 10.1016/j.sysarc.2026.103912
+    CorpusId: 290027397
+- title: 'Foundation-model-assisted electrochemical sensing: from molecular recognition interfaces to
+    autonomous point-of-need analytical decisions'
+  year: 2026
+  authors:
+  - Li Fu
+  - Yanfei Lv
+  - Fei Chen
+  - Shichao Zhao
+  - Cheng-Te Lin
+  - H. Karimi‐Maleh
+  paperId: de3a18506f1fa6c27e01f47f855b1a1a24db69ba
+  external_ids:
+    DOI: 10.1016/j.trac.2026.119022
+    CorpusId: 290058735
+- title: Multi-domain generalization few-shot intent recognition with dual representation learning
+  year: 2026
+  authors:
+  - Shun Yang
+  - Yajun Du
+  paperId: 85417f8f92517f1766af575ff17a75a515799957
+  external_ids:
+    DBLP: journals/ipm/YangD26
+    DOI: 10.1016/j.ipm.2026.104781
+    CorpusId: 287088211
+- title: An agentic framework for data augmentation in construction defect report classification
+  year: 2026
+  authors:
+  - Uzair Ahmad
+  - Hasan Haroglu
+  - A. Tezel
+  - Bekir Sait Ciftler
+  paperId: bb2213c8cc4c10e37448e7c28898cb94c43644fa
+  external_ids:
+    DBLP: journals/aei/AhmadHTC26
+    DOI: 10.1016/j.aei.2026.104679
+    CorpusId: 287289050
+- title: An empirical study of attention mechanisms in wide and deep neural networks for smart contract
+    vulnerability detection
+  year: 2026
+  authors:
+  - Samuel Banning Osei
+  - Rubing Huang
+  - Rongcun Wang
+  - Zhongchen Ma
+  paperId: 5d66d216f655f2af8f6fe8a4c0a8f3f094eebce7
+  external_ids:
+    DBLP: journals/jss/OseiHWM26
+    DOI: 10.1016/j.jss.2026.112895
+    CorpusId: 287662262
+- title: AI-driven similarity assessment between P&ID nodes in support of HAZOP report generation
+  year: 2026
+  authors:
+  - Ehab Elhosary
+  - O. Moselhi
+  paperId: a1c88de831d93e57bd152e394efc9cbf08435806
+  external_ids:
+    DBLP: journals/eswa/ElhosaryM26
+    DOI: 10.1016/j.eswa.2026.132744
+    CorpusId: 288020622
+- title: Intent disentangling model with hypergraph for next POI recommendation
+  year: 2026
+  authors:
+  - Xiaoying Gao
+  - Ling Ding
+  - Jianting Chen
+  - Y. Mo
+  - Yunxiao Yang
+  - Peng Du
+  - Zaiyuan Di
+  - Zhihao Wang
+  - Yang Xiang
+  paperId: 15d1d86e3564fe8ecfd520653c10c13bf475b761
+  external_ids:
+    DBLP: journals/eswa/GaoDCMYDDWX26
+    DOI: 10.1016/j.eswa.2026.132751
+    CorpusId: 288191367
+- title: Improving zero-shot translation with the navigation ability-enhanced language tags
+  year: 2026
+  authors:
+  - Changtong Zan
+  - Liang Ding
+  - Li Shen
+  - Yibin Lei
+  - Yibing Zhan
+  - Weifeng Liu
+  paperId: 9114532cb270ba7164dc848f3b005453c8cf5448
+  external_ids:
+    DBLP: journals/eaai/ZanDSLZL26
+    DOI: 10.1016/j.engappai.2026.115149
+    CorpusId: 288682686
+- title: Sentiment classification of Vietnamese public service feedback using a transformer-based language
+    model for digital government
+  year: 2026
+  authors:
+  - Tran Thanh Phuong
+  - Thai Nguyen Ngoc
+  - Hoi Tran Van
+  - Thanh Q. Nguyen
+  paperId: 4b12221318b668f32f903d59f4bdcecef22c7360
+  external_ids:
+    DBLP: journals/eaai/PhuongNVN26
+    DOI: 10.1016/j.engappai.2026.115169
+    CorpusId: 288898695
+- title: 'DFR-HCI: A forensic-ready microservice architecture for human-to-human communication-based cybercrime
+    detection'
+  year: 2026
+  authors:
+  - S. Baror
+  - R. Ikuesan
+  - H. Venter
+  paperId: 276866993162b2b82dc01d63568cbb179a8a2355
+  external_ids:
+    DBLP: journals/di/BarorIV26
+    DOI: 10.1016/j.fsidi.2026.302134
+    CorpusId: 288912446
+- title: RC-transformer convolutional neural network for abstractive text summarization in indian languages
+  year: 2026
+  authors:
+  - J. Anitha
+  - Tan Kuan Tak
+  - Balajee Maram
+  - P. Kshirsagar
+  paperId: c393117a89628d2bae33143c5a872982bf4c79a6
+  external_ids:
+    DBLP: journals/eaai/AnithaTMK26
+    DOI: 10.1016/j.engappai.2026.115189
+    CorpusId: 288935421
+- title: Agent-orchestrated domain-specific large language model for large-scale database-driven geotechnical
+    site characterizations
+  year: 2026
+  authors:
+  - Qiujing Pan
+  - Guangcan Sun
+  - Zehang Qian
+  - Xiaosong Tang
+  - Ming Lei
+  - Chao Shi
+  paperId: 8b1dd507a81c48a1c7fe9736b921c2920236aa95
+  external_ids:
+    DOI: 10.1016/j.autcon.2026.107064
+    CorpusId: 288946509
+- title: 'FLAIR: An LLM-integrated multi-layer framework for fine-grained activity type inference in human
+    trajectory data'
+  year: 2026
+  authors:
+  - Yilin Lyu
+  - Kang Liu
+  - Zhongcai Cao
+  - Yuxiao Luo
+  - Ling Yin
+  - Tengfei Yang
+  - Zugang Chen
+  paperId: 3de515ee741dc963990e6c5241d3b264df7f78e7
+  external_ids:
+    DOI: 10.1016/j.trc.2026.105787
+    CorpusId: 288998759
+- title: 'ALISTA: Accelerator using LSH-based maximum inner-product search in transformer attention'
+  year: 2026
+  authors:
+  - Shin Sunny
+  - Satyajit Das
+  paperId: 6fae1cc278033e7c6031da4ff819c53236638270
+  external_ids:
+    DBLP: journals/integration/SunnyD26
+    DOI: 10.1016/j.vlsi.2026.102784
+    CorpusId: 289000338
+- title: 'Taste peptides: A critical review on taste perception mechanisms, AI-driven screening, and multidimensional
+    evaluation technologies'
+  year: 2026
+  authors:
+  - Benxiu Xiao
+  - Yue Chen
+  - Siqi Yang
+  - Shaoxiao Zeng
+  - Baodong Zheng
+  - Haoran Chen
+  paperId: aa255c498e5103f68dd0b33cac2e7e42aa02bb11
+  external_ids:
+    DOI: 10.1016/j.tifs.2026.105855
+    CorpusId: 289039155
+- title: 'GuidedDCNet: A diffusion-integrated framework with multi-scale conditional guidance for enhanced
+    data classification'
+  year: 2026
+  authors:
+  - Phan Minh Nhat
+  - N. Phuong
+  - V. H. Nguyen
+  paperId: 19306705c0800841094463e4762235f6c1d8549f
+  external_ids:
+    DBLP: journals/asc/NhatPN26
+    DOI: 10.1016/j.asoc.2026.115621
+    CorpusId: 289057755
+- title: 'Predicting commercialization in renewable energy patents: A hybrid multimodal framework integrating
+    BERT and ELECTRA embeddings with gradient boosting'
+  year: 2026
+  authors:
+  - P. Nazari
+  - N. Pilevari
+  - A. Shakeri
+  - Ameneh Khadivar
+  paperId: 45e0ed5f10aeecf2edafc42e1df0f4066abcc960
+  external_ids:
+    DOI: 10.1016/j.wpi.2026.102464
+    CorpusId: 289105852
+- title: Leveraging text and multimedia data for assessing user credibility in X
+  year: 2026
+  authors:
+  - Oumaima Achour
+  - L. Romdhane
+  paperId: e72c05eddb1aeaba6ce3e9d14f60e948a095a512
+  external_ids:
+    DOI: 10.1016/j.osnem.2026.100352
+    CorpusId: 289235520
+- title: 'CLKSP: medical entity extraction with contrastive learning and knowledgeable soft prompt'
+  year: 2026
+  authors:
+  - Zhengying Wang
+  - Jiong Yu
+  paperId: 41fe1daec17a06dcbc5337b621221457b3fcf6b9
+  external_ids:
+    DOI: 10.1016/j.eij.2026.101007
+    CorpusId: 289349255
+- title: 'Revealing Country-level disparities in researchers’ transition to artificial intelligence: A
+    Two-stage analytical framework'
+  year: 2026
+  authors:
+  - Sae-Na Choi
+  - Junghye Lee
+  paperId: 1eac50d2e42d5f91fcece1f1de2ff59abebbb487
+  external_ids:
+    DOI: 10.1016/j.joi.2026.101843
+    CorpusId: 289354778
+- title: A self-adaptive top token transformer for gastrointestinal endoscopy image restoration
+  year: 2026
+  authors:
+  - Yuxi Huang
+  - Yushan Chen
+  - Hui Lin
+  - Mingzhen Yang
+  - Xi Zheng
+  - Yi Wu
+  - Kunping Yang
+  paperId: 54d2cbf8083a3db1e5690babefadd930741790e5
+  external_ids:
+    DOI: 10.1016/j.knosys.2026.116445
+    CorpusId: 289405999
+- title: 'TuckerDreamer: Subject-driven text-to-image generation via Tucker-based frequency-domain fine-tuning'
+  year: 2026
+  authors:
+  - Yuze Guo
+  - Bin Wang
+  paperId: 2390104fcf51cdf55d9cf993ac3d093b2badf426
+  external_ids:
+    DOI: 10.1016/j.imavis.2026.106088
+    CorpusId: 289439216
+- title: Exploring embeddings and document structure recognition for extractive summarization of Portuguese
+    Supreme Court judgments
+  year: 2026
+  authors:
+  - Martim Zanatti
+  - Rui Melo
+  - Miguel Won
+  - Ricardo Ribeiro
+  - H. S. Pinto
+  - J. Borbinha
+  - João Dias
+  - Pedro A. Santos
+  paperId: d5fde65d01e40e4673879f6b7f4680954dce4200
+  external_ids:
+    DBLP: journals/iswa/ZanattiMWRPBDS26
+    DOI: 10.1016/j.iswa.2026.200688
+    CorpusId: 289508060
+- title: Modeling latent cross-modal interaction for reliability-aware entity alignment in multimodal
+    relation extraction
+  year: 2026
+  authors:
+  - Xiyang Liu
+  - Chunming Hu
+  - Richong Zhang
+  - J. Chen
+  - Baowen Xu
+  paperId: dc5062b2c1feaef25882178e8fd224b04d36765e
+  external_ids:
+    DOI: 10.1016/j.knosys.2026.116474
+    CorpusId: 289518448
+- title: Real-time facial emotion mapping during traditional fermented beverage tasting
+  year: 2026
+  authors:
+  - Ismael Castillo-Ortiz
+  - Ángel Díaz-Pacheco
+  paperId: 9004e605a8e831fc3a30c7e1290070a39a830758
+  external_ids:
+    DOI: 10.1016/j.ijgfs.2026.101581
+    CorpusId: 289523683
+- title: 'Layered cross-modal fusion for multispectral object detection: A case study on RGB–R walnuts'
+  year: 2026
+  authors:
+  - Huihua Wang
+  - Ruoyu Li
+  - Yuelong Xia
+  - Lu Fang
+  - Tingfeng Li
+  - Zaiqing Chen
+  - Lijun Yun
+  paperId: 412a9bb0fe4a82a7fb83b257a05bbc39ac3bba47
+  external_ids:
+    DOI: 10.1016/j.compag.2026.112071
+    CorpusId: 289544710
+- title: Are urban form and function related to urban discourse? Insights from remote sensing and social
+    media data for 15 major cities across the globe
+  year: 2026
+  authors:
+  - De-Cyuan Jheng
+  - Richard Lemoine-Rodríguez
+  - Carolin Biewer
+  - Karen C. Seto
+  - H. Taubenböck
+  paperId: 9fe273c82b9fc1479ff7ee076845ab0b660feb4e
+  external_ids:
+    DOI: 10.1016/j.habitatint.2026.103907
+    CorpusId: 289574229
+- title: Schema-portable adaptive early-exit transformer for resource-aware IoT intrusion detection
+  year: 2026
+  authors:
+  - August F. Y. Chao
+  paperId: 9806fd11c5960aa50d63fb25d5ff7bb5a8e328ea
+  external_ids:
+    DOI: 10.1016/j.jnca.2026.104534
+    CorpusId: 289597192
+- title: Analyzing climate risk disclosures in the banking sector using transformer models and generative
+    AI
+  year: 2026
+  authors:
+  - A. Kongthon
+  - Patipan Sae-Lim
+  paperId: f05b86b4faa8181c8408dd5b4d592bf2b218d903
+  external_ids:
+    DOI: 10.1016/j.joitmc.2026.100815
+    CorpusId: 289606939
+- title: 'CloudX: A dual-layered cloud native architecture for GPU resource management using interactive
+    notebook'
+  year: 2026
+  authors:
+  - A. Shiddiqi
+  - R. Ijtihadie
+  - Timothy Girry Kale
+  - R. J. Akbar
+  - D. A. Navastara
+  - Nuniek Fahriani
+  - Gloriyano Cristho Daniel Pepuho
+  - Urdhanaka Aptanagi
+  - Ntivuguruzwa Jean de La Croix
+  paperId: 9e6738bc9dee193a2074c46f5a36459d5e8be1da
+  external_ids:
+    DOI: 10.1016/j.array.2026.101026
+    CorpusId: 289790099
+- title: 'DTCC: Decision Transformer-driven framework for adaptive network congestion control'
+  year: 2026
+  authors:
+  - Xiaolan Ji
+  - Biao Han
+  - Xiaoliang Wang
+  - Ruidong Li
+  - Jinshu Su
+  paperId: 10df981fb35c7151dd80cbe16817cd98b9657275
+  external_ids:
+    DOI: 10.1016/j.comnet.2026.112531
+    CorpusId: 289946026
+- title: A novel knowledge-entity-grounded scholarly retrieval framework in full-text academic documents
+  year: 2026
+  authors:
+  - Si Shen
+  - Chuan Jiang
+  - Dongbo Wang
+  - Zhixiao Zhao
+  - Haotian Hu
+  - Min Song
+  - Jia Tina Du
+  paperId: 815eaecd7d3e95506a78bce74e8393140c240fe3
+  external_ids:
+    DOI: 10.1016/j.joi.2026.101846
+    CorpusId: 289948626
+- title: Comparative study of advanced deep learning architectures for efficient multi-physics surrogate
+    modeling in pyrolysis cooling channels
+  year: 2026
+  authors:
+  - Yunhe Bai
+  - Jiajun Zhao
+  - Xiaoshuang Li
+  - Chen Zhang
+  - Longzhu Han
+  - Hui Gao
+  paperId: bf9644ad4f5cc0623b01b813897d42007cb14781
+  external_ids:
+    DOI: 10.1016/j.icheatmasstransfer.2026.111931
+    CorpusId: 290097997
+- title: Harnessing Advanced Transfer Learning Techniques in GPT-2 for Real-World Multilingual Applications
+  year: 2026
+  authors:
+  - Dejan Dodi
+  - Ć. DušanREGODI
+  - Ć. AnaVUKI
+  - Ć. VukVUJOVI
+  - Ć. NikolaMILUTINOVI
+  paperId: 1fe8f29391b8cbcca9bfb2397ae8f11dded0640b
+  external_ids:
+    DOI: 10.17559/tv-20240906001971
+    CorpusId: 289821241
+- title: 'TAN: A Temporal Attention Network for Photovoltaic Power Forecasting'
+  year: 2026
+  authors:
+  - Chao Huang
+  - Hui Zhang
+  - Tian Luan
+  paperId: 8c9cb6240c7bf9823310d6d32d26fcaf037689ea
+  external_ids:
+    DOI: 10.17559/tv-20250917002999
+    CorpusId: 289799669
+- title: 'Revisiting the S-O-R Framework in Live-Streaming Commerce: An AI-Driven Emotion Recognition
+    Approach'
+  year: 2026
+  authors:
+  - Lei Mei
+  - Yang Yang
+  - Yuqin Deng
+  paperId: 5fd096876b9d8153f91532b622aee7e3667b60ab
+  external_ids:
+    DOI: 10.17559/tv-20250906002961
+    CorpusId: 289770807
+- title: 'MemeBridge: A Dataset for Benchmarking and Mitigating the Bidirectional Cultural Gap in Meme
+    Interpretation'
+  year: 2026
+  authors:
+  - Hangxiao Zhu
+  - Ming Jiang
+  - Yu Zhang
+  paperId: d569107280be57eb7b152d7f5a8f3b3ee40d8556
+  external_ids:
+    DBLP: conf/kdd/ZhuQLJZX26
+    DOI: 10.1145/3770854.3785691
+    CorpusId: 285542826
+- title: 'Rethinking Temporal Knowledge Graph Representation Learning: From Entities to Evolutionary Event-Centric
+    Clusters'
+  year: 2026
+  authors:
+  - Qian Chen
+  - Ling Chen
+  paperId: b6e21b06ff1a0fcbf1b56e7be9e4e730e95fddae
+  external_ids:
+    DBLP: conf/kdd/ChenC26
+    DOI: 10.1145/3770854.3780173
+    CorpusId: 287619227
+- title: 'Beyond Content: Integrating Generated User Intent and Planned Behavior Theory for Reliable Fake
+    News Detection'
+  year: 2026
+  authors:
+  - Ling Sun
+  - Yuan Rao
+  - H. Xia
+  - Hongxu Jiang
+  - Chenlong Zhang
+  paperId: f526759150e042bf18ca1f78485eb4a23c62df1b
+  external_ids:
+    DBLP: conf/kdd/SunRXJZ26
+    DOI: 10.1145/3770854.3780276
+    CorpusId: 287619243
+- title: Multi-Modal Representation for Spatially Resolved Transcriptomics Based on Global Correlation
+    and Dynamic Cluster Discovery
+  year: 2026
+  authors:
+  - Chuanxiu Li
+  - Shengwu Xiong
+  - Zhenyu Xiong
+  - Ming-Han Sun
+  - Qixiang Zou
+  - Yi Rong
+  paperId: 53030818e2619d14541f81c6a91d2949607b54db
+  external_ids:
+    DBLP: conf/kdd/LiXXSZR26
+    DOI: 10.1145/3770854.3780239
+    CorpusId: 287619140

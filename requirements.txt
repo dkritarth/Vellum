@@ -1,0 +1,7 @@
+# Top-level dependencies for scripts/ingest.py.
+# Install into a local project venv — do not install into global/system
+# Python (per ~/.claude/CLAUDE.md and the markitdown pipx isolation):
+#   python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+markitdown[pdf]
+requests
+pyyaml

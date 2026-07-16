@@ -5,3 +5,8 @@
 markitdown[pdf]
 requests
 pyyaml
+
+# scripts/ask.py (single-paper Q&A) needs paper-qa, deliberately not listed
+# here: it pulls a large dependency tree (litellm, tiktoken, etc.) that
+# ingest.py doesn't need. Install separately if you're using Q&A:
+#   pip install paper-qa

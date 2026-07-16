@@ -27,9 +27,15 @@ wired up via paper-qa, but **is currently blocked in environments without
 `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`** — the wiring itself is verified
 end-to-end short of the live API call.
 
-M2 (cross-paper synthesis) and M3 (citation graph) are not started. See
-`PLAN.md`'s roadmap and `NOTES.md`'s "Natural next step" section for what's
-planned next.
+**M2 (cross-paper synthesis) is done.** `scripts/synthesize.py` reads a
+folder of already-ingested papers and drafts a cited lit-review paragraph
+answering "what do these papers say about X" (Claude-CLI-driven, same
+credential path as ingestion's extraction pass), plus a `--contradictions`
+mode for agreement/disagreement detection. See `NOTES.md`'s M2 section for
+test queries and output samples.
+
+M3 (citation graph) is not started. See `PLAN.md`'s roadmap and `NOTES.md`'s
+M2 section ("What's next") for what's planned there.
 
 Storage is one plain-file directory per paper (no database) — see
 `PLAN.md` for the rationale.
@@ -71,6 +77,18 @@ source .venv/bin/activate
 python scripts/ask.py 1706.03762 "What optimizer did they use?"
 python scripts/ask.py papers/1810.04805 "How is NSP pre-training done?"
 ```
+
+Synthesize a lit-review paragraph across ingested papers (no API key
+required — same `claude` CLI path as ingestion):
+
+```bash
+source .venv/bin/activate
+python scripts/synthesize.py "how do these papers handle attention/alignment mechanisms"
+python scripts/synthesize.py "is recurrence necessary for good performance" --contradictions
+```
+
+This writes `synthesis/<topic-slug>.md` with the synthesized prose and a
+frontmatter block noting which papers were included.
 
 See `CLAUDE.md`'s Commands section for the full details, and `NOTES.md` for
 known limitations of each path.

@@ -1,8 +1,183 @@
 # NOTES
 
 Running notes on implementation status, blockers, and known limitations
-for the ingest/extract/Q&A pipeline. M1 section is current; M0 section
-kept below for history.
+for the ingest/extract/synthesis/Q&A pipeline. M2 section is current; M1
+and M0 sections kept below for history.
+
+## M2 status: cross-paper synthesis (`scripts/synthesize.py`)
+
+Built per `PLAN.md`'s M2 milestone ("can answer 'what do papers X, Y, Z say
+about topic T' across a folder, generating a draft lit-review paragraph")
+and the Phase 2 roadmap item ("aggregate extracted sections/claims across
+a folder of papers... reuse `research-paper-writing` skill for the writing
+side... contradiction/agreement detection (stretch)").
+
+### 1. What it does
+
+`scripts/synthesize.py "<topic>" [paper-ids...]` (all ingested papers under
+`papers/` if no ids given) reads each matched paper's `metadata.yaml` +
+the relevant `paper.md` section slices (using the `sections` line
+boundaries `ingest.py` already populates — `References` is deliberately
+excluded from the prompt since it's a citation list, not content relevant
+to a synthesis question, and is often the single largest section by
+character count), builds a citation label per paper (`"<First author's
+last name> et al. <year>"`, e.g. "Vaswani et al. 2017"; falls back to
+title or slug if authors/year are missing), and shells out to the `claude`
+CLI in non-interactive mode — the exact same credential path
+`ingest.py`'s `extract_sections_claude()` uses (`claude -p --output-format
+json --tools ""`, no raw `ANTHROPIC_API_KEY` needed) — to draft a 1-3
+paragraph lit-review-style synthesis with inline citations back to each
+paper's citation label.
+
+A `--contradictions` flag switches to an agreement/disagreement-detection
+prompt instead (the Phase 2 "stretch" item): same paper-loading and
+citation machinery, but the prompt asks Claude to structure the answer
+under "Agreement:"/"Disagreement:" and explicitly instructs it not to
+fabricate disagreement that isn't there — verified this works (see test 3
+below): when three papers spanning different eras of the same research
+question were asked about, Claude correctly distinguished "no direct
+disagreement, Bahdanau et al. simply predates the recurrence-necessity
+question" from a real position split, rather than manufacturing a false
+tension.
+
+Output: `synthesis/<topic-slug>.md` (or `<topic-slug>-contradictions.md`),
+plain markdown with YAML frontmatter (`topic`, `mode`, `papers` included,
+`citation_labels`, `generated_at`, `extraction_method: claude-cli`)
+followed by the synthesized prose — same plain-file convention as
+`papers/`, no database. `--print-only` skips the file write for quick
+ad-hoc queries.
+
+### 2. No index added
+
+Per `PLAN.md`'s explicit "only introduce a lightweight index if plain file
+scans prove too slow" rule and `AGENTS.md`'s "no SQLite/Postgres/vector
+store without re-justifying it" guardrail: this reads all 5 papers'
+`metadata.yaml` + relevant `paper.md` slices via a plain `Path.iterdir()`
+glob, with no index of any kind. End-to-end wall time for a 5-paper
+synthesis call is dominated entirely by the `claude -p` call itself
+(10-60s, consistent with `ingest.py`'s per-call cost noted in the M1
+section below) — the file-reading/aggregation step is sub-100ms even
+un-optimized. At this corpus size (5 papers, and PLAN.md's stated target
+of "hundreds, not millions" for one PhD student's active reading list),
+there is no performance wall to justify an index; this was not
+revisited.
+
+### 3. "Reuse `research-paper-writing` skill for the writing side" — how, exactly
+
+Read `~/.claude/skills/research-paper-writing/SKILL.md` before building
+this: that skill's own workflow is explicitly interactive and
+multi-message ("Rewrite paragraph-by-paragraph with one message only per
+paragraph," "Run reverse outlining after writing each section," "Load only
+the section reference file needed for the current edit target") — it is
+designed to be invoked via Claude Code's `Skill` tool inside a live,
+turn-taking session where a human or agent reviews and iterates on one
+paragraph at a time. A plain Python script shelling out to `claude -p` in
+one-shot non-interactive mode has no way to drive that turn-taking
+workflow or load the skill's `references/*.md` files as a live skill
+invocation — there is no CLI flag or API to say "invoke skill X" from
+outside an interactive session.
+
+So the "reuse" here is at the **prompt-engineering level**, not a literal
+skill invocation: `SYNTHESIZE_PROMPT_TMPL` in `scripts/synthesize.py`
+directly restates the skill's core global principles that are actually
+applicable to a single generated paragraph (state the paragraph's point in
+its first sentence; keep explicit sentence-to-sentence flow rather than a
+flat list; back every claim with evidence/citation; no fabricated
+claims/relevance) as literal instructions in the prompt sent to `claude
+-p`. This is documented here explicitly rather than silently — the task
+brief anticipated this exact gap ("if research-paper-writing skill can't
+be invoked non-interactively from a script... document why"), and this is
+that documentation.
+
+### 4. Tested against the real papers already in `papers/`
+
+Three real queries were run end-to-end (not fixtures) against the 5 papers
+ingested in M1 (Attention Is All You Need, BERT, ResNet, Bahdanau
+attention, the PLOS ONE paper):
+
+1. `"how do these papers handle attention/alignment mechanisms"` restricted
+   to `1706.03762 1409.0473` (Vaswani/Bahdanau) — produced a genuinely
+   well-cited two-paragraph contrast: Bahdanau's attention as "a targeted
+   fix to a specific bottleneck" layered on recurrence vs. Vaswani's
+   "attention-as-foundation" argument that recurrence is actively
+   limiting, correctly citing the additive-vs-scaled-dot-product attention
+   distinction both papers actually discuss. Every sentence attributing a
+   claim to a paper carried an inline `(Author et al. year)` citation, as
+   required.
+2. `"how is transfer learning / pretraining used across these papers"`
+   with no paper-id filter (all 5 papers) — correctly identified that
+   pretraining is central to BERT and ResNet (ImageNet pretraining
+   transferring to COCO detection) but only tangential/absent in
+   Bahdanau, Vaswani, and the LRP interpretability paper (which treats a
+   pretrained Caffe ImageNet model purely as a fixed object of analysis,
+   not a technique) — and explicitly connected BERT's adoption of the
+   Transformer encoder as its own backbone, a genuine cross-paper link
+   the source papers don't state directly but is supported by both texts.
+3. `"is recurrence necessary for good sequence modeling performance"
+   --contradictions` on `1706.03762 1409.0473 1810.04805` — correctly
+   reported agreement between Vaswani/BERT (recurrence not required) and
+   correctly declined to manufacture a disagreement with Bahdanau, framing
+   it instead as "recurrence-optional vs. recurrence-retained-but-improved"
+   since Bahdanau's paper simply predates that question rather than taking
+   an opposing position on it.
+4. A deliberately off-topic query (`"clinical trial design for drug
+   efficacy in oncology"` against Vaswani/ResNet) correctly produced a
+   single honest sentence stating neither paper is relevant, rather than
+   padding out a fabricated paragraph — confirms the "if none of the
+   papers substantively address the topic, say so plainly" instruction
+   works in practice, not just in the prompt text.
+
+All 4 runs are saved under `synthesis/` in this repo for inspection
+(`--print-only` was used for the deliberately-off-topic run so it wasn't
+written to disk).
+
+### 5. Known limitation: caveman-mode leakage (same root cause as M1)
+
+The `--contradictions` test above came back in noticeably more
+telegraphic/caveman-flavored phrasing ("Vaswani et al. 2017 drop
+recurrence... get better BLEU") than the plain-synthesis prompt's output,
+despite `synthesize.py`'s prompt explicitly instructing "Do not use
+caveman/terse/compressed phrasing regardless of any other session-level
+style preference." This is the same environment-config artifact already
+noted in the M1 section below for `ingest.py`'s `claude_summary` field
+(this machine's global `~/.claude/settings.json` activates caveman mode
+via a `SessionStart` hook for every `claude` CLI invocation) — not a bug
+in `synthesize.py` itself, and not something this script can fully
+control from outside. The content was still accurate; only the fluency
+suffered.
+
+### 6. Storage / no new dependencies
+
+No new Python dependencies were needed — `synthesize.py` uses only
+`pyyaml` (already in `requirements.txt` for `ingest.py`) plus the stdlib.
+No changes to `requirements.txt` were required.
+
+### 7. What's next (M3, explicitly out of scope for this pass)
+
+Per `PLAN.md`, M3 is the citation graph: build paper -> cited-papers (from
+References sections) and paper -> citing-papers (best-effort, e.g. via
+Semantic Scholar API) links, then visualize/query the graph (most-cited
+papers in the corpus, cluster detection). Given what M2 built, the
+concrete next steps would be:
+
+- A References-section parser (the one section `synthesize.py`
+  deliberately excludes from its prompt) that extracts individual
+  citation entries per paper — this is a new, genuinely different parsing
+  problem from section-boundary extraction, since References sections
+  have heterogeneous per-venue citation formats.
+- A best-effort external lookup (Semantic Scholar API is the
+  `PLAN.md`-suggested candidate) to resolve "paper X cites paper Y" links
+  where Y isn't itself in the local `papers/` corpus, and to get
+  citing-paper data (which isn't derivable from the local corpus alone).
+- Graph storage: still plausibly plain files (e.g. one `citations.yaml`
+  per paper, or a single corpus-level edge-list file) rather than a graph
+  database, consistent with this project's storage philosophy — but this
+  is the phase where `PLAN.md` explicitly flags the plain-files decision
+  as most likely to be revisited if the corpus grows large enough that
+  graph queries (not just lookups) become the dominant access pattern.
+- This is explicitly out of scope for this M2 pass, per `AGENTS.md`'s "do
+  not start Phase 3 work" rule — noted here only as the natural next step,
+  not started.
 
 ## M1 status: ingestion inputs, Claude-driven extraction, paper-qa wiring
 
@@ -177,30 +352,14 @@ title/author read over the regex-only guesser.
   comment) since it pulls a much heavier dependency tree than `ingest.py`
   needs on its own.
 
-## Natural next step (M2, explicitly out of scope for this pass)
+## Natural next step (M2) — [now done, see M2 section above]
 
-Per `PLAN.md`, M2 is cross-paper synthesis: "what do papers X, Y, Z say
-about topic T" across a folder, generating a draft lit-review paragraph
-(reusing the `research-paper-writing` skill for the writing side). Given
-what M1 built, the concrete next steps are:
-
-- A small aggregation script that reads every `papers/*/metadata.yaml` +
-  the relevant section slice of `paper.md` (using the `sections`
-  boundaries this pipeline now populates reliably) across a folder, rather
-  than re-reading whole PDFs.
-- A synthesis prompt (Claude-driven, same CLI-passthrough pattern as
-  extraction, or the `research-paper-writing` skill directly) that takes
-  N papers' relevant section text and drafts a comparison paragraph.
-- Only introduce a lightweight index (SQLite FTS5 or embeddings) if a
-  plain glob over `papers/*/metadata.yaml` proves too slow for the corpus
-  size actually in use — per `PLAN.md`'s explicit "don't add an index
-  until proven necessary" rule. Do not start Phase 3 (citation graph) work
-  before this is solid, per `AGENTS.md`.
-- If `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` becomes available in a future
-  environment, `scripts/ask.py` needs no code changes — just re-run with
-  the key set — and is a good sanity check to do before investing in M2's
-  synthesis work, since M2 will likely also want an LLM call per synthesis
-  request.
+This section originally listed M2 (cross-paper synthesis) as the planned
+next step after M1; it's kept here for history since the M2 section above
+now documents what was actually built (`scripts/synthesize.py`). One item
+from the original list is still open: if `ANTHROPIC_API_KEY`/
+`OPENAI_API_KEY` becomes available in a future environment, `scripts/
+ask.py` needs no code changes — just re-run with the key set.
 
 ## M0 status: working, not blocked (history)
 

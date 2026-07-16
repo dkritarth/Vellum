@@ -86,9 +86,46 @@ environment — paper-qa calls the provider API directly via LiteLLM (unlike
 Claude Code session's credentials). See `NOTES.md` if you hit "No LLM API
 key found."
 
+Synthesize a lit-review-style paragraph across a folder of already-ingested
+papers (M2 — cross-paper synthesis, reads `metadata.yaml` + `paper.md`
+section slices, shells out to the `claude` CLI same as `ingest.py`'s
+extraction pass, no raw API key required):
+
+```bash
+source .venv/bin/activate
+# default: every paper under papers/
+python scripts/synthesize.py "how do these papers handle attention/alignment mechanisms"
+# restrict to specific paper ids/slugs
+python scripts/synthesize.py "how is pretraining used?" 1810.04805 1706.03762
+# contradiction/agreement-detection mode instead of a plain synthesis paragraph
+python scripts/synthesize.py "is recurrence necessary for good performance" --contradictions
+# print to stdout without writing a file
+python scripts/synthesize.py "topic" --print-only
+```
+
+Output: `synthesis/<topic-slug>.md` (or `<topic-slug>-contradictions.md` in
+`--contradictions` mode) — YAML frontmatter (`topic`, `mode`, `papers`
+included, `citation_labels`, `generated_at`, `extraction_method`) followed
+by the synthesized prose. Plain files, no database, consistent with
+`papers/`'s convention; no SQLite/embeddings index was added since a plain
+glob over 5 papers is effectively instant — see `NOTES.md` for the "only
+add an index if you hit a real wall" rationale.
+
+There is no heuristic fallback for synthesis (unlike `ingest.py`'s section
+extraction): if the `claude` CLI is missing or fails, `synthesize.py` exits
+non-zero with a clear error rather than writing a fabricated or low-quality
+file. The "reuse `research-paper-writing` skill for the writing side" from
+`PLAN.md` is implemented at the prompt level (the synthesis prompt mirrors
+that skill's prose principles — topic-sentence-first paragraphs, explicit
+claim-to-citation alignment, no flat "Paper A says X" listing) rather than
+as a literal Skill-tool invocation — see `NOTES.md`'s M2 section for why
+that skill can't be driven non-interactively from a plain script.
+
 There is no test suite yet; validate by re-running `ingest.py` against a
 few real arXiv IDs/DOIs/URLs and spot-checking `metadata.yaml` section
-boundaries against `paper.md`, per `AGENTS.md`'s Testing section.
+boundaries against `paper.md`, per `AGENTS.md`'s Testing section. Validate
+`synthesize.py` similarly: re-run against real ingested papers and read the
+generated `synthesis/*.md` prose for coherence and citation accuracy.
 
 Token/cost usage for this project's Claude Code sessions and background
 agents (including worktree-isolated agent sessions, since each gets its own

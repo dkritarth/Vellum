@@ -1,4 +1,6 @@
+input_type: arxiv
 arxiv_id: '1810.04805'
+doi: null
 source_url: https://arxiv.org/abs/1810.04805
 pdf_url: https://arxiv.org/pdf/1810.04805.pdf
 title: 'BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding'
@@ -21,45 +23,53 @@ abstract: We introduce a new language representation model called BERT, which st
   natural language processing tasks, including pushing the GLUE score to 80.5% (7.7% point absolute improvement),
   MultiNLI accuracy to 86.7% (4.6% absolute improvement), SQuAD v1.1 question answering Test F1 to 93.2
   (1.5 point absolute improvement) and SQuAD v2.0 Test F1 to 83.1 (5.1 point absolute improvement).
-ingested_at: '2026-07-16T07:45:51+00:00'
-extraction_method: heuristic-regex
+claude_summary: This paper introduces BERT (Bidirectional Encoder Representations from Transformers),
+  a language representation model that pre-trains deep bidirectional representations by jointly conditioning
+  on both left and right context in all layers, using a masked language model objective plus a next-sentence-prediction
+  task. Unlike prior unidirectional (left-to-right) approaches such as OpenAI GPT and shallow bidirectional
+  concatenations like ELMo, BERT can be fine-tuned with just one additional output layer to create state-of-the-art
+  models for a wide range of tasks without substantial task-specific architecture changes. BERT achieves
+  new state-of-the-art results on eleven NLP tasks, including pushing the GLUE score to 80.5%, MultiNLI
+  accuracy to 86.7%, SQuAD v1.1 Test F1 to 93.2, and SQuAD v2.0 Test F1 to 83.1.
+ingested_at: '2026-07-16T08:03:25+00:00'
+extraction_method: claude-cli
 sections:
 - name: Abstract
-  found: false
-  start_line: null
-  end_line: null
+  found: true
+  start_line: 7
+  end_line: 55
 - name: Introduction
   found: true
   start_line: 55
-  end_line: 125
+  end_line: 126
 - name: Related Work
   found: true
   start_line: 126
-  end_line: 134
+  end_line: 212
 - name: Method
   found: true
-  start_line: 135
-  end_line: 1329
+  start_line: 212
+  end_line: 353
 - name: Experiments
-  found: false
-  start_line: null
-  end_line: null
+  found: true
+  start_line: 352
+  end_line: 596
 - name: Results
   found: false
   start_line: null
   end_line: null
 - name: Discussion
-  found: false
-  start_line: null
-  end_line: null
+  found: true
+  start_line: 596
+  end_line: 735
 - name: Conclusion
-  found: false
-  start_line: null
-  end_line: null
+  found: true
+  start_line: 735
+  end_line: 757
 - name: References
-  found: false
-  start_line: null
-  end_line: null
+  found: true
+  start_line: 757
+  end_line: 1330
 files:
   pdf: paper.pdf
   markdown: paper.md

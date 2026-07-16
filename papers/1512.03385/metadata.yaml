@@ -1,4 +1,6 @@
+input_type: arxiv
 arxiv_id: '1512.03385'
+doi: null
 source_url: https://arxiv.org/abs/1512.03385
 pdf_url: https://arxiv.org/pdf/1512.03385.pdf
 title: Deep Residual Learning for Image Recognition
@@ -24,29 +26,38 @@ abstract: Deeper neural networks are more difficult to train. We present a resid
   improvement on the COCO object detection dataset. Deep residual nets are foundations of our submissions
   to ILSVRC & COCO 2015 competitions, where we also won the 1st places on the tasks of ImageNet detection,
   ImageNet localization, COCO detection, and COCO segmentation.
-ingested_at: '2026-07-16T07:45:52+00:00'
-extraction_method: heuristic-regex
+claude_summary: This paper introduces deep residual learning to ease training of very deep convolutional
+  neural networks. Instead of directly fitting a desired underlying mapping, stacked layers are reformulated
+  to learn residual functions with reference to layer inputs, implemented via identity shortcut connections
+  that add no extra parameters or computational complexity. The authors show these residual networks are
+  easier to optimize and gain accuracy from significantly increased depth, evaluating ResNets up to 152
+  layers on ImageNet (winning 1st place in the ILSVRC 2015 classification task with 3.57% top-5 ensemble
+  error) and successfully training networks with over 1000 layers on CIFAR-10. The learned representations
+  also transfer well, yielding large gains on COCO and PASCAL VOC object detection, ImageNet localization,
+  and COCO segmentation.
+ingested_at: '2026-07-16T08:03:52+00:00'
+extraction_method: claude-cli
 sections:
 - name: Abstract
-  found: false
-  start_line: null
-  end_line: null
+  found: true
+  start_line: 9
+  end_line: 55
 - name: Introduction
-  found: false
-  start_line: null
-  end_line: null
+  found: true
+  start_line: 55
+  end_line: 107
 - name: Related Work
-  found: false
-  start_line: null
-  end_line: null
+  found: true
+  start_line: 107
+  end_line: 194
 - name: Method
   found: true
-  start_line: 264
-  end_line: 380
+  start_line: 194
+  end_line: 381
 - name: Experiments
   found: true
   start_line: 381
-  end_line: 1249
+  end_line: 831
 - name: Results
   found: false
   start_line: null
@@ -60,9 +71,9 @@ sections:
   start_line: null
   end_line: null
 - name: References
-  found: false
-  start_line: null
-  end_line: null
+  found: true
+  start_line: 831
+  end_line: 1250
 files:
   pdf: paper.pdf
   markdown: paper.md

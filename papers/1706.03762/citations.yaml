@@ -1,0 +1,1007 @@
+paper_slug: '1706.03762'
+title: Attention Is All You Need
+generated_at: '2026-07-16T11:48:53+00:00'
+parse_method: claude-cli
+references_parsed: 40
+references:
+- raw: Jimmy Lei Ba, Jamie Ryan Kiros, Geoffrey E Hinton - Layer normalization
+  title: Layer normalization
+  authors:
+  - Jimmy Lei Ba
+  - Jamie Ryan Kiros
+  - Geoffrey E Hinton
+  year: 2016
+- raw: Dzmitry Bahdanau, Kyunghyun Cho, Yoshua Bengio - Neural machine translation by jointly learning
+    to align and translate
+  title: Neural machine translation by jointly learning to align and translate
+  authors:
+  - Dzmitry Bahdanau
+  - Kyunghyun Cho
+  - Yoshua Bengio
+  year: 2014
+- raw: Denny Britz, Anna Goldie, Minh-Thang Luong, Quoc V. Le - Massive exploration of neural machine
+    translation architectures
+  title: Massive exploration of neural machine translation architectures
+  authors:
+  - Denny Britz
+  - Anna Goldie
+  - Minh-Thang Luong
+  - Quoc V. Le
+  year: 2017
+- raw: Jianpeng Cheng, Li Dong, Mirella Lapata - Long short-term memory-networks for machine reading
+  title: Long short-term memory-networks for machine reading
+  authors:
+  - Jianpeng Cheng
+  - Li Dong
+  - Mirella Lapata
+  year: 2016
+- raw: Kyunghyun Cho, Bart van Merrienboer, Caglar Gulcehre, Fethi Bougares, Holger Schwenk, Yoshua Bengio
+    - Learning phrase representations using rnn encoder-decoder for statistical machine translation
+  title: Learning phrase representations using rnn encoder-decoder for statistical machine translation
+  authors:
+  - Kyunghyun Cho
+  - Bart van Merrienboer
+  - Caglar Gulcehre
+  - Fethi Bougares
+  - Holger Schwenk
+  - Yoshua Bengio
+  year: 2014
+- raw: 'Francois Chollet - Xception: Deep learning with depthwise separable convolutions'
+  title: 'Xception: Deep learning with depthwise separable convolutions'
+  authors:
+  - Francois Chollet
+  year: 2016
+- raw: Junyoung Chung, Çaglar Gülçehre, Kyunghyun Cho, Yoshua Bengio - Empirical evaluation of gated recurrent
+    neural networks on sequence modeling
+  title: Empirical evaluation of gated recurrent neural networks on sequence modeling
+  authors:
+  - Junyoung Chung
+  - Çaglar Gülçehre
+  - Kyunghyun Cho
+  - Yoshua Bengio
+  year: 2014
+- raw: Chris Dyer, Adhiguna Kuncoro, Miguel Ballesteros, Noah A. Smith - Recurrent neural network grammars
+  title: Recurrent neural network grammars
+  authors:
+  - Chris Dyer
+  - Adhiguna Kuncoro
+  - Miguel Ballesteros
+  - Noah A. Smith
+  year: 2016
+- raw: Jonas Gehring, Michael Auli, David Grangier, Denis Yarats, Yann N. Dauphin - Convolutional sequence
+    to sequence learning
+  title: Convolutional sequence to sequence learning
+  authors:
+  - Jonas Gehring
+  - Michael Auli
+  - David Grangier
+  - Denis Yarats
+  - Yann N. Dauphin
+  year: 2017
+- raw: Alex Graves - Generating sequences with recurrent neural networks
+  title: Generating sequences with recurrent neural networks
+  authors:
+  - Alex Graves
+  year: 2013
+- raw: Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun - Deep residual learning for image recognition
+  title: Deep residual learning for image recognition
+  authors:
+  - Kaiming He
+  - Xiangyu Zhang
+  - Shaoqing Ren
+  - Jian Sun
+  year: 2016
+- raw: 'Sepp Hochreiter, Yoshua Bengio, Paolo Frasconi, Jürgen Schmidhuber - Gradient flow in recurrent
+    nets: the difficulty of learning long-term dependencies'
+  title: 'Gradient flow in recurrent nets: the difficulty of learning long-term dependencies'
+  authors:
+  - Sepp Hochreiter
+  - Yoshua Bengio
+  - Paolo Frasconi
+  - Jürgen Schmidhuber
+  year: 2001
+- raw: Sepp Hochreiter, Jürgen Schmidhuber - Long short-term memory
+  title: Long short-term memory
+  authors:
+  - Sepp Hochreiter
+  - Jürgen Schmidhuber
+  year: 1997
+- raw: Zhongqiang Huang, Mary Harper - Self-training PCFG grammars with latent annotations across languages
+  title: Self-training PCFG grammars with latent annotations across languages
+  authors:
+  - Zhongqiang Huang
+  - Mary Harper
+  year: 2009
+- raw: Rafal Jozefowicz, Oriol Vinyals, Mike Schuster, Noam Shazeer, Yonghui Wu - Exploring the limits
+    of language modeling
+  title: Exploring the limits of language modeling
+  authors:
+  - Rafal Jozefowicz
+  - Oriol Vinyals
+  - Mike Schuster
+  - Noam Shazeer
+  - Yonghui Wu
+  year: 2016
+- raw: Łukasz Kaiser, Samy Bengio - Can active memory replace attention?
+  title: Can active memory replace attention?
+  authors:
+  - Łukasz Kaiser
+  - Samy Bengio
+  year: 2016
+- raw: Łukasz Kaiser, Ilya Sutskever - Neural GPUs learn algorithms
+  title: Neural GPUs learn algorithms
+  authors:
+  - Łukasz Kaiser
+  - Ilya Sutskever
+  year: 2016
+- raw: Nal Kalchbrenner, Lasse Espeholt, Karen Simonyan, Aaron van den Oord, Alex Graves, Koray Kavukcuoglu
+    - Neural machine translation in linear time
+  title: Neural machine translation in linear time
+  authors:
+  - Nal Kalchbrenner
+  - Lasse Espeholt
+  - Karen Simonyan
+  - Aaron van den Oord
+  - Alex Graves
+  - Koray Kavukcuoglu
+  year: 2017
+- raw: Yoon Kim, Carl Denton, Luong Hoang, Alexander M. Rush - Structured attention networks
+  title: Structured attention networks
+  authors:
+  - Yoon Kim
+  - Carl Denton
+  - Luong Hoang
+  - Alexander M. Rush
+  year: 2017
+- raw: 'Diederik Kingma, Jimmy Ba - Adam: A method for stochastic optimization'
+  title: 'Adam: A method for stochastic optimization'
+  authors:
+  - Diederik Kingma
+  - Jimmy Ba
+  year: 2015
+- raw: Oleksii Kuchaiev, Boris Ginsburg - Factorization tricks for LSTM networks
+  title: Factorization tricks for LSTM networks
+  authors:
+  - Oleksii Kuchaiev
+  - Boris Ginsburg
+  year: 2017
+- raw: Zhouhan Lin, Minwei Feng, Cicero Nogueira dos Santos, Mo Yu, Bing Xiang, Bowen Zhou, Yoshua Bengio
+    - A structured self-attentive sentence embedding
+  title: A structured self-attentive sentence embedding
+  authors:
+  - Zhouhan Lin
+  - Minwei Feng
+  - Cicero Nogueira dos Santos
+  - Mo Yu
+  - Bing Xiang
+  - Bowen Zhou
+  - Yoshua Bengio
+  year: 2017
+- raw: Minh-Thang Luong, Quoc V. Le, Ilya Sutskever, Oriol Vinyals, Lukasz Kaiser - Multi-task sequence
+    to sequence learning
+  title: Multi-task sequence to sequence learning
+  authors:
+  - Minh-Thang Luong
+  - Quoc V. Le
+  - Ilya Sutskever
+  - Oriol Vinyals
+  - Lukasz Kaiser
+  year: 2015
+- raw: Minh-Thang Luong, Hieu Pham, Christopher D Manning - Effective approaches to attention-based neural
+    machine translation
+  title: Effective approaches to attention-based neural machine translation
+  authors:
+  - Minh-Thang Luong
+  - Hieu Pham
+  - Christopher D Manning
+  year: 2015
+- raw: 'Mitchell P Marcus, Mary Ann Marcinkiewicz, Beatrice Santorini - Building a large annotated corpus
+    of english: the penn treebank'
+  title: 'Building a large annotated corpus of english: the penn treebank'
+  authors:
+  - Mitchell P Marcus
+  - Mary Ann Marcinkiewicz
+  - Beatrice Santorini
+  year: 1993
+- raw: David McClosky, Eugene Charniak, Mark Johnson - Effective self-training for parsing
+  title: Effective self-training for parsing
+  authors:
+  - David McClosky
+  - Eugene Charniak
+  - Mark Johnson
+  year: 2006
+- raw: Ankur Parikh, Oscar Täckström, Dipanjan Das, Jakob Uszkoreit - A decomposable attention model
+  title: A decomposable attention model
+  authors:
+  - Ankur Parikh
+  - Oscar Täckström
+  - Dipanjan Das
+  - Jakob Uszkoreit
+  year: 2016
+- raw: Romain Paulus, Caiming Xiong, Richard Socher - A deep reinforced model for abstractive summarization
+  title: A deep reinforced model for abstractive summarization
+  authors:
+  - Romain Paulus
+  - Caiming Xiong
+  - Richard Socher
+  year: 2017
+- raw: Slav Petrov, Leon Barrett, Romain Thibaux, Dan Klein - Learning accurate, compact, and interpretable
+    tree annotation
+  title: Learning accurate, compact, and interpretable tree annotation
+  authors:
+  - Slav Petrov
+  - Leon Barrett
+  - Romain Thibaux
+  - Dan Klein
+  year: 2006
+- raw: Ofir Press, Lior Wolf - Using the output embedding to improve language models
+  title: Using the output embedding to improve language models
+  authors:
+  - Ofir Press
+  - Lior Wolf
+  year: 2016
+- raw: Rico Sennrich, Barry Haddow, Alexandra Birch - Neural machine translation of rare words with subword
+    units
+  title: Neural machine translation of rare words with subword units
+  authors:
+  - Rico Sennrich
+  - Barry Haddow
+  - Alexandra Birch
+  year: 2015
+- raw: 'Noam Shazeer, Azalia Mirhoseini, Krzysztof Maziarz, Andy Davis, Quoc Le, Geoffrey Hinton, Jeff
+    Dean - Outrageously large neural networks: the sparsely-gated mixture-of-experts layer'
+  title: 'Outrageously large neural networks: the sparsely-gated mixture-of-experts layer'
+  authors:
+  - Noam Shazeer
+  - Azalia Mirhoseini
+  - Krzysztof Maziarz
+  - Andy Davis
+  - Quoc Le
+  - Geoffrey Hinton
+  - Jeff Dean
+  year: 2017
+- raw: 'Nitish Srivastava, Geoffrey E Hinton, Alex Krizhevsky, Ilya Sutskever, Ruslan Salakhutdinov -
+    Dropout: a simple way to prevent neural networks from overfitting'
+  title: 'Dropout: a simple way to prevent neural networks from overfitting'
+  authors:
+  - Nitish Srivastava
+  - Geoffrey E Hinton
+  - Alex Krizhevsky
+  - Ilya Sutskever
+  - Ruslan Salakhutdinov
+  year: 2014
+- raw: Sainbayar Sukhbaatar, Arthur Szlam, Jason Weston, Rob Fergus - End-to-end memory networks
+  title: End-to-end memory networks
+  authors:
+  - Sainbayar Sukhbaatar
+  - Arthur Szlam
+  - Jason Weston
+  - Rob Fergus
+  year: 2015
+- raw: Ilya Sutskever, Oriol Vinyals, Quoc V V Le - Sequence to sequence learning with neural networks
+  title: Sequence to sequence learning with neural networks
+  authors:
+  - Ilya Sutskever
+  - Oriol Vinyals
+  - Quoc V V Le
+  year: 2014
+- raw: Christian Szegedy, Vincent Vanhoucke, Sergey Ioffe, Jonathon Shlens, Zbigniew Wojna - Rethinking
+    the inception architecture for computer vision
+  title: Rethinking the inception architecture for computer vision
+  authors:
+  - Christian Szegedy
+  - Vincent Vanhoucke
+  - Sergey Ioffe
+  - Jonathon Shlens
+  - Zbigniew Wojna
+  year: 2015
+- raw: Vinyals & Kaiser, Koo, Petrov, Sutskever, Hinton - Grammar as a foreign language
+  title: Grammar as a foreign language
+  authors:
+  - Vinyals
+  - Kaiser
+  - Koo
+  - Petrov
+  - Sutskever
+  - Hinton
+  year: 2015
+- raw: 'Yonghui Wu, Mike Schuster, Zhifeng Chen, Quoc V Le, Mohammad Norouzi, Wolfgang Macherey, Maxim
+    Krikun, Yuan Cao, Qin Gao, Klaus Macherey, et al - Google''s neural machine translation system: bridging
+    the gap between human and machine translation'
+  title: 'Google''s neural machine translation system: bridging the gap between human and machine translation'
+  authors:
+  - Yonghui Wu
+  - Mike Schuster
+  - Zhifeng Chen
+  - Quoc V Le
+  - Mohammad Norouzi
+  - Wolfgang Macherey
+  - Maxim Krikun
+  - Yuan Cao
+  - Qin Gao
+  - Klaus Macherey
+  year: 2016
+- raw: Jie Zhou, Ying Cao, Xuguang Wang, Peng Li, Wei Xu - Deep recurrent models with fast-forward connections
+    for neural machine translation
+  title: Deep recurrent models with fast-forward connections for neural machine translation
+  authors:
+  - Jie Zhou
+  - Ying Cao
+  - Xuguang Wang
+  - Peng Li
+  - Wei Xu
+  year: 2016
+- raw: Muhua Zhu, Yue Zhang, Wenliang Chen, Min Zhang, Jingbo Zhu - Fast and accurate shift-reduce constituent
+    parsing
+  title: Fast and accurate shift-reduce constituent parsing
+  authors:
+  - Muhua Zhu
+  - Yue Zhang
+  - Wenliang Chen
+  - Min Zhang
+  - Jingbo Zhu
+  year: 2013
+cites:
+- slug: '1409.0473'
+  title: Neural Machine Translation by Jointly Learning to Align and Translate
+  confidence: high
+- slug: '1512.03385'
+  title: Deep Residual Learning for Image Recognition
+  confidence: high
+semantic_scholar:
+  lookup_status: ok
+  paper_id: 204e3073870fae3d05bcbc2f6a8e263d9b72e776
+  matched_title: Attention is All you Need
+  citation_count: 184385
+  citing_lookup_status: ok
+cited_by_external:
+- title: 'SCULP: An unsupervised LLM-based log parser with self-correcting capabilities'
+  year: 2026
+  authors:
+  - Le Zhang
+  - Xiancong Meng
+  - Jiaxu Chen
+  - Yaping Chi
+  paperId: 6328548d63815e3ce30da9885c332b22671ae8a1
+  external_ids:
+    DBLP: journals/jss/ZhangMCC26
+    DOI: 10.1016/j.jss.2026.112935
+    CorpusId: 288116906
+- title: 'InterpLog: Interpretable log-based anomaly detection assisting troubleshooting for system reliability'
+  year: 2026
+  authors:
+  - Rui Xiao
+  - Yabo Wang
+  - Weilong Li
+  - Jiakun Sun
+  - Shuyuan Jin
+  paperId: 70a2a5a5431e85514656dfb31b874a695d7e89bd
+  external_ids:
+    DBLP: journals/jss/XiaoWLSJ26
+    DOI: 10.1016/j.jss.2026.112916
+    CorpusId: 288143561
+- title: 'TemSoGraph: Learning temporal social graphs for cyberbullying prediction'
+  year: 2026
+  authors:
+  - Wensi Jiang
+  - Min Wang
+  - Huadong Mo
+  - Daoyi Dong
+  - Yu Zhang
+  - Wenjie Zhang
+  paperId: 9ccd1099689d0c11fa6a0da4b6679e42db78cf5d
+  external_ids:
+    DBLP: journals/isci/JiangWMDZZ26
+    DOI: 10.1016/j.ins.2026.123650
+    CorpusId: 288567396
+- title: 'PM-SSL: Physics-guided multimodal self-supervised learning for lithology identification with
+    scarce labels'
+  year: 2026
+  authors:
+  - Qingwei Pang
+  - Qingyu Pang
+  - Chenglizhao Chen
+  - Shanchen Pang
+  paperId: e28c6f044c37da28b0f1215fa88e598323419090
+  external_ids:
+    DBLP: journals/ijon/PangPCP26
+    DOI: 10.1016/j.neucom.2026.134124
+    CorpusId: 288882928
+- title: 'Multi-step Ahead Forecaster: A priori temporal information mining transformer for industrial
+    process forecasting'
+  year: 2026
+  authors:
+  - Mingjiang Dong
+  - Yalin Wang
+  - Cao Song
+  - Xujie Tan
+  - Chenliang Liu
+  paperId: 655bc336323f1356b1d1fc88d1201a127644802c
+  external_ids:
+    DBLP: journals/eaai/DongWSTL26
+    DOI: 10.1016/j.engappai.2026.115293
+    CorpusId: 289002390
+- title: A visionary dual-scale hybrid network for abdominal multi-organ segmentation
+  year: 2026
+  authors:
+  - Miao Liao
+  - Shiyuan Gong
+  - Xiong Li
+  - S. Di
+  - Weihong Lai
+  - Xiaomei Jiang
+  paperId: 36d3800759107da8ca40a96c5e792b7e618131d6
+  external_ids:
+    DBLP: journals/eaai/LiaoGLDLJ26
+    DOI: 10.1016/j.engappai.2026.115246
+    CorpusId: 289050872
+- title: 'TDFormer: A novel triple decoupled transformer for accurate multi-step wind power forecasting'
+  year: 2026
+  authors:
+  - Lei Liu
+  - Xiangyu Liu
+  - Jie Huang
+  - Tianqi Li
+  - Qiuju Chen
+  - Bin Li
+  paperId: feb140b6de86c4d16894940f8e8a15cb86682a47
+  external_ids:
+    DBLP: journals/eaai/LiuLHLCL26
+    DOI: 10.1016/j.engappai.2026.115310
+    CorpusId: 289126281
+- title: State-of-health estimation of lithium-ion batteries based on probabilistic diffusion models and
+    self-learning dynamic channel attention assisted extended long short-term memory
+  year: 2026
+  authors:
+  - Jianguo Miao
+  - Jilong Xie
+  - Miao Huang
+  - Wensheng Ma
+  - Zhaofei Li
+  - Changhao Piao
+  paperId: a6aaf42c4e753a5d036627a60237ffeb22226879
+  external_ids:
+    DBLP: journals/eaai/MiaoXHMLP26
+    DOI: 10.1016/j.engappai.2026.115379
+    CorpusId: 289255722
+- title: Improving local association in end-to-end tracking via Hard Negative Confusion-aware Denoising
+  year: 2026
+  authors:
+  - Danyang Cao
+  - Haoyu Zhang
+  paperId: 1f00d0765f003405ca850e2808e8201e1cfe5000
+  external_ids:
+    DBLP: journals/eaai/CaoZ26
+    DOI: 10.1016/j.engappai.2026.115389
+    CorpusId: 289297265
+- title: Physics-guided residual learning framework for aftershock time history prediction using mainshock
+    acceleration data
+  year: 2026
+  authors:
+  - Mengdie Chen
+  - N Time
+  - Jong‐Su Jeon
+  paperId: c5e16fa71e48e149b0fc6380bc4c5778cbe0447d
+  external_ids:
+    DBLP: journals/eaai/ChenMJ26
+    DOI: 10.1016/j.engappai.2026.115399
+    CorpusId: 289297817
+- title: Hierarchical multi-type annotation fusion with uncertainty-aware cross-attention for chest X-ray
+    classification
+  year: 2026
+  authors:
+  - S. Thota
+  - Fayadh S. Alenezi
+  - Kemal Polat
+  - A. Alhudhaif
+  paperId: c07dd68ff78abca1ba9fdb9ef3c71a58daf91818
+  external_ids:
+    DBLP: journals/asc/ThotaAPA26
+    DOI: 10.1016/j.asoc.2026.115787
+    CorpusId: 289508551
+- title: Multi-branch molecular feature fusion for molecular property prediction
+  year: 2026
+  authors:
+  - Chaobin Sun
+  - Na Li
+  - Kairui Lyu
+  - Zihe Liu
+  - Junwei Du
+  - Zhuo Chen
+  - Bin Yu
+  paperId: d502acb8ea278cd8fceb71da4ec7b5c601b1c57e
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115501
+    CorpusId: 289538176
+- title: Flow-accelerated diffusion model for trajectory generation and optimization in offline reinforcement
+    learning
+  year: 2026
+  authors:
+  - He Diao
+  - Shan Zhong
+  - Xianglin Chen
+  - Ping Zhang
+  - Zhenyu Feng
+  - Bei Peng
+  paperId: 6b106ed1eb9973633bc844839b562ef9b4f379fb
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115521
+    CorpusId: 289721888
+- title: A unified workflow for pore structure and flow analysis using deep learning and REV constraints
+  year: 2026
+  authors:
+  - Zhazha Hu
+  - Xun Zhang
+  - L. Xu
+  - Wenbing Guo
+  - Linxian Gong
+  - Norbert Klitzsch
+  - Guoyan Li
+  paperId: 3b9617c340b80bb920db6c4c176b85421940d437
+  external_ids:
+    DOI: 10.1016/j.jgsce.2026.205970
+    CorpusId: 289729752
+- title: Spatiotemporal graph-based surrogate modeling and deep reinforcement learning for multi-layer
+    injection-production decision in waterflood reservoirs
+  year: 2026
+  authors:
+  - Shifang Zhang
+  - Hu Huang
+  - Lei Wang
+  - Bin Gong
+  - Deli Jia
+  paperId: 0af4b505041f77ec1f10b0e8e538696faf11f83a
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115452
+    CorpusId: 289738402
+- title: Multivariable temporal-frequency reconstruction model with two-stage decomposition and explainable
+    AI-driven feature selection for highly volatile time-series forecasting
+  year: 2026
+  authors:
+  - Maohuan Wang
+  - Jie Xu
+  - Lei Sun
+  - Tao Zhang
+  paperId: 59109220719a09ef2256cd828b2880d313e0b347
+  external_ids:
+    DOI: 10.1016/j.asoc.2026.115822
+    CorpusId: 289752705
+- title: Continuous state evolution with token purification for visual tracking
+  year: 2026
+  authors:
+  - Xianxin Jia
+  - Zhiqiang Hou
+  - Nating Du
+  - Hao Yue
+  - Hao Cui
+  - Sugang Ma
+  - Yang Liu
+  paperId: 9676465293c28faad465ec92bb6fc5a84f69063e
+  external_ids:
+    DOI: 10.1016/j.neucom.2026.134391
+    CorpusId: 289763713
+- title: Solving the capacitated vehicle routing problem via a collaborative adaptive fusion transformer
+  year: 2026
+  authors:
+  - Zhong-zhi Yang
+  - Junqing Li
+  - Yanan Wang
+  - Hui Zhang
+  paperId: ba9532e4b62cfc41ca2e6b6df7169fcd6c4ec929
+  external_ids:
+    DOI: 10.1016/j.asoc.2026.115866
+    CorpusId: 289764425
+- title: Dynamic feature arbitration and synergistic attention for high-fidelity brain MRI super-resolution
+  year: 2026
+  authors:
+  - Yu Zhang
+  - Yu Fu
+  - Weihao Zheng
+  - Xia Liu
+  - Zhijun Yao
+  - Bin Hu
+  paperId: 0fdbb919913105e8bac2e9dd12a1a6d7300c521a
+  external_ids:
+    DOI: 10.1016/j.neucom.2026.134394
+    CorpusId: 289773066
+- title: 'When transformers obey physics: A physics-guided transformer with symbolic regression for real
+    time monitoring of flowing bottom-hole pressure'
+  year: 2026
+  authors:
+  - C. Adenutsi
+  - Nii Sowah Laryea-Adjei
+  - Tahiru Abdul-Mumin
+  - K. Sarkodie
+  - Samuel Erzuah
+  paperId: 12f30137bd10265913fdb9cff75bc48ad9ea5120
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115567
+    CorpusId: 289778861
+- title: 'HFAT-HMR: Empowering ViT for human mesh recovery via high-frequency enhancement and auxiliary
+    tokens'
+  year: 2026
+  authors:
+  - Jinming Zhang
+  - Yingjie Chen
+  - Linlin Yang
+  - Boshu Jia
+  - Fang Liu
+  - Baochang Zhang
+  - Xiaoyu Wu
+  - Libiao Jin
+  paperId: 981d19ef5769648fd42ba865cbceeaa949c36bb3
+  external_ids:
+    DOI: 10.1016/j.neucom.2026.134382
+    CorpusId: 289783500
+- title: 'Enhancing fairness in energy efficiency and peak age of information in low earth orbit-aided
+    unmanned aerial vehicle-integrated sensing and communication networks: Attention-aided multi-agent
+    proximal policy optimization approach'
+  year: 2026
+  authors:
+  - Kimchheang Chhea
+  - Jung-Ryun Lee
+  paperId: 3a41bcf8503fbf26cdba70d3f094928929c4da5c
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115492
+    CorpusId: 289787477
+- title: A novel monitoring method for molten iron flow state at the blast furnace taphole by fusing image
+    and operating state data
+  year: 2026
+  authors:
+  - Zhaohui Jiang
+  - Xuekun Liu
+  - Dong Pan
+  - Chuan Xu
+  - Weihua Gui
+  paperId: a1ee6ef05c429f7b1ed0e4d83d9b27494d54e325
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115536
+    CorpusId: 289813705
+- title: Contrastive distillation and cross-modal Mamba fusion for multimodal brain disease diagnosis
+  year: 2026
+  authors:
+  - Zhiwen Wang
+  - Jiaqi Xie
+  - Deyu Tang
+  - Jin Deng
+  - Yong Liang
+  - Qiong Huang
+  - Jinfeng Wang
+  paperId: 2736f3c280a9ffbfc106f0b084a5f73b05b62a8b
+  external_ids:
+    DOI: 10.1016/j.bspc.2026.110888
+    CorpusId: 289902515
+- title: 'DFMD-Net: a dual-encoder fusion and multi-scale decoding network for polyp segmentation'
+  year: 2026
+  authors:
+  - Caixia Zheng
+  - Guangyan Chen
+  - Songling Che
+  - Jingru Guo
+  - Yanlin He
+  - Wanqiang Zhu
+  paperId: f61dea3eca81275d25fc314c9d5131786e5e0c46
+  external_ids:
+    DOI: 10.1016/j.bspc.2026.110923
+    CorpusId: 289905118
+- title: Automatic prompt generation via reinforcement learning guided contrastive purification for label-free
+    SAM segmentation
+  year: 2026
+  authors:
+  - Yansong Zhang
+  - Hangbei Cheng
+  - Jianan Zhang
+  - Guangze Shi
+  - Xueyu Liu
+  - Lijie Shi
+  - Junxin Chen
+  - Yongfei Wu
+  paperId: 0359d64e1fd1424d8a3635cc76ae84c392b80782
+  external_ids:
+    DOI: 10.1016/j.bspc.2026.110939
+    CorpusId: 289913778
+- title: 'Real-time motion planning for virtual coupling train operations: A learning-based combinatorial
+    optimization method'
+  year: 2026
+  authors:
+  - Haili Chen
+  - Shukai Li
+  - Yiwen Zhang
+  - Lixing Yang
+  paperId: baff71be89cd2b3743cc89395f4bb5157d13fd32
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115529
+    CorpusId: 289915084
+- title: State prior Mamba for image super-resolution
+  year: 2026
+  authors:
+  - Xiaohai Xue
+  - Qianzhu Shi
+  - Xiaohong Zou
+  paperId: 5e131726e1a9538813438ebf8d97f63a10bc9847
+  external_ids:
+    DOI: 10.1016/j.cag.2026.104677
+    CorpusId: 289945665
+- title: A bicycle traffic prediction framework using pretrained large language models
+  year: 2026
+  authors:
+  - Xiamei Wen
+  - D. Duives
+  - Serge P. Hoogendoorn
+  paperId: dfb09bac4f1e398dbab6e6e3d3778723811d7aac
+  external_ids:
+    DOI: 10.1016/j.trc.2026.105851
+    CorpusId: 289958770
+- title: 'FEM-Lite: A lightweight frequency-enhanced Mamba network with cross-scale contextual attention
+    and edge-aware weighted loss for medical image segmentation'
+  year: 2026
+  authors:
+  - Quang-Huy Nguyen
+  - M. Luong
+  - Thi-Thao Tran
+  - Van-Truong Pham
+  paperId: 61dffe41ce4a198a41bdc783455db37fb4ca97da
+  external_ids:
+    DOI: 10.1016/j.imavis.2026.106111
+    CorpusId: 289987560
+- title: Cascaded spectral operator transformer with mixture-of-experts for urban wind field prediction
+  year: 2026
+  authors:
+  - Xinyu Huang
+  - Jie Liu
+  - Siqi Wang
+  - Xinhai Chen
+  - Hang Zou
+  - Jiawei Li
+  - Yonggang Che
+  - Qingyang Zhang
+  paperId: 7d7c0b3cbdb479faa49147f5eff0ae8e8989bcd0
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115560
+    CorpusId: 289993725
+- title: Automated extraction of elevation profiles from limited imagery for bridge design
+  year: 2026
+  authors:
+  - Morris Florek
+  - Maximilian Kellner
+  - Johannes Reimer
+  - Steffen Marx
+  - A. Reiterer
+  - Chongjie Kang
+  paperId: 959c9cec10eacb866e9e110d915510e3e0b84a1a
+  external_ids:
+    DOI: 10.1016/j.autcon.2026.107126
+    CorpusId: 290001156
+- title: 'DARS: An algorithm-hardware co-design framework for accelerating sparse attention via dynamic
+    adaptive hierarchical Top-K pruning'
+  year: 2026
+  authors:
+  - Yi Zhang
+  - Junsheng Chang
+  - Yuxin Huang
+  - Yang Guo
+  - Sheng Liu
+  paperId: 71b6164ee82022bb3f8ab0c05e1305254a0c0692
+  external_ids:
+    DOI: 10.1016/j.sysarc.2026.103912
+    CorpusId: 290027397
+- title: Multi-feature fusion transformer network for Autism spectrum disorder detection via facial images
+  year: 2026
+  authors:
+  - Munto Wondimagegn Bekele
+  - Mengying Zhou
+  - Wei Li
+  - Zhihai Lv
+  - Na Li
+  - Yuanjie Cao
+  - Yi Pan
+  - Su-fen Hu
+  - Yanjie Wei
+  - Wenhui Xi
+  paperId: 37a4a797c6c35046ec49c6e521a902eea8061deb
+  external_ids:
+    DOI: 10.1016/j.bspc.2026.110970
+    CorpusId: 290031925
+- title: 'Weaver: Kronecker product approximations of spatiotemporal attention for traffic network forecasting'
+  year: 2026
+  authors:
+  - Christopher H. Cheong
+  - Gary Davis
+  - Seongjin Choi
+  paperId: a751e0e8e308fcd549eba93853dd40c24bb46016
+  external_ids:
+    DOI: 10.1016/j.trc.2026.105825
+    CorpusId: 290038611
+- title: Efficient and scalable horticulture species identification and crown segmentation using multi-modal
+    vision transformers and unmanned aerial vehicles imagery
+  year: 2026
+  authors:
+  - P. Vinod
+  - M. D. Behera
+  - S. Trivedi
+  - B. Satish Kumar
+  - Shreyas Ranganatha
+  - S. Rama Subramoniam
+  - G.C. Satisha
+  - Ramachandra Hebbar
+  - Sushil Kumar Srivastav
+  paperId: 44f7b1041e250cb592acdb4184a9f00cd7caeb0c
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115637
+    CorpusId: 290054423
+- title: 'Foundation-model-assisted electrochemical sensing: from molecular recognition interfaces to
+    autonomous point-of-need analytical decisions'
+  year: 2026
+  authors:
+  - Li Fu
+  - Yanfei Lv
+  - Fei Chen
+  - Shichao Zhao
+  - Cheng-Te Lin
+  - H. Karimi‐Maleh
+  paperId: de3a18506f1fa6c27e01f47f855b1a1a24db69ba
+  external_ids:
+    DOI: 10.1016/j.trac.2026.119022
+    CorpusId: 290058735
+- title: 'Generative AI for environmental mass spectrometry: Opportunities and challenges'
+  year: 2026
+  authors:
+  - Wen Li
+  - Bin Hu
+  paperId: f9e026fcc0404d45c497aa238026aa8553cbb733
+  external_ids:
+    DOI: 10.1016/j.trac.2026.119023
+    CorpusId: 290056932
+- title: 'Generative AI for video-driven image animation: A survey'
+  year: 2026
+  authors:
+  - Gaurav Rai
+  - Akshit Salhotra
+  - Ojaswa Sharma
+  paperId: 96a94583daea3aecfaefa0de1b5b926a44b2d4cf
+  external_ids:
+    DOI: 10.1016/j.cag.2026.104680
+    CorpusId: 290060999
+- title: An explainable DAE-transformer-based multimodal fusion algorithm for elderly emotion recognition
+  year: 2026
+  authors:
+  - Haijing Wang
+  - Miantezila Milembolo
+  - Guo Bin
+  - Wu Jinshuang
+  paperId: 6c8a30407c1ba2201dd30faf177149c47fbcd21e
+  external_ids:
+    DOI: 10.1016/j.bspc.2026.110898
+    CorpusId: 290064839
+- title: Boosting lung nodule detection by reconstruction-based data augmentation
+  year: 2026
+  authors:
+  - Yan Wang
+  - Gaoxiang Chen
+  - Chaofeng Wang
+  - Xiangmei Liu
+  paperId: a6c6409c2ad9ad2fab0796e7c55874087833ac52
+  external_ids:
+    DOI: 10.1016/j.bspc.2026.110992
+    CorpusId: 290068950
+- title: Zero-shot Chinese Character Recognition with Radical Tree Positional Embedding and spatial alignment
+  year: 2026
+  authors:
+  - Anna Zhu
+  - Hongyi Cai
+  - Junjie Yang
+  - Guan Li
+  paperId: 12c1603581021d4136dbbcd33b1e7ba655ec6c7b
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115537
+    CorpusId: 290070026
+- title: Longitudinal driving intention prediction via a new framework fusing dynamic driving styles and
+    environmental factors
+  year: 2026
+  authors:
+  - Zhen Shi
+  - Lin Yang
+  - Anze Xu
+  - Yuxuan Chen
+  - Yue Jin
+  - Jingzhong Li
+  - Chenggang Pan
+  - Xianling Meng
+  paperId: 501b5e0bd03745d7e630fd698e063172191d5319
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115574
+    CorpusId: 290071719
+- title: 'An integration framework for gait-emotion recognition: Combining cognitive insights with neural
+    networks'
+  year: 2026
+  authors:
+  - Yiyang Wu
+  - Yue Qu
+  - Xuechen Yu
+  - S. Kuai
+  - Hao Tan
+  paperId: bc2c48ff5c10cbc850730aab9ad782e49e49c629
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115263
+    CorpusId: 290072994
+- title: A dual-sensor measurement system integrating bio-speckle laser imaging and multispectral reflectance
+    for non-destructive quantification of drought-induced physiological changes in soybean
+  year: 2026
+  authors:
+  - Juseung Kim
+  - Moonsub Lee
+  - Hoonsoo Lee
+  paperId: 861173cdd801381978c4e004604a05db53cd8da0
+  external_ids:
+    DOI: 10.1016/j.measurement.2026.122504
+    CorpusId: 290077749
+- title: 'Sensor calibration for autonomous driving: A survey'
+  year: 2026
+  authors:
+  - Zhizhou Wu
+  - Bin Pan
+  - Jizhao Wang
+  - Maoyuan Li
+  - Wenxin Jiang
+  - Zhipeng Liu
+  - Chi Zhang
+  paperId: 0a0f851843df2fe869d425057a052bae1e7cbea8
+  external_ids:
+    DOI: 10.1016/j.measurement.2026.122492
+    CorpusId: 290103517
+- title: Wavelet-enhanced hybrid state space and convolutional network for coronary artery segmentation
+  year: 2026
+  authors:
+  - Yue Zhang
+  - Fuzhi Wu
+  - Chen Zhang
+  - Chenghui Wang
+  - Ying Zhang
+  - Huiming Li
+  - Yuhang Liu
+  - P. Haigron
+  - Tianyu Tang
+  - Ying Cui
+  - Huazhong Shu
+  paperId: 8bc6537d1a277fe5d57af042ae34d8bd3675a61b
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115607
+    CorpusId: 290108320
+- title: Cross-modal Orthogonal Adaptive Contrastive Learning for robust chest radiology report generation
+  year: 2026
+  authors:
+  - Q. Tang
+  - Lijun Liu
+  - Dengjun Zhu
+  - Jiaman Ding
+  - Wei Peng
+  - Li Liu
+  paperId: a14fc96292d585239df70bde2b3b2718c17e69e8
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115620
+    CorpusId: 290125163
+- title: 'Human-robot collaborative assembly towards human-centric manufacturing paradigm: a review'
+  year: 2026
+  authors:
+  - Xinghui Xia
+  - Cunbo Zhuang
+  - Shi-Mei Liu
+  - Jianhua Liu
+  paperId: c60b242367358035ff2a15b2435c425db6c2b72a
+  external_ids:
+    DOI: 10.1016/j.jmsy.2026.07.006
+    CorpusId: 290150677
+- title: 'Intelligent rock classification from a mesoscopic perspective: A computer vision approach based
+    on thin section images'
+  year: 2026
+  authors:
+  - Weiqi Kong
+  - Peng Hou
+  - Quansheng Liu
+  - Zhijun Wu
+  - M. Rabatuly
+  - Fakai Dou
+  paperId: 33e3ec4af7de37029cc14be3204812aedfabc71b
+  external_ids:
+    DOI: 10.1016/j.ijrmms.2026.106640
+    CorpusId: 290156316

@@ -7,25 +7,17 @@ Snapshot for resuming work later. Read this first, then PLAN.md/AGENTS.md/NOTES.
 - **M0** (arXiv ingest -> markdown -> section extraction) — done, merged, on `master`.
 - **M1** (DOI/URL/local-file inputs, Claude-CLI extraction, paper-qa Q&A) — done, merged, on `master`. paper-qa Q&A blocked without `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` — documented in NOTES.md, not fixed.
 - **M2** (cross-paper synthesis, `scripts/synthesize.py`, `--contradictions` mode) — done, merged, on `master`. Verified against real papers.
-- **M3** (citation graph) — **WIP, NOT merged.** Builder agent was stopped mid-run (user asked to halt everything for handoff). Work-in-progress is committed on branch `worktree-agent-a7643537dae1fb5ef` (pushed to origin), NOT on `master`:
-  - `scripts/citations.py` + `papers/*/citations.yaml` for all 5 papers — local-corpus citation-edge matching appears to be built.
-  - **Semantic Scholar external lookups (paper -> citing papers) were NOT done** — agent was about to start that step when stopped. Its last message: *"Now let's add the Semantic Scholar external lookups (best-effort, with retry/backoff already built in) for all 5 papers."*
-  - **Not verified** — no fresh-eyes review or execution-verification pass happened. Do not trust it's correct; re-check before merging.
+- **M3** (citation graph) — **done, merged, pushed to `master`** (merge commit `31783c2`). `scripts/citations.py` (build + report subcommands), `papers/*/citations.yaml` for all 5 papers (in-corpus reference matching + Semantic Scholar external citing-papers lookups), `citations/report.md` (most-cited ranking, adjacency listing, connected-component clusters). Verified by a fresh agent against real paper text before merge (see below) — PASS-WITH-CONCERNS, no blocking bugs.
+  - Known latent concerns (not bugs, not fixed): the Claude-CLI reference-parsing step is not perfectly deterministic run-to-run (~10% variance in `references_parsed` count observed on a repeat run); `semantic_scholar.lookup_status: ok` doesn't distinguish a genuinely-zero-citations paper from an empty `cited_by_external` list; the 0.55 Jaccard title-matching threshold is untested at corpus sizes beyond 5 papers.
+  - Worktree `worktree-agent-a7643537dae1fb5ef` and its local branch have been removed (content preserved via merge commit); the branch still exists on `origin` if needed.
 
-`master` is clean, pushed, matches `origin/master` (commit `47f7200`).
+`master` is clean, pushed, matches `origin/master` (commit `31783c2`).
 
-## To resume M3
+## Suggested next steps (not started)
 
-```bash
-git fetch origin
-git worktree add .claude/worktrees/agent-a7643537dae1fb5ef worktree-agent-a7643537dae1fb5ef
-# or just: git checkout worktree-agent-a7643537dae1fb5ef in a scratch clone
-```
-Review `scripts/citations.py` and the 5 `citations.yaml` files, then either:
-- resume the same agent (if the session/agentId is still resumable), or
-- hand it to a fresh builder agent with the remaining task: Semantic Scholar external lookups (citing-papers direction) + the report/query script (`scripts/citations.py` "most-cited"/cluster view) if not already present, per M3's original brief in PLAN.md's roadmap.
-
-Then: **verify before merge** — this project's standing rule now (per user instruction) is every build gets reviewed by a fresh agent that actually *runs* the scripts against real data before merging, not just a diff read. Use `caveman:cavecrew-reviewer` for a structured diff audit, plus a full agent that executes `scripts/citations.py`/`ingest.py`/`synthesize.py` against `papers/` and confirms sane output.
+- Stress-test with 5-10 more real papers, varied venues/formats (would also exercise the title-matching-at-scale concern above).
+- Add a regression script that re-runs ingest/synthesize/citations against the existing corpus and diffs output sensibly, so future changes self-verify without a human.
+- If reference-parsing determinism becomes a real problem at larger scale, consider pinning `claude -p` temperature/sampling or adding a lightweight self-consistency check.
 
 ## Standing conventions for this project (established this session)
 
@@ -47,8 +39,3 @@ Then: **verify before merge** — this project's standing rule now (per user ins
 - Section-extraction and synthesis both shell out to the `claude` CLI (`claude -p --output-format json --tools ""`) rather than calling the Anthropic API directly — this is intentional (reuses existing credentials, no raw key needed) but means both are unavailable if the `claude` binary isn't on PATH.
 - Corpus is small (5 real papers) — extraction/synthesis/citation-matching haven't been stress-tested at larger scale yet.
 
-## Suggested next steps (not started)
-
-- Finish + verify M3 (see above).
-- Stress-test with 5-10 more real papers, varied venues/formats.
-- Add a regression script that re-runs ingest/synthesize/citations against the existing corpus and diffs output sensibly, so future changes self-verify without a human.

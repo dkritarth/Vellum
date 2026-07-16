@@ -34,11 +34,40 @@ credential path as ingestion's extraction pass), plus a `--contradictions`
 mode for agreement/disagreement detection. See `NOTES.md`'s M2 section for
 test queries and output samples.
 
-M3 (citation graph) is not started. See `PLAN.md`'s roadmap and `NOTES.md`'s
-M2 section ("What's next") for what's planned there.
+**M3 (citation graph) is done.** `scripts/citations.py` parses each paper's
+References section (Claude-CLI-driven, no regex fallback — see the script's
+module docstring), matches references against the rest of the local corpus
+to build in-corpus citation edges, and does best-effort Semantic Scholar
+lookups for external citing-papers data. `citations.py report` writes
+`citations/report.md` — a most-cited-in-corpus ranking, adjacency listing,
+and connected-component clusters. This closes out `PLAN.md`'s full 3-phase
+roadmap; see `HANDOFF.md` for verification notes and known latent
+limitations (parse non-determinism, external-lookup status edge cases).
 
 Storage is one plain-file directory per paper (no database) — see
 `PLAN.md` for the rationale.
+
+## Development cost
+
+Computed from every Claude Code session transcript for this project
+(`scripts/usage.sh`, a thin wrapper over the global token/cost tracker at
+`~/.claude/scripts/token_tracker.py`), across the main working directory and
+all worktree-isolated agent sessions used during development:
+
+| Model | Input tokens | Output tokens | Cache read tokens | Cache creation tokens | Messages | Cost (USD) |
+| --- | --- | --- | --- | --- | --- | --- |
+| claude-sonnet-5 | 482 | 177,125 | 15,583,369 | 2,102,665 | 242 | $13.30 |
+| **Total** | **482** | **177,125** | **15,583,369** | **2,102,665** | **242** | **$13.30** |
+
+Every session used a single model (Sonnet 5). The bulk of "input" is cheap
+prompt-cache reads (15.6M tokens), not fresh context — only 482 tokens were
+ever sent as literal uncached input across the whole project, since Claude
+Code's context caching keeps repeated conversation history near-free between
+turns. `scripts/usage.sh` reproduces the input/output/cost columns directly;
+the cache-token columns above come from a one-off query over the same
+underlying `~/.claude/usage/usage.jsonl` log (that raw log already records
+`cache_read_tokens`/`cache_creation_tokens` per message — the report command
+just doesn't surface them as columns yet).
 
 ## Usage
 

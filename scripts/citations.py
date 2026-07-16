@@ -227,6 +227,24 @@ def _chunk_text(text: str, chunk_chars: int = CHUNK_CHARS) -> list[str]:
     return [c for c in chunks if c.strip()]
 
 
+def _coerce_year(raw_year) -> int | None:
+    """Accepts an int as-is. Also recovers a 4-digit year from a string the
+    CLI occasionally emits despite the prompt asking for a bare int (e.g.
+    "2017" or "c. 2017") -- silently discarding that data was a real bug,
+    since it's recoverable. Prints a [warn] (matching every other data-loss
+    path in this file) only when a non-null value genuinely couldn't be
+    parsed."""
+    if isinstance(raw_year, int):
+        return raw_year
+    if isinstance(raw_year, str):
+        match = re.search(r"(1[5-9]\d{2}|20\d{2})", raw_year)
+        if match:
+            return int(match.group(1))
+    if raw_year is not None:
+        print(f"    [warn] could not parse reference year {raw_year!r}; recording as null.", file=sys.stderr)
+    return None
+
+
 def _parse_references_chunk(chunk: str) -> list[dict] | None:
     """Parse one chunk via claude -p. Returns a list of entries, or None if
     the call failed/was refused/returned unparseable output for this chunk
@@ -246,7 +264,7 @@ def _parse_references_chunk(chunk: str) -> list[dict] | None:
         title = entry.get("title") if isinstance(entry.get("title"), str) else None
         authors_raw = entry.get("authors")
         authors = [a for a in authors_raw if isinstance(a, str) and a.strip()] if isinstance(authors_raw, list) else []
-        year = entry.get("year") if isinstance(entry.get("year"), int) else None
+        year = _coerce_year(entry.get("year"))
         if not raw and not title:
             continue
         out.append({"raw": raw, "title": title, "authors": authors, "year": year})
@@ -254,10 +272,18 @@ def _parse_references_chunk(chunk: str) -> list[dict] | None:
 
 
 def _dedupe_references(entries: list[dict]) -> list[dict]:
-    """Chunk boundaries can occasionally cause the same citation to be split
-    (partial at end of one chunk, partial at start of next) and parsed
-    twice with slightly different `raw` text -- dedupe on normalized title
-    when available, else on a normalized prefix of `raw`."""
+    """Chunk boundaries can occasionally cause the exact same citation to be
+    reparsed intact in two overlapping chunk views, with slightly different
+    `raw` text -- dedupe on normalized title when available, else on the full
+    normalized `raw` text (not just a prefix -- `raw` is already capped at
+    <200 chars by the extraction prompt, and a short prefix risked colliding
+    two distinct references that merely share a long common author-list
+    opening). Note: this does NOT merge two genuinely complementary partial
+    fragments of one citation split across a chunk boundary (e.g. one
+    fragment with authors but no title, another with a title but no authors)
+    -- those fragments share no matchable key and are left as separate,
+    partial entries; reconstructing them would need cross-fragment text
+    stitching, out of scope here."""
     seen: set[str] = set()
     out = []
     for entry in entries:
@@ -265,8 +291,10 @@ def _dedupe_references(entries: list[dict]) -> list[dict]:
         if entry.get("title"):
             key = "t:" + " ".join(sorted(_normalize_title(entry["title"])))
         elif entry.get("raw"):
-            key = "r:" + re.sub(r"[^a-z0-9]", "", entry["raw"].lower())[:60]
+            key = "r:" + re.sub(r"[^a-z0-9]", "", entry["raw"].lower())
         if key and key in seen:
+            print(f"    [info] dropping likely-duplicate reference: {entry.get('raw', entry.get('title', ''))[:80]!r}",
+                  file=sys.stderr)
             continue
         if key:
             seen.add(key)
@@ -274,25 +302,33 @@ def _dedupe_references(entries: list[dict]) -> list[dict]:
     return out
 
 
-def parse_references(references_text: str) -> list[dict]:
-    """Returns a list of {"raw", "title", "authors", "year"} dicts, or [] if
-    parsing wasn't possible at all (no claude CLI, empty section) -- never
-    raises, per AGENTS.md's "degrade gracefully" rule. Parses in chunks (see
-    CHUNK_CHARS) so that one bad chunk (e.g. a PDF-conversion-garbled stretch
-    that trips a usage-policy refusal -- see module docstring) only loses
-    that chunk's references, not the whole paper's."""
+def parse_references(references_text: str) -> tuple[list[dict], bool]:
+    """Returns (entries, attempted_ok). `attempted_ok` is True iff at least
+    one chunk was actually parsed by the `claude` CLI successfully (even if
+    that chunk -- or all of them -- legitimately contained zero extractable
+    references); it's False if the CLI is missing or every chunk call
+    failed/was refused. Callers need this distinction to avoid conflating
+    "we tried and found nothing" with "we never managed to try" (both used to
+    collapse to the same `parse_method: none`, per AGENTS.md's "degrade
+    gracefully" rule -- degrading gracefully means being honest about what
+    happened, not erasing the difference). Never raises. Parses in chunks
+    (see CHUNK_CHARS) so that one bad chunk (e.g. a PDF-conversion-garbled
+    stretch that trips a usage-policy refusal -- see module docstring) only
+    loses that chunk's references, not the whole paper's."""
     if not references_text.strip():
-        return []
+        return [], False
     chunks = _chunk_text(references_text)
     all_entries: list[dict] = []
+    any_chunk_ok = False
     for i, chunk in enumerate(chunks):
         entries = _parse_references_chunk(chunk)
         if entries is None:
             print(f"    [warn] reference-parsing chunk {i + 1}/{len(chunks)} failed/refused; skipping that chunk only.",
                   file=sys.stderr)
             continue
+        any_chunk_ok = True
         all_entries.extend(entries)
-    return _dedupe_references(all_entries)
+    return _dedupe_references(all_entries), any_chunk_ok
 
 
 # ---------------------------------------------------------------------------
@@ -347,7 +383,29 @@ def match_reference_to_corpus(ref: dict, corpus: list[tuple[str, dict]], self_sl
 # ---------------------------------------------------------------------------
 
 
-def _s2_get(path: str, params: dict) -> dict | None:
+# Sentinel distinct from `None`: `None` means the API definitively said "not
+# found" (a real 404), `S2_UNAVAILABLE` means we couldn't get an answer at all
+# (retries exhausted on 429s/network errors/bad JSON/other HTTP errors) --
+# collapsing these was a real bug (a transient rate-limit used to get recorded
+# as a permanent "not_found" fact in citations.yaml).
+S2_UNAVAILABLE = object()
+
+# A few author-name tokens the Semantic Scholar API is observed to return in
+# place of a real name for malformed upstream records (e.g. "Data", "Time",
+# a bare single first name with no surname). Not exhaustive -- just filters
+# the concrete junk seen in this project's corpus rather than fabricating a
+# general name-validity classifier.
+_JUNK_AUTHOR_TOKENS = {"data", "time", "n/a", "unknown", "et al", "et al."}
+
+
+def _looks_like_author_name(name: str) -> bool:
+    return bool(name) and name.strip().lower() not in _JUNK_AUTHOR_TOKENS
+
+
+def _s2_get(path: str, params: dict) -> dict | None | object:
+    """Returns the parsed JSON dict on success, `None` on a genuine 404 (not
+    found), or `S2_UNAVAILABLE` if the API couldn't be reached/answered after
+    retries -- callers must not treat the latter two as equivalent."""
     url = f"{S2_API_BASE}/{path}"
     last_err = None
     for attempt in range(S2_RETRY_TRIES):
@@ -372,30 +430,52 @@ def _s2_get(path: str, params: dict) -> dict | None:
         last_err = f"HTTP {resp.status_code}: {resp.text[:200]}"
         break
     print(f"  [warn] Semantic Scholar lookup for {path!r} unavailable after retries ({last_err}).", file=sys.stderr)
-    return None
+    return S2_UNAVAILABLE
 
 
-def s2_lookup_paper(title: str, arxiv_id: str | None) -> dict | None:
+def s2_lookup_paper(title: str, arxiv_id: str | None) -> dict | None | object:
     """Resolve a paper's Semantic Scholar id, preferring a direct arXiv-id
-    lookup (exact, no ambiguity) and falling back to a title search."""
+    lookup (exact, no ambiguity) and falling back to a title search. Returns
+    the paper dict on success, `None` if the API was reachable and genuinely
+    has no match, or `S2_UNAVAILABLE` if any lookup involved couldn't be
+    completed (so callers don't record a transient failure as a permanent
+    fact)."""
+    saw_unavailable = False
     if arxiv_id:
         data = _s2_get(f"paper/arXiv:{arxiv_id}", {"fields": "title,externalIds,paperId,year,citationCount"})
-        if data and data.get("paperId"):
+        if data is S2_UNAVAILABLE:
+            saw_unavailable = True
+        elif data and data.get("paperId"):
             return data
     if title:
         data = _s2_get("paper/search", {"query": title, "limit": 1, "fields": "title,externalIds,paperId,year,citationCount"})
-        candidates = (data or {}).get("data") or []
-        if candidates:
-            top = candidates[0]
-            if _title_similarity(title, top.get("title", "")) >= 0.5:
-                return top
-    return None
+        if data is S2_UNAVAILABLE:
+            saw_unavailable = True
+        else:
+            candidates = (data or {}).get("data") or []
+            if candidates:
+                top = candidates[0]
+                if _title_similarity(title, top.get("title", "")) >= 0.5:
+                    return top
+    return S2_UNAVAILABLE if saw_unavailable else None
+
+
+# Fetch more than we keep and sort by citationCount so the stored sample is
+# "most-cited/most-influential" rather than whatever order the API happens to
+# return (observed to be recency-skewed -- every entry landing in the same
+# year, missing the foundational/highly-cited citing works entirely).
+S2_CITATIONS_FETCH_LIMIT = 100
 
 
 def s2_lookup_citing_papers(paper_id: str, limit: int = S2_CITATIONS_LIMIT) -> list[dict] | None:
-    data = _s2_get(f"paper/{paper_id}/citations", {"fields": "title,year,authors,externalIds", "limit": limit})
-    if data is None:
+    data = _s2_get(
+        f"paper/{paper_id}/citations",
+        {"fields": "title,year,authors,externalIds,citationCount", "limit": S2_CITATIONS_FETCH_LIMIT},
+    )
+    if data is S2_UNAVAILABLE:
         return None
+    if data is None:
+        return []  # genuine 404 on a paperId we just resolved -- treat as zero citing papers, not unavailable
     out = []
     for entry in data.get("data") or []:
         citing = entry.get("citingPaper") or {}
@@ -405,12 +485,14 @@ def s2_lookup_citing_papers(paper_id: str, limit: int = S2_CITATIONS_LIMIT) -> l
             {
                 "title": citing.get("title"),
                 "year": citing.get("year"),
-                "authors": [a.get("name") for a in (citing.get("authors") or []) if a.get("name")],
+                "authors": [a.get("name") for a in (citing.get("authors") or []) if _looks_like_author_name(a.get("name"))],
                 "paperId": citing.get("paperId"),
                 "external_ids": citing.get("externalIds") or {},
+                "citation_count": citing.get("citationCount"),
             }
         )
-    return out
+    out.sort(key=lambda e: e.get("citation_count") or 0, reverse=True)
+    return out[:limit]
 
 
 # ---------------------------------------------------------------------------
@@ -456,12 +538,13 @@ def build_one(slug: str, papers_dir: Path, corpus: list[tuple[str, dict]], *, us
     if not references_text:
         print("  no References section text available; skipping reference parsing.")
         references: list[dict] = []
-        parse_method = "none"
+        parse_method = "none"  # no section to parse -- distinct from "unavailable" (attempted, failed)
     else:
         print("  parsing References section via claude CLI (can take 10-60s)...")
-        references = parse_references(references_text)
-        parse_method = "claude-cli" if references else "none"
-        print(f"  parsed {len(references)} reference entr{'y' if len(references) == 1 else 'ies'}")
+        references, attempted_ok = parse_references(references_text)
+        parse_method = "claude-cli" if attempted_ok else "unavailable"
+        print(f"  parsed {len(references)} reference entr{'y' if len(references) == 1 else 'ies'}"
+              f" (parse_method: {parse_method})")
 
     cites = []
     seen_slugs = set()
@@ -478,9 +561,12 @@ def build_one(slug: str, papers_dir: Path, corpus: list[tuple[str, dict]], *, us
     if use_external:
         arxiv_id = meta.get("arxiv_id")
         s2_paper = s2_lookup_paper(title, arxiv_id)
-        if s2_paper is None:
+        if s2_paper is S2_UNAVAILABLE:
+            s2_block["lookup_status"] = "unavailable"
+            print("  [s2] paper lookup: unavailable (network/rate-limit -- not a confirmed non-match)")
+        elif s2_paper is None:
             s2_block["lookup_status"] = "not_found"
-            print("  [s2] paper lookup: not found / unavailable")
+            print("  [s2] paper lookup: not found")
         else:
             s2_block = {
                 "lookup_status": "ok",

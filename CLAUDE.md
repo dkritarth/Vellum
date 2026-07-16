@@ -23,9 +23,35 @@ Use these existing skills rather than reimplementing their functionality:
 
 ## Commands
 
-No build/test tooling exists yet (project is at the planning stage). Once
-scripts/code are added under `scripts/` or `src/`, document the actual
-run/test commands here.
+One-time setup (local virtualenv — do not install markitdown/requests/pyyaml
+into global Python; `markitdown` via pipx is not importable from scripts):
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Ingest a single arXiv paper end-to-end (download PDF -> markdown ->
+heuristic section extraction -> `papers/<arxiv-id>/`):
+
+```bash
+source .venv/bin/activate
+python scripts/ingest.py 1706.03762
+# or paste an arxiv.org URL directly:
+python scripts/ingest.py https://arxiv.org/abs/1706.03762
+```
+
+Output per paper: `papers/<arxiv-id>/paper.pdf`, `paper.md`, `metadata.yaml`
+(title/authors/year/venue/abstract + section boundaries). See `NOTES.md`
+for known limitations of the current (heuristic, non-LLM) section
+extractor — it degrades gracefully (missing sections -> `found: false`)
+rather than failing, per `AGENTS.md`'s "must tolerate partial/missing
+sections" rule, but recall varies a lot with PDF layout quality.
+
+There is no test suite yet; validate by re-running `ingest.py` against a
+few real arXiv IDs and spot-checking `metadata.yaml` section boundaries
+against `paper.md`, per `AGENTS.md`'s Testing section.
 
 ## Structure
 

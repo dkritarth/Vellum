@@ -90,6 +90,23 @@ There is no test suite yet; validate by re-running `ingest.py` against a
 few real arXiv IDs/DOIs/URLs and spot-checking `metadata.yaml` section
 boundaries against `paper.md`, per `AGENTS.md`'s Testing section.
 
+Token/cost usage for this project's Claude Code sessions and background
+agents (including worktree-isolated agent sessions, since each gets its own
+`~/.claude/projects/` transcript):
+
+```bash
+scripts/usage.sh --by model     # per model
+scripts/usage.sh --by day       # per day
+scripts/usage.sh --since 2026-07-01
+```
+
+This is a thin filter over the global tracker at
+`~/.claude/scripts/token_tracker.py`, which scans every session transcript
+on the machine (`~/.claude/projects/**/*.jsonl`), prices tokens per current
+Anthropic API rates, and accumulates results incrementally into
+`~/.claude/usage/{usage.jsonl,summary.json}` — not project-specific storage,
+so it survives this repo being deleted/re-cloned.
+
 ## Structure
 
 ```

@@ -10,3 +10,10 @@ pyyaml
 # here: it pulls a large dependency tree (litellm, tiktoken, etc.) that
 # ingest.py doesn't need. Install separately if you're using Q&A:
 #   pip install paper-qa
+
+# webapp/ (Phase 4 browse-only local web UI) — thin FastAPI read layer over
+# papers/, synthesis/, citations/ on disk. No database.
+fastapi
+uvicorn[standard]
+jinja2
+markdown

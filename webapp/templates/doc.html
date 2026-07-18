@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<p><a href="/">&larr; back to corpus</a></p>
+<div class="doc-body">{{ html|safe }}</div>
+{% endblock %}

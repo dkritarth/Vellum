@@ -153,6 +153,17 @@ Anthropic API rates, and accumulates results incrementally into
 `~/.claude/usage/{usage.jsonl,summary.json}` — not project-specific storage,
 so it survives this repo being deleted/re-cloned.
 
+Run the local browse-only web UI (Phase 4 workstream 2 — read-only view over
+`papers/`, `synthesis/`, `citations/` on disk; no write path yet, no
+database, thin FastAPI wrapper, not a rewrite of the pipeline):
+
+```bash
+source .venv/bin/activate
+pip install -r requirements.txt   # picks up fastapi/uvicorn/jinja2/markdown
+uvicorn webapp.main:app --reload
+# open http://127.0.0.1:8000/
+```
+
 ## Structure
 
 ```
@@ -162,6 +173,7 @@ local-anara/
   AGENTS.md    - AI agent conventions and guardrails
   CLAUDE.md    - this file
   papers/      - one directory per ingested paper (plain files, no DB)
+  webapp/      - Phase 4 browse-only FastAPI UI (reads papers/synthesis/citations off disk)
 ```
 
 ## Workflow

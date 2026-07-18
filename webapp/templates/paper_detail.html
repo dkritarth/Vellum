@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ meta.title or slug }}{% endblock %}
+{% block content %}
+<p><a href="/">&larr; back to corpus</a></p>
+<h1>{{ meta.title or slug }}</h1>
+<dl>
+  <dt>Authors</dt><dd>{{ meta.authors|join(", ") if meta.authors else "—" }}</dd>
+  <dt>Year</dt><dd>{{ meta.year or "—" }}</dd>
+  <dt>Venue</dt><dd>{{ meta.venue or "—" }}</dd>
+  <dt>Extraction method</dt><dd>{{ meta.extraction_method or "—" }}</dd>
+  <dt>Model</dt><dd>{{ meta.model or "—" }}</dd>
+  <dt>DOI</dt><dd>{{ meta.doi or "—" }}</dd>
+  <dt>arXiv ID</dt><dd>{{ meta.arxiv_id or "—" }}</dd>
+</dl>
+
+{% if meta.abstract %}
+<h2>Abstract</h2>
+<p>{{ meta.abstract }}</p>
+{% endif %}
+
+{% if citations %}
+<h2>Citations</h2>
+<p>References parsed: {{ citations.references_parsed if citations.references_parsed is defined else 0 }}
+   (method: {{ citations.parse_method or "none" }}{% if citations.model %}, model: {{ citations.model }}{% endif %})</p>
+{% endif %}
+
+{% if paper_html %}
+<h2>Full text</h2>
+<div class="paper-body">{{ paper_html|safe }}</div>
+{% else %}
+<p><em>No paper.md on disk for this entry (metadata-only).</em></p>
+{% endif %}
+{% endblock %}

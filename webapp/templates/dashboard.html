@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}local-anara — corpus{% endblock %}
+{% block content %}
+<h1>Papers ({{ papers|length }})</h1>
+<table>
+  <thead>
+    <tr><th>Title</th><th>Year</th><th>Extraction</th><th>Model</th></tr>
+  </thead>
+  <tbody>
+    {% for p in papers %}
+    <tr>
+      <td><a href="/papers/{{ p.slug }}">{{ p.title or p.slug }}</a></td>
+      <td>{{ p.year or "—" }}</td>
+      <td>{{ p.extraction_method or "—" }}</td>
+      <td>{{ p.model or "—" }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4">No papers ingested yet — run scripts/ingest.py.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h1>Synthesis</h1>
+<ul>
+  {% for name in synthesis_files %}
+  <li><a href="/synthesis/{{ name }}">{{ name }}</a></li>
+  {% else %}
+  <li>No synthesis output yet — run scripts/synthesize.py.</li>
+  {% endfor %}
+</ul>
+
+<h1>Citation graph</h1>
+{% if has_citations_report %}
+<p><a href="/citations">View citation graph report</a></p>
+{% else %}
+<p>No citations/report.md yet — run scripts/citations.py.</p>
+{% endif %}
+{% endblock %}

@@ -47,27 +47,61 @@ limitations (parse non-determinism, external-lookup status edge cases).
 Storage is one plain-file directory per paper (no database) — see
 `PLAN.md` for the rationale.
 
-## Development cost
+## Development cost and token usage
 
-Computed from every Claude Code session transcript for this project
-(`scripts/usage.sh`, a thin wrapper over the global token/cost tracker at
-`~/.claude/scripts/token_tracker.py`), across the main working directory and
-all worktree-isolated agent sessions used during development:
+Snapshot: **2026-07-18**. Claude and Codex usage are reported separately
+because their local telemetry and billing units differ.
 
-| Model | Input tokens | Output tokens | Cache read tokens | Cache creation tokens | Messages | Cost (USD) |
-| --- | --- | --- | --- | --- | --- | --- |
-| claude-sonnet-5 | 482 | 177,125 | 15,583,369 | 2,102,665 | 242 | $13.30 |
-| **Total** | **482** | **177,125** | **15,583,369** | **2,102,665** | **242** | **$13.30** |
+### Claude Code sessions
 
-Every session used a single model (Sonnet 5). The bulk of "input" is cheap
-prompt-cache reads (15.6M tokens), not fresh context — only 482 tokens were
-ever sent as literal uncached input across the whole project, since Claude
-Code's context caching keeps repeated conversation history near-free between
-turns. `scripts/usage.sh` reproduces the input/output/cost columns directly;
-the cache-token columns above come from a one-off query over the same
-underlying `~/.claude/usage/usage.jsonl` log (that raw log already records
-`cache_read_tokens`/`cache_creation_tokens` per message — the report command
-just doesn't surface them as columns yet).
+Includes the main project session plus worktree-isolated Claude agents. The
+tracker prices usage using its configured Anthropic rates:
+
+| Model | Uncached input | Output | Cache read | Cache creation | Messages | Cost (USD) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| claude-sonnet-5 | 972 | 341,175 | 32,189,127 | 3,772,432 | 487 | $24.9412 |
+| **Total** | **972** | **341,175** | **32,189,127** | **3,772,432** | **487** | **$24.9412** |
+
+Cache reads/creation are shown separately from uncached input; do not add
+those columns to `Uncached input` as if they were independent prompt text.
+`scripts/usage.sh` now scans incrementally before reporting, so new Claude
+sessions are included automatically and duplicate assistant message records
+are ignored.
+
+### Codex sessions
+
+Codex stores per-thread token usage locally in `~/.codex/state_5.sqlite`.
+For this repository, the current local record contains one GPT-5.6 Luna
+thread:
+
+| Model | Threads | Input tokens | Cached input | Output | Reasoning output | Total tokens | Cost (USD) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| gpt-5.6-luna | 1 | 4,468,814 | 4,302,592 | 34,431 | 15,521 | 4,503,245 | $4.6754 |
+
+Estimated from the supplied GPT-5.6 pricing: Luna input is `$1.00/M` and
+output is `$6.00/M`. This snapshot uses `$4.4688` input cost plus `$0.2066`
+output cost = **$4.6754**. Cached input is included at the input rate because
+no separate cache rate was supplied. Reasoning output is already included in
+the output-token count and is not charged twice.
+
+Pricing reference:
+
+| Model | Input / 1M tokens | Output / 1M tokens |
+| --- | ---: | ---: |
+| GPT-5.6 Sol | $5.00 | $30.00 |
+| GPT-5.6 Terra | $2.50 | $15.00 |
+| GPT-5.6 Luna | $1.00 | $6.00 |
+
+Refresh Codex numbers from the local database with:
+
+```bash
+sqlite3 ~/.codex/state_5.sqlite \
+  "SELECT model, COUNT(*), SUM(tokens_used) FROM threads WHERE cwd LIKE '%local-anara%' OR rollout_path LIKE '%local-anara%' GROUP BY model;"
+```
+
+Claude's raw project-filtered ledger is under
+`~/.claude/usage/usage.jsonl`; Codex's session records remain local under
+`~/.codex/`. Neither usage source is committed to this repository.
 
 ## Usage
 

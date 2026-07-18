@@ -5,4 +5,9 @@
 # this just scopes the report to project dirs whose name contains "local-anara"
 # so worktree-isolated agent sessions are included too.
 set -euo pipefail
-exec python3 "$HOME/.claude/scripts/token_tracker.py" report --project local-anara "$@"
+tracker_script="$HOME/.claude/scripts/token_tracker.py"
+
+# Refresh incrementally first, so sessions created since the previous report
+# are included. The tracker deduplicates assistant message IDs.
+python3 "$tracker_script" scan >/dev/null
+exec python3 "$tracker_script" report --project local-anara "$@"

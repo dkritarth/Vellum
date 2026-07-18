@@ -13,3 +13,12 @@ form label { display: flex; flex-direction: column; gap: 0.2rem; font-weight: 60
 form label.checkbox { flex-direction: row; align-items: center; font-weight: normal; }
 form input[type="text"] { font-weight: normal; padding: 0.35rem 0.5rem; }
 form button { align-self: flex-start; padding: 0.4rem 1rem; }
+.chat-form { max-width: none; }
+.chat-form textarea, .chat-form select { font: inherit; padding: 0.4rem 0.5rem; }
+.chat-transcript { display: flex; flex-direction: column; gap: 0.8rem; margin: 1.5rem 0; }
+.chat-message { padding: 0.8rem 1rem; border-radius: 8px; white-space: pre-wrap; }
+.chat-message h2 { font-size: 0.9rem; margin: 0 0 0.3rem; }
+.chat-user { background: #8882; }
+.chat-assistant { background: #4c8bff22; }
+.error { color: #d33; font-weight: 600; }
+.muted { opacity: 0.7; }

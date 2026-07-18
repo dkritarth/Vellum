@@ -20,3 +20,6 @@ uvicorn[standard]
 jinja2
 markdown
 python-multipart
+
+# webapp/chat (Claude Agent SDK, using the installed Claude Code CLI/auth).
+claude-agent-sdk>=0.2.122,<0.3

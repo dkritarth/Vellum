@@ -142,6 +142,20 @@ boundaries against `paper.md`, per `AGENTS.md`'s Testing section. Validate
 `synthesize.py` similarly: re-run against real ingested papers and read the
 generated `synthesis/*.md` prose for coherence and citation accuracy.
 
+Chat with the corpus through the local web UI at `/chat`:
+
+```bash
+source .venv/bin/activate
+uvicorn webapp.main:app --reload
+# open http://127.0.0.1:8000/chat
+```
+
+Chat uses `claude-agent-sdk` directly and the installed Claude Code CLI/auth,
+not `scripts/ask.py`'s paper-qa/API-key path. Select one paper for full
+converted-text Q&A, or corpus overview for metadata/abstract questions. The
+model field is required on every call. Chat transcripts are in-memory only and
+are lost when the web process restarts.
+
 Compile an already-generated synthesis file to a thesis-chapter-style LaTeX
 PDF (Phase 4 workstream 3 — takes `synthesize.py`'s output only; ingested-
 paper notes under `papers/*/paper.md` stay markdown-only, no LaTeX rendering
@@ -182,6 +196,9 @@ scripts/usage.sh --by model     # per model
 scripts/usage.sh --by day       # per day
 scripts/usage.sh --since 2026-07-01
 ```
+
+`scripts/usage.sh` refreshes the tracker incrementally before each report, so
+new Claude sessions and worktree-agent sessions are included automatically.
 
 This is a thin filter over the global tracker at
 `~/.claude/scripts/token_tracker.py`, which scans every session transcript

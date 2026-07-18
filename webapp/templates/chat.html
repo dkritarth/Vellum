@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}local-anara — chat{% endblock %}
+{% block content %}
+<h1>Chat with papers</h1>
+<p>One-paper mode supplies full converted text. Corpus mode supplies metadata
+and abstracts for high-level comparison. Conversation state lives in memory
+and disappears when the server restarts.</p>
+
+{% if error %}
+<p class="error">{{ error }}</p>
+{% endif %}
+
+<div class="chat-transcript">
+  {% for item in messages %}
+  <article class="chat-message chat-{{ item.role }}">
+    <h2>{{ "You" if item.role == "user" else "local-anara" }}</h2>
+    <div>{{ item.content }}</div>
+  </article>
+  {% else %}
+  <p class="muted">Ask about a method, experiment, claim, or comparison.</p>
+  {% endfor %}
+</div>
+
+<form method="post" action="/chat" class="chat-form">
+  <label>Paper scope
+    <select name="paper_slug">
+      <option value=""{% if not chat_scope %} selected{% endif %}>Corpus overview — abstracts/metadata</option>
+      {% for paper in papers %}
+      <option value="{{ paper.slug }}"{% if chat_scope == paper.slug %} selected{% endif %}>{{ paper.title or paper.slug }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Model
+    <input type="text" name="model" value="{{ model }}" placeholder="e.g. sonnet, claude-sonnet-5" required>
+  </label>
+  <label>Question
+    <textarea name="message" rows="5" maxlength="12000" required autofocus></textarea>
+  </label>
+  <button type="submit">Ask Claude</button>
+</form>
+<p><a href="/chat/new">Start a new chat</a></p>
+{% endblock %}

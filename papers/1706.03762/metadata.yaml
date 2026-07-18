@@ -29,13 +29,12 @@ abstract: The dominant sequence transduction models are based on complex recurre
   BLEU score of 41.8 after training for 3.5 days on eight GPUs, a small fraction of the training costs
   of the best models from the literature. We show that the Transformer generalizes well to other tasks
   by applying it successfully to English constituency parsing both with large and limited training data.
-claude_summary: The paper introduces the Transformer, a sequence transduction architecture built entirely
-  on attention mechanisms, dispensing with recurrence and convolutions used in prior encoder-decoder models.
-  By relying on self-attention and multi-head attention with positional encodings, the model achieves
-  greater parallelizability and reduced training time. The Transformer sets new state-of-the-art BLEU
-  scores on WMT 2014 English-to-German (28.4) and English-to-French (41.8) translation tasks, while also
-  generalizing well to English constituency parsing.
-ingested_at: '2026-07-16T08:03:14+00:00'
+claude_summary: Paper introduces Transformer, sequence transduction model dropping recurrence/convolution
+  entirely, using self-attention alone (plus positional encoding) for encoder-decoder architecture. Achieves
+  new state-of-art BLEU on WMT2014 English-German (28.4) and English-French (41.8) translation tasks,
+  training faster/cheaper than RNN or CNN-based prior best models. Also generalizes well to English constituency
+  parsing, showing broad applicability beyond translation.
+ingested_at: '2026-07-18T13:01:01+00:00'
 extraction_method: claude-cli
 sections:
 - name: Abstract
@@ -53,7 +52,7 @@ sections:
 - name: Method
   found: true
   start_line: 91
-  end_line: 266
+  end_line: 306
 - name: Experiments
   found: true
   start_line: 306
@@ -63,9 +62,9 @@ sections:
   start_line: 363
   end_line: 478
 - name: Discussion
-  found: true
-  start_line: 266
-  end_line: 306
+  found: false
+  start_line: null
+  end_line: null
 - name: Conclusion
   found: true
   start_line: 478

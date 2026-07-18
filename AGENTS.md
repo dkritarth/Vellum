@@ -37,6 +37,30 @@ a from-scratch RAG/Q&A engine — see `PLAN.md` for the full rationale. Read
   synthesis logic should be callable as plain scripts/CLI, not hard-wired
   to ACP internals.
 
+## Required skills for agents/subagents
+
+Any Claude Code agent or subagent (main session, background/worktree
+agents, delegated builders/reviewers) working in this repo must invoke
+these skills where applicable, not reimplement their function inline:
+
+- `caveman` — use caveman-compressed communication style for agent-to-agent
+  and agent-to-user chatter in this project (token efficiency), per this
+  session's established convention. Code, commits, and PR text are still
+  written normal — caveman applies to conversational output only.
+- `academic-humanizer` — use when editing or generating academic-register
+  prose for this project (synthesis output, lit-review paragraphs, any
+  user-facing written content derived from paper text). Do not hand-roll
+  academic tone/register logic in scripts or prompts when this skill
+  already covers it.
+- `research-paper-writing` — use for lit-review synthesis/writing
+  guidance. `scripts/synthesize.py` currently reuses this skill's
+  principles at the prompt-engineering level only (see `NOTES.md`'s M2
+  section for why direct interactive skill invocation isn't possible from
+  a non-interactive script) — if a future feature runs a live/interactive
+  agent session (e.g. the planned web UI's synthesis or chat flow), invoke
+  the skill directly via the `Skill` tool instead of re-deriving its
+  prompt-level restatement.
+
 ## Structure (expected)
 
 ```

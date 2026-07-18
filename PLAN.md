@@ -91,6 +91,57 @@ one client among several, not the foundation.
 - This is the most speculative phase and the most likely to get cut or
   descoped if Phase 1/2 already meet the PhD-workflow need.
 
+**Phase 4 — Local web interface + model selection + LaTeX synthesis**
+(decided 2026-07-18, after Phase 1-3 shipped; scope confirmed via grilling
+session — see git history around this addition for the full Q&A)
+
+- **Explicit per-call model selection.** Every AI call site (ingest
+  section-extraction, synthesize, citations reference-parsing, future
+  chat) gets an explicit, user-chosen model — no automatic tiering. Wire
+  `claude -p --model <name>` through `ingest.py`/`synthesize.py`/
+  `citations.py`; record which model was actually used per-call in the
+  relevant output file (currently only `extraction_method` is recorded,
+  not model — this is a real gap, since a changed default model would
+  otherwise silently make past and future extractions inconsistent with
+  no record of why).
+- **Local web UI**, in this build order:
+  1. Browse view (read-only: corpus, synthesis outputs, citation graph) —
+     lowest risk, immediately useful.
+  2. Trigger actions from the UI (ingest, synthesize, build citations,
+     pick model) instead of CLI-only.
+  3. Chat/Q&A interface (Anara's actual core loop) — biggest lift, depends
+     on the Agent SDK integration below being solid first.
+  - Stack: FastAPI backend (thin wrapper over the existing scripts, not a
+    rewrite) + a lightweight frontend (htmx or minimal React) — no new
+    backend language/runtime, no database; reads directly off
+    `papers/`/`synthesis/`/`citations/` on disk, same plain-files
+    convention as the rest of the project. Everything runs locally — no
+    hosted service dependency, consistent with the project's local-first
+    philosophy.
+- **LaTeX-compiled synthesis output.** `synthesize.py`'s output should be
+  compilable to a proper typeset PDF (thesis-chapter-ready), not just
+  markdown. Use `tectonic` (single binary, no multi-GB TeXLive install)
+  for local compilation — no hosted LaTeX service. Scoped to synthesis
+  output only; ingested-paper notes stay markdown (no clear benefit to
+  LaTeX-rendering raw extracted sections).
+- **Agent SDK for new work.** The existing `claude -p` CLI-shelling
+  pattern in `ingest.py`/`synthesize.py`/`citations.py` stays as-is (it
+  works, is verified, low-risk to leave alone) — but all *new* AI-driven
+  features from here on (starting with the chat/Q&A interface above)
+  should use the Claude Agent SDK directly rather than shelling out to the
+  CLI. This also finally unblocks single-paper Q&A: `scripts/ask.py`
+  today depends on paper-qa/LiteLLM, which requires a raw
+  `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` and cannot bill against a Claude
+  subscription — the whole reason this project exists instead of paying
+  for Anara. An Agent-SDK-based chat feature rides the same
+  subscription-backed auth as the rest of the pipeline.
+- Why this phase exists at all: the project owner is about to start a CS
+  PhD and wants this tool to functionally replace Anara for personal use
+  (see Problem statement above) — Anara's actual product is a web app with
+  model-agnostic chat, not a CLI. A CLI-only tool caps how close this gets
+  to being a real Anara replacement, which is the project's own success
+  criterion below.
+
 ## Tech approach
 
 - **Ingestion**: simple fetch/download scripts (arXiv API, DOI resolver,

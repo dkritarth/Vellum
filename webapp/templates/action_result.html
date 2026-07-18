@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}local-anara — {{ action }} result{% endblock %}
+{% block content %}
+<p><a href="/actions">&larr; back to actions</a></p>
+<h1>{{ action }}: {{ "succeeded" if ok else "failed" }}</h1>
+<p>Command: <code>{{ cmd }}</code></p>
+<p>Exit code: {{ returncode }}</p>
+{% if slug %}
+<p>Paper slug: <a href="/papers/{{ slug }}">{{ slug }}</a></p>
+{% endif %}
+<h2>stdout (last {{ tail_n }} lines)</h2>
+<pre>{{ stdout_tail }}</pre>
+<h2>stderr (last {{ tail_n }} lines)</h2>
+<pre>{{ stderr_tail }}</pre>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}local-anara — actions{% endblock %}
+{% block content %}
+<h1>Actions</h1>
+<p>Trigger pipeline scripts from here instead of the CLI. Each action shells
+out to the corresponding <code>scripts/*.py</code> and can take a while
+(model calls run synchronously) -- the page will wait for it to finish
+before showing the result.</p>
+
+<h2>Ingest a paper</h2>
+<form method="post" action="/actions/ingest">
+  <label>Paper ref (arXiv ID/URL, DOI, PDF URL, or local path)
+    <input type="text" name="paper_ref" required>
+  </label>
+  <label>Model
+    <input type="text" name="model" placeholder="e.g. sonnet, claude-sonnet-5" required>
+  </label>
+  <button type="submit">Ingest</button>
+</form>
+
+<h2>Synthesize across papers</h2>
+<form method="post" action="/actions/synthesize">
+  <label>Topic
+    <input type="text" name="topic" required>
+  </label>
+  <label>Paper ids/slugs (comma-separated, blank = all ingested papers)
+    <input type="text" name="paper_ids" placeholder="e.g. 1706.03762, 1810.04805">
+  </label>
+  <label>Model
+    <input type="text" name="model" placeholder="e.g. sonnet, claude-sonnet-5" required>
+  </label>
+  <label class="checkbox">
+    <input type="checkbox" name="contradictions" value="1">
+    Contradiction/agreement-detection mode
+  </label>
+  <button type="submit">Synthesize</button>
+</form>
+
+<h2>Build citation graph</h2>
+<form method="post" action="/actions/citations/build">
+  <label>Model
+    <input type="text" name="model" placeholder="e.g. sonnet, claude-sonnet-5" required>
+  </label>
+  <label class="checkbox">
+    <input type="checkbox" name="no_external" value="1">
+    Skip Semantic Scholar external lookups (--no-external)
+  </label>
+  <button type="submit">Build citations</button>
+</form>
+{% endblock %}

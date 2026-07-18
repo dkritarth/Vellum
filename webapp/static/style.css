@@ -7,4 +7,9 @@ table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid #8883; }
 dl { display: grid; grid-template-columns: 8rem 1fr; gap: 0.25rem 1rem; }
 dt { font-weight: 600; }
-pre { overflow-x: auto; padding: 0.75rem; background: #8881; border-radius: 6px; }
+pre { overflow-x: auto; padding: 0.75rem; background: #8881; border-radius: 6px; white-space: pre-wrap; }
+form { display: flex; flex-direction: column; gap: 0.6rem; max-width: 32rem; margin-bottom: 2rem; }
+form label { display: flex; flex-direction: column; gap: 0.2rem; font-weight: 600; }
+form label.checkbox { flex-direction: row; align-items: center; font-weight: normal; }
+form input[type="text"] { font-weight: normal; padding: 0.35rem 0.5rem; }
+form button { align-self: flex-start; padding: 0.4rem 1rem; }

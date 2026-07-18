@@ -36,6 +36,12 @@ pip install paper-qa   # needed for scripts/ask.py; not in requirements.txt
                         # it only if you're using Q&A.
 ```
 
+`scripts/latex_synthesis.py` (Phase 4 workstream 3 — LaTeX-compiled synthesis
+output) additionally needs `tectonic` on PATH — a single self-contained LaTeX
+compiler binary, not a Python package, so it is not in `requirements.txt` and
+not pip-installable. Install it separately (e.g. `brew install tectonic` on
+macOS); it's already present at `/opt/homebrew/bin/tectonic` on this machine.
+
 Ingest a paper end-to-end (download/read -> markdown -> section extraction
 -> `papers/<slug>/`). Accepts an arXiv ID/URL, a DOI/doi.org URL, a direct
 PDF URL, or a local PDF file path — auto-detected (see `classify_input()` in
@@ -135,6 +141,37 @@ few real arXiv IDs/DOIs/URLs and spot-checking `metadata.yaml` section
 boundaries against `paper.md`, per `AGENTS.md`'s Testing section. Validate
 `synthesize.py` similarly: re-run against real ingested papers and read the
 generated `synthesis/*.md` prose for coherence and citation accuracy.
+
+Compile an already-generated synthesis file to a thesis-chapter-style LaTeX
+PDF (Phase 4 workstream 3 — takes `synthesize.py`'s output only; ingested-
+paper notes under `papers/*/paper.md` stay markdown-only, no LaTeX rendering
+for those):
+
+```bash
+source .venv/bin/activate
+# topic slug (as produced by synthesize.py), or a path to the .md file directly
+python scripts/latex_synthesis.py how-do-these-papers-handle-attention-mechanisms
+# handles the --contradictions variant the same way
+python scripts/latex_synthesis.py is-recurrence-necessary-for-good-performance-contradictions
+# emit .tex/.bib only, skip the tectonic compile step (CI/no-tectonic environments)
+python scripts/latex_synthesis.py <slug> --no-compile
+```
+
+Output: `synthesis/<topic-slug>.tex` (`\documentclass{report}`, `\chapter{
+<topic>}`, standard margins, no title page/TOC — a single thesis chapter, not
+a standalone thesis), `synthesis/<topic-slug>.bib` (one BibTeX entry per
+paper in the synthesis, built from that paper's `papers/<slug>/metadata.yaml`,
+keyed by its slug so `\cite{<slug>}` lines up 1:1), and (unless `--no-compile`
+is passed) `synthesis/<topic-slug>.pdf` compiled via `tectonic`. Citations are
+numeric (`report`'s default `\cite` numbering, plain `bibtex` — no natbib/
+biblatex): the literal "Author et al. (Year)"-style citation text that
+`synthesize.py` already writes into the prose (matching its `citation_labels`
+frontmatter) is replaced with `\cite{<slug>}` calls, not left in the prose
+alongside a bracketed number — see `scripts/latex_synthesis.py`'s CITATION
+REPLACEMENT STRATEGY comment for the reasoning. Requires `tectonic` on PATH
+(see the setup section above); if it's missing or the compile fails, the
+script prints the exact `tectonic` error and exits non-zero rather than
+silently leaving a stale/missing PDF.
 
 Token/cost usage for this project's Claude Code sessions and background
 agents (including worktree-isolated agent sessions, since each gets its own

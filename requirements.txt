@@ -11,9 +11,12 @@ pyyaml
 # ingest.py doesn't need. Install separately if you're using Q&A:
 #   pip install paper-qa
 
-# webapp/ (Phase 4 browse-only local web UI) — thin FastAPI read layer over
-# papers/, synthesis/, citations/ on disk. No database.
+# webapp/ (Phase 4 local web UI: browse + trigger pipeline actions) — thin
+# FastAPI layer over papers/, synthesis/, citations/ on disk. No database.
+# python-multipart is required by FastAPI/Starlette to parse the action
+# forms' application/x-www-form-urlencoded POST bodies.
 fastapi
 uvicorn[standard]
 jinja2
 markdown
+python-multipart

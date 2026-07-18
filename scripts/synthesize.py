@@ -26,10 +26,14 @@ skills" rules:
     prompt" here, not a literal invocation.
 
 Usage:
-    python scripts/synthesize.py "how do these papers handle attention/alignment?"
-    python scripts/synthesize.py "how is pretraining used?" 1810.04805 1706.03762
-    python scripts/synthesize.py "do these papers agree on X?" --contradictions
-    python scripts/synthesize.py "topic" --papers-dir papers --out-dir synthesis
+    python scripts/synthesize.py "how do these papers handle attention/alignment?" --model <model>
+    python scripts/synthesize.py "how is pretraining used?" 1810.04805 1706.03762 --model <model>
+    python scripts/synthesize.py "do these papers agree on X?" --contradictions --model <model>
+    python scripts/synthesize.py "topic" --papers-dir papers --out-dir synthesis --model <model>
+
+--model is required (no default): passed through verbatim to the claude
+CLI's own --model flag, per PLAN.md's Phase 4 decision that the user picks
+the model for every call rather than automatic tiering.
 
 Output: a plain markdown file at synthesis/<topic-slug>.md (or
 synthesis/<topic-slug>-contradictions.md in --contradictions mode) with a
@@ -283,11 +287,16 @@ def build_papers_block(paper_dirs: list[Path]) -> tuple[str, list[tuple[str, str
     return combined, [(slug, label, meta) for slug, label, _, meta in entries]
 
 
-def call_claude(prompt: str) -> str:
+def call_claude(prompt: str, model: str) -> str:
     """Shell out to the claude CLI in non-interactive print mode, same
     credential path as ingest.py's extract_sections_claude(). Raises
     SynthesisError (never silently degrades) on any failure, since there is
-    no reasonable non-LLM fallback for synthesis prose."""
+    no reasonable non-LLM fallback for synthesis prose.
+
+    `model` is passed through verbatim to the claude CLI's own --model flag
+    -- per PLAN.md's Phase 4 decision ("no automatic tiering, user picks the
+    model for every call"), there is no default and no validation/whitelist
+    here."""
     if shutil.which(CLAUDE_BIN) is None:
         raise SynthesisError(
             "`claude` CLI not found on PATH. Synthesis requires it (same credential path ingest.py's "
@@ -296,7 +305,7 @@ def call_claude(prompt: str) -> str:
 
     try:
         proc = subprocess.run(
-            [CLAUDE_BIN, "-p", "--output-format", "json", "--tools", ""],
+            [CLAUDE_BIN, "-p", "--output-format", "json", "--tools", "", "--model", model],
             input=prompt,
             capture_output=True,
             text=True,
@@ -341,6 +350,10 @@ def main() -> int:
     parser.add_argument("--papers-dir", default=None, help="Override the papers/ directory (default: <repo>/papers)")
     parser.add_argument("--out-dir", default=None, help="Override the synthesis/ output directory (default: <repo>/synthesis)")
     parser.add_argument("--print-only", action="store_true", help="Print the synthesis to stdout without writing a file")
+    parser.add_argument("--model", required=True,
+                         help="Model to pass through verbatim to the claude CLI's --model flag. Required -- "
+                              "no default, per PLAN.md's Phase 4 decision that the user picks the model for "
+                              "every call (no automatic tiering).")
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent
@@ -357,7 +370,7 @@ def main() -> int:
         prompt = tmpl.format(topic=args.topic, n_papers=len(entries), papers_block=papers_block)
 
         print("Calling claude CLI for synthesis (this can take 10-60s)...", file=sys.stderr)
-        synthesis_text = call_claude(prompt)
+        synthesis_text = call_claude(prompt, args.model)
     except SynthesisError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -382,6 +395,7 @@ def main() -> int:
         "citation_labels": {slug: label for slug, label, _ in entries},
         "generated_at": generated_at,
         "extraction_method": "claude-cli",
+        "model": args.model,
     }
     content = "---\n" + yaml.safe_dump(frontmatter, sort_keys=False) + "---\n\n" + synthesis_text + "\n"
     out_path.write_text(content, encoding="utf-8")

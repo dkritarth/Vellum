@@ -41,30 +41,37 @@ Ingest a paper end-to-end (download/read -> markdown -> section extraction
 PDF URL, or a local PDF file path — auto-detected (see `classify_input()` in
 `scripts/ingest.py`):
 
+`--model` is required — no default is chosen for you; pass whatever model
+string the `claude` CLI's own `--model` flag accepts (e.g. `sonnet`,
+`claude-sonnet-5`):
+
 ```bash
 source .venv/bin/activate
-python scripts/ingest.py 1706.03762
-python scripts/ingest.py https://arxiv.org/abs/1706.03762   # arxiv URL
-python scripts/ingest.py 10.18653/v1/N19-1423               # DOI
-python scripts/ingest.py https://doi.org/10.18653/v1/N19-1423
-python scripts/ingest.py https://example.org/some-paper.pdf # direct PDF URL
-python scripts/ingest.py ~/Downloads/some-paper.pdf          # local file
+python scripts/ingest.py 1706.03762 --model sonnet
+python scripts/ingest.py https://arxiv.org/abs/1706.03762 --model sonnet   # arxiv URL
+python scripts/ingest.py 10.18653/v1/N19-1423 --model sonnet               # DOI
+python scripts/ingest.py https://doi.org/10.18653/v1/N19-1423 --model sonnet
+python scripts/ingest.py https://example.org/some-paper.pdf --model sonnet # direct PDF URL
+python scripts/ingest.py ~/Downloads/some-paper.pdf --model sonnet          # local file
 # DOI with no open-access PDF: attach one you already have locally
-python scripts/ingest.py 10.1371/journal.pone.0130140 --pdf ~/Downloads/paper.pdf
+python scripts/ingest.py 10.1371/journal.pone.0130140 --model sonnet --pdf ~/Downloads/paper.pdf
 ```
 
 Output per paper: `papers/<slug>/paper.pdf`, `paper.md` (both omitted for a
 metadata-only DOI entry with no PDF available), `metadata.yaml`
 (input_type/title/authors/year/venue/abstract/doi/arxiv_id + section
-boundaries + `extraction_method`).
+boundaries + `extraction_method` + `model`).
 
 Section extraction tries a Claude-driven pass first (shells out to the
 `claude` CLI in non-interactive mode — `claude -p --output-format json
---tools ""` — using whatever credentials this environment already has, no
-raw `ANTHROPIC_API_KEY` required), and transparently falls back to the M0
-heuristic regex extractor if the `claude` binary isn't on PATH or the call
-fails/times out/returns bad JSON. `metadata.yaml`'s `extraction_method`
-field (`claude-cli` or `heuristic-regex`) records which one actually ran.
+--tools "" --model <value of --model>` — using whatever credentials this
+environment already has, no raw `ANTHROPIC_API_KEY` required), and
+transparently falls back to the M0 heuristic regex extractor if the
+`claude` binary isn't on PATH or the call fails/times out/returns bad JSON.
+`metadata.yaml`'s `extraction_method` field (`claude-cli` or
+`heuristic-regex`) records which one actually ran; the sibling `model`
+field records the `--model` value that was used (`null` when the
+heuristic-regex fallback ran instead).
 See `NOTES.md` for recall numbers and remaining known limitations of each
 path — extraction always degrades gracefully (missing sections ->
 `found: false`) rather than failing, per `AGENTS.md`'s "must tolerate
@@ -93,14 +100,16 @@ extraction pass, no raw API key required):
 
 ```bash
 source .venv/bin/activate
+# --model is required -- no default, user picks the model for every call (PLAN.md Phase 4);
+# <model> is any value accepted by the claude CLI's own --model flag (passed through verbatim).
 # default: every paper under papers/
-python scripts/synthesize.py "how do these papers handle attention/alignment mechanisms"
+python scripts/synthesize.py "how do these papers handle attention/alignment mechanisms" --model <model>
 # restrict to specific paper ids/slugs
-python scripts/synthesize.py "how is pretraining used?" 1810.04805 1706.03762
+python scripts/synthesize.py "how is pretraining used?" 1810.04805 1706.03762 --model <model>
 # contradiction/agreement-detection mode instead of a plain synthesis paragraph
-python scripts/synthesize.py "is recurrence necessary for good performance" --contradictions
+python scripts/synthesize.py "is recurrence necessary for good performance" --contradictions --model <model>
 # print to stdout without writing a file
-python scripts/synthesize.py "topic" --print-only
+python scripts/synthesize.py "topic" --print-only --model <model>
 ```
 
 Output: `synthesis/<topic-slug>.md` (or `<topic-slug>-contradictions.md` in

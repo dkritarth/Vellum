@@ -165,7 +165,7 @@ def get_references_text(paper_dir: Path, meta: dict) -> str:
     return text
 
 
-def _call_claude_json(prompt: str) -> dict | None:
+def _call_claude_json(prompt: str, model: str) -> dict | None:
     """Shell out to `claude -p`, same pattern as ingest.py/synthesize.py. Returns
     the parsed JSON payload, or None on any failure (binary missing, timeout,
     non-zero exit, unparseable JSON) -- never raises."""
@@ -174,7 +174,7 @@ def _call_claude_json(prompt: str) -> dict | None:
         return None
     try:
         proc = subprocess.run(
-            [CLAUDE_BIN, "-p", "--output-format", "json", "--tools", ""],
+            [CLAUDE_BIN, "-p", "--output-format", "json", "--tools", "", "--model", model],
             input=prompt,
             capture_output=True,
             text=True,
@@ -245,12 +245,12 @@ def _coerce_year(raw_year) -> int | None:
     return None
 
 
-def _parse_references_chunk(chunk: str) -> list[dict] | None:
+def _parse_references_chunk(chunk: str, model: str) -> list[dict] | None:
     """Parse one chunk via claude -p. Returns a list of entries, or None if
     the call failed/was refused/returned unparseable output for this chunk
     specifically (caller treats None as "this chunk contributed nothing",
     not a fatal error for the whole paper)."""
-    payload = _call_claude_json(REFERENCE_PARSE_PROMPT_TMPL.format(references_text=chunk))
+    payload = _call_claude_json(REFERENCE_PARSE_PROMPT_TMPL.format(references_text=chunk), model)
     if payload is None:
         return None
     raw_refs = payload.get("references")
@@ -302,7 +302,7 @@ def _dedupe_references(entries: list[dict]) -> list[dict]:
     return out
 
 
-def parse_references(references_text: str) -> tuple[list[dict], bool]:
+def parse_references(references_text: str, model: str) -> tuple[list[dict], bool]:
     """Returns (entries, attempted_ok). `attempted_ok` is True iff at least
     one chunk was actually parsed by the `claude` CLI successfully (even if
     that chunk -- or all of them -- legitimately contained zero extractable
@@ -321,7 +321,7 @@ def parse_references(references_text: str) -> tuple[list[dict], bool]:
     all_entries: list[dict] = []
     any_chunk_ok = False
     for i, chunk in enumerate(chunks):
-        entries = _parse_references_chunk(chunk)
+        entries = _parse_references_chunk(chunk, model)
         if entries is None:
             print(f"    [warn] reference-parsing chunk {i + 1}/{len(chunks)} failed/refused; skipping that chunk only.",
                   file=sys.stderr)
@@ -528,7 +528,7 @@ def resolve_paper_slugs(refs: list[str], corpus: list[tuple[str, dict]]) -> list
     return out
 
 
-def build_one(slug: str, papers_dir: Path, corpus: list[tuple[str, dict]], *, use_external: bool) -> dict:
+def build_one(slug: str, papers_dir: Path, corpus: list[tuple[str, dict]], *, use_external: bool, model: str) -> dict:
     paper_dir = papers_dir / slug
     meta = dict(next(m for s, m in corpus if s == slug))
     title = meta.get("title") or slug
@@ -539,10 +539,12 @@ def build_one(slug: str, papers_dir: Path, corpus: list[tuple[str, dict]], *, us
         print("  no References section text available; skipping reference parsing.")
         references: list[dict] = []
         parse_method = "none"  # no section to parse -- distinct from "unavailable" (attempted, failed)
+        model_used = None
     else:
         print("  parsing References section via claude CLI (can take 10-60s)...")
-        references, attempted_ok = parse_references(references_text)
+        references, attempted_ok = parse_references(references_text, model)
         parse_method = "claude-cli" if attempted_ok else "unavailable"
+        model_used = model if attempted_ok else None
         print(f"  parsed {len(references)} reference entr{'y' if len(references) == 1 else 'ies'}"
               f" (parse_method: {parse_method})")
 
@@ -589,6 +591,7 @@ def build_one(slug: str, papers_dir: Path, corpus: list[tuple[str, dict]], *, us
         "title": title,
         "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         "parse_method": parse_method,
+        "model": model_used,
         "references_parsed": len(references),
         "references": references,
         "cites": cites,
@@ -616,7 +619,7 @@ def cmd_build(args: argparse.Namespace) -> int:
         return 1
 
     for slug in slugs:
-        result = build_one(slug, papers_dir, corpus, use_external=not args.no_external)
+        result = build_one(slug, papers_dir, corpus, use_external=not args.no_external, model=args.model)
         out_path = papers_dir / slug / "citations.yaml"
         with out_path.open("w", encoding="utf-8") as f:
             yaml.safe_dump(result, f, sort_keys=False, allow_unicode=True, width=100)
@@ -774,6 +777,7 @@ def main() -> int:
 
     build_p = sub.add_parser("build", help="Parse references + build citation edges for one or more ingested papers")
     build_p.add_argument("paper_ids", nargs="*", help="Paper slugs under papers/ (default: all ingested papers)")
+    build_p.add_argument("--model", required=True, help="Model name to pass to `claude -p --model` for reference parsing (required, no default -- pick explicitly every run)")
     build_p.add_argument("--no-external", action="store_true", help="Skip Semantic Scholar lookups (in-corpus edges only)")
     build_p.add_argument("--papers-dir", default=None, help="Override the papers/ directory")
     build_p.set_defaults(func=cmd_build)

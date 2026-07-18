@@ -40,7 +40,8 @@ PDF. See `classify_input()`.
 
 NOTE on section extraction (read AGENTS.md before changing this):
 The Claude-driven pass shells out to the `claude` CLI in non-interactive
-mode (`claude -p --output-format json --tools ""`), which uses whatever
+mode (`claude -p --output-format json --tools "" --model <value of the
+required --model CLI flag>`), which uses whatever
 credentials/session this environment already has (no raw ANTHROPIC_API_KEY
 is assumed or required). If the `claude` binary isn't on PATH, or the call
 fails/times out/returns unparseable output, we transparently fall back to
@@ -565,6 +566,7 @@ def _validate_claude_sections(payload: dict) -> list[dict] | None:
 
 def extract_sections_claude(
     markdown_text: str,
+    model: str,
 ) -> tuple[list[dict], str | None, str | None, list[str]] | None:
     """Claude-driven section extraction via the `claude` CLI in non-interactive
     print mode. Returns (sections, summary, title, authors) on success, or
@@ -597,7 +599,7 @@ def extract_sections_claude(
 
     try:
         proc = subprocess.run(
-            [CLAUDE_BIN, "-p", "--output-format", "json", "--tools", ""],
+            [CLAUDE_BIN, "-p", "--output-format", "json", "--tools", "", "--model", model],
             input=prompt,
             capture_output=True,
             text=True,
@@ -645,14 +647,16 @@ def extract_sections_claude(
     return sections, summary, title, authors
 
 
-def extract_sections(markdown_text: str) -> tuple[list[dict], str, str | None, str | None, list[str]]:
+def extract_sections(markdown_text: str, model: str) -> tuple[list[dict], str, str | None, str | None, list[str], str | None]:
     """Try the Claude-driven pass first, fall back to the heuristic regex
-    extractor. Returns (sections, extraction_method, claude_summary, claude_title, claude_authors)."""
-    claude_result = extract_sections_claude(markdown_text)
+    extractor. Returns (sections, extraction_method, claude_summary, claude_title,
+    claude_authors, model_used). model_used is the --model string when the
+    claude-cli path ran, or None when the heuristic-regex fallback ran instead."""
+    claude_result = extract_sections_claude(markdown_text, model)
     if claude_result is not None:
         sections, summary, title, authors = claude_result
-        return sections, "claude-cli", summary, title, authors
-    return extract_sections_heuristic(markdown_text), "heuristic-regex", None, None, []
+        return sections, "claude-cli", summary, title, authors, model
+    return extract_sections_heuristic(markdown_text), "heuristic-regex", None, None, [], None
 
 
 def slugify(text: str, max_len: int = 60) -> str:
@@ -670,12 +674,14 @@ def write_paper(
     pdf_url: str | None,
     pdf_path: Path | None,
     meta: dict,
+    model: str,
 ) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     files = {}
     sections: list[dict]
     extraction_method = "none"
+    model_used = None
     claude_summary = None
 
     if pdf_path is not None:
@@ -691,7 +697,7 @@ def write_paper(
         files["markdown"] = "paper.md"
 
         print("Extracting section boundaries ...")
-        sections, extraction_method, claude_summary, claude_title, claude_authors = extract_sections(markdown_text)
+        sections, extraction_method, claude_summary, claude_title, claude_authors, model_used = extract_sections(markdown_text, model)
         n_found = sum(1 for s in sections if s["found"])
         print(f"      [{extraction_method}] found {n_found}/{len(sections)} canonical sections")
 
@@ -727,6 +733,7 @@ def write_paper(
         "claude_summary": claude_summary,
         "ingested_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         "extraction_method": extraction_method,
+        "model": model_used,
         "sections": sections,
         "files": files,
     }
@@ -737,7 +744,7 @@ def write_paper(
     print(f"Done. Wrote {out_dir}/")
 
 
-def ingest_arxiv(arxiv_id: str, papers_dir: Path) -> Path:
+def ingest_arxiv(arxiv_id: str, papers_dir: Path, model: str) -> Path:
     out_dir = papers_dir / arxiv_id.replace("/", "_")
     print(f"[1/3] Fetching arXiv metadata for {arxiv_id} ...")
     meta = fetch_arxiv_metadata(arxiv_id)
@@ -758,11 +765,12 @@ def ingest_arxiv(arxiv_id: str, papers_dir: Path) -> Path:
         pdf_url=pdf_url,
         pdf_path=tmp_pdf,
         meta=meta,
+        model=model,
     )
     return out_dir
 
 
-def ingest_doi(doi: str, papers_dir: Path, local_pdf: Path | None) -> Path:
+def ingest_doi(doi: str, papers_dir: Path, local_pdf: Path | None, model: str) -> Path:
     out_dir = papers_dir / slugify(doi.replace("/", "_"))
     print(f"[1/3] Resolving DOI {doi} via Crossref ...")
     meta = fetch_doi_metadata(doi)
@@ -795,6 +803,7 @@ def ingest_doi(doi: str, papers_dir: Path, local_pdf: Path | None) -> Path:
         pdf_url=meta.get("pdf_url"),
         pdf_path=pdf_path,
         meta=meta,
+        model=model,
     )
     return out_dir
 
@@ -808,6 +817,7 @@ def _write_metadata_for_untethered_input(
     title: str | None,
     authors: list[str],
     extraction_method: str,
+    model: str | None,
     claude_summary: str | None,
     sections: list[dict],
 ) -> None:
@@ -826,6 +836,7 @@ def _write_metadata_for_untethered_input(
         "claude_summary": claude_summary,
         "ingested_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         "extraction_method": extraction_method,
+        "model": model,
         "sections": sections,
         "files": {"pdf": "paper.pdf", "markdown": "paper.md"},
     }
@@ -835,7 +846,7 @@ def _write_metadata_for_untethered_input(
     print(f"Done. Wrote {out_dir}/")
 
 
-def ingest_pdf_url(url: str, papers_dir: Path) -> Path:
+def ingest_pdf_url(url: str, papers_dir: Path, model: str) -> Path:
     # Directory name is finalized after we can guess a title; use a
     # temporary staging dir under papers_dir first.
     parsed = urlparse(url)
@@ -849,7 +860,7 @@ def ingest_pdf_url(url: str, papers_dir: Path) -> Path:
 
     print("[2/3] Converting to markdown and extracting section boundaries ...")
     markdown_text = convert_to_markdown(tmp_pdf)
-    sections, extraction_method, claude_summary, claude_title, claude_authors = extract_sections(markdown_text)
+    sections, extraction_method, claude_summary, claude_title, claude_authors, model_used = extract_sections(markdown_text, model)
     n_found = sum(1 for s in sections if s["found"])
     print(f"      [{extraction_method}] found {n_found}/{len(sections)} canonical sections")
 
@@ -881,13 +892,14 @@ def ingest_pdf_url(url: str, papers_dir: Path) -> Path:
         title=title,
         authors=authors,
         extraction_method=extraction_method,
+        model=model_used,
         claude_summary=claude_summary,
         sections=sections,
     )
     return out_dir
 
 
-def ingest_local_file(path_str: str, papers_dir: Path) -> Path:
+def ingest_local_file(path_str: str, papers_dir: Path, model: str) -> Path:
     pdf_path = Path(path_str)
     if not pdf_path.is_file():
         raise FileNotFoundError(f"Local file not found: {pdf_path}")
@@ -895,7 +907,7 @@ def ingest_local_file(path_str: str, papers_dir: Path) -> Path:
     print(f"[1/3] Reading local file {pdf_path} ...")
     print("[2/3] Converting to markdown and extracting section boundaries ...")
     markdown_text = convert_to_markdown(pdf_path)
-    sections, extraction_method, claude_summary, claude_title, claude_authors = extract_sections(markdown_text)
+    sections, extraction_method, claude_summary, claude_title, claude_authors, model_used = extract_sections(markdown_text, model)
     n_found = sum(1 for s in sections if s["found"])
     print(f"      [{extraction_method}] found {n_found}/{len(sections)} canonical sections")
 
@@ -920,22 +932,23 @@ def ingest_local_file(path_str: str, papers_dir: Path) -> Path:
         title=title,
         authors=authors,
         extraction_method=extraction_method,
+        model=model_used,
         claude_summary=claude_summary,
         sections=sections,
     )
     return out_dir
 
 
-def ingest(raw_input: str, papers_dir: Path, local_pdf: Path | None = None) -> Path:
+def ingest(raw_input: str, papers_dir: Path, model: str, local_pdf: Path | None = None) -> Path:
     kind, value = classify_input(raw_input)
     if kind == "arxiv":
-        return ingest_arxiv(value, papers_dir)
+        return ingest_arxiv(value, papers_dir, model)
     if kind == "doi":
-        return ingest_doi(value, papers_dir, local_pdf)
+        return ingest_doi(value, papers_dir, local_pdf, model)
     if kind == "pdf_url":
-        return ingest_pdf_url(value, papers_dir)
+        return ingest_pdf_url(value, papers_dir, model)
     if kind == "local_file":
-        return ingest_local_file(value, papers_dir)
+        return ingest_local_file(value, papers_dir, model)
     raise UnresolvedInputError(f"Unhandled input kind: {kind!r}")
 
 
@@ -955,6 +968,14 @@ def main() -> int:
         default=None,
         help="Output root (default: <repo_root>/papers)",
     )
+    parser.add_argument(
+        "--model",
+        required=True,
+        help="Model to pass through to the `claude` CLI's own --model flag for "
+        "Claude-driven section extraction (e.g. sonnet, claude-sonnet-5). "
+        "Required — no default, per this project's no-auto-tiering policy: "
+        "you pick the model for every call.",
+    )
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent
@@ -962,7 +983,7 @@ def main() -> int:
     local_pdf = Path(args.pdf).expanduser().resolve() if args.pdf else None
 
     try:
-        ingest(args.paper_ref, papers_dir, local_pdf=local_pdf)
+        ingest(args.paper_ref, papers_dir, args.model, local_pdf=local_pdf)
     except Exception as exc:  # noqa: BLE001 - top-level CLI error boundary
         print(f"error: {exc}", file=sys.stderr)
         return 1

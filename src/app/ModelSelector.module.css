@@ -1,0 +1,16 @@
+.label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--vellum-text-dim, #8a8a8a);
+  font-size: 12px;
+}
+
+.select {
+  border: 1px solid var(--vellum-border, #2a2a2a);
+  border-radius: 6px;
+  background: var(--vellum-bg, #101010);
+  color: var(--vellum-text, #eaeaea);
+  font-size: 12px;
+  padding: 4px 7px;
+}

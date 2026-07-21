@@ -118,7 +118,9 @@ export interface AskStartParams {
 }
 
 export class ChatManager {
-  private readonly acpSessions = new Map<string, AcpSession>()
+  // Cache agent conversations by both paper and backend. A Claude session
+  // must never be reused after user switches this chat to Codex.
+  private readonly acpSessions = new Map<AcpBackend, Map<string, AcpSession>>()
 
   constructor(private readonly client: AcpClient) {}
 
@@ -142,7 +144,7 @@ export class ChatManager {
    */
   async newChat(params: OpenChatParams): Promise<ChatSession> {
     const backend = params.backend ?? DEFAULT_BACKEND
-    await this.disposeSession(params.paperSlug)
+    await this.disposePaperSessions(params.paperSlug)
     return createChatSession(params.db, { paperSlug: params.paperSlug, backend })
   }
 
@@ -191,7 +193,7 @@ export class ChatManager {
         } else if (update.kind === 'error') {
           // A broken turn likely means a broken session — evict the cache
           // so the next turn spawns fresh rather than reusing a dead one.
-          await this.disposeSession(params.paperSlug)
+          await this.disposeSession(params.paperSlug, backend)
           onEvent({ kind: 'error', message: errorMessageFromUpdate(update) })
           return
         } else if (update.kind === 'done') {
@@ -199,7 +201,7 @@ export class ChatManager {
         }
       }
     } catch (err) {
-      await this.disposeSession(params.paperSlug)
+      await this.disposeSession(params.paperSlug, backend)
       onEvent({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
       return
     }
@@ -214,25 +216,36 @@ export class ChatManager {
 
   /** Dispose every cached ACP session. Call on app shutdown. */
   async disposeAll(): Promise<void> {
-    const slugs = [...this.acpSessions.keys()]
-    await Promise.all(slugs.map((slug) => this.disposeSession(slug)))
+    const disposals: Promise<void>[] = []
+    for (const [backend, sessions] of this.acpSessions) {
+      for (const slug of sessions.keys()) disposals.push(this.disposeSession(slug, backend))
+    }
+    await Promise.all(disposals)
   }
 
   private async getOrCreateAcpSession(
     paperSlug: string,
     backend: AcpBackend,
   ): Promise<{ session: AcpSession; freshlySpawned: boolean }> {
-    const cached = this.acpSessions.get(paperSlug)
+    const sessions = this.acpSessions.get(backend)
+    const cached = sessions?.get(paperSlug)
     if (cached) return { session: cached, freshlySpawned: false }
     const session = await this.client.newSession(backend)
-    this.acpSessions.set(paperSlug, session)
+    if (sessions) sessions.set(paperSlug, session)
+    else this.acpSessions.set(backend, new Map([[paperSlug, session]]))
     return { session, freshlySpawned: true }
   }
 
-  private async disposeSession(paperSlug: string): Promise<void> {
-    const session = this.acpSessions.get(paperSlug)
+  private async disposePaperSessions(paperSlug: string): Promise<void> {
+    await Promise.all([...this.acpSessions.keys()].map((backend) => this.disposeSession(paperSlug, backend)))
+  }
+
+  private async disposeSession(paperSlug: string, backend: AcpBackend): Promise<void> {
+    const sessions = this.acpSessions.get(backend)
+    const session = sessions?.get(paperSlug)
     if (!session) return
-    this.acpSessions.delete(paperSlug)
+    sessions?.delete(paperSlug)
+    if (sessions?.size === 0) this.acpSessions.delete(backend)
     await session.dispose().catch(() => undefined)
   }
 }

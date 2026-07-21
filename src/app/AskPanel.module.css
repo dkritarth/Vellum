@@ -6,7 +6,7 @@
 
 .header {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   padding: 8px;
   border-bottom: 1px solid var(--vellum-border, #2a2a2a);
   flex-shrink: 0;

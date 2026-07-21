@@ -5,7 +5,7 @@
 import type { Database } from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import type { AcpClient, AcpPromptRequest, AcpSession, AcpUpdate } from '../acp/client.js'
+import type { AcpBackend, AcpClient, AcpPromptRequest, AcpSession, AcpUpdate } from '../acp/client.js'
 import { upsertPaper } from '../library/repo.js'
 import { openDb } from '../store/db.js'
 import { ChatManager } from './manager.js'
@@ -30,14 +30,16 @@ class FakeSession implements AcpSession {
 class FakeClient implements AcpClient {
   sessions: FakeSession[] = []
   newSessionCalls = 0
+  backends: AcpBackend[] = []
 
   constructor(
     private readonly updates: AcpUpdate[] = [],
     private readonly newSessionImpl?: () => Promise<AcpSession>,
   ) {}
 
-  async newSession(): Promise<AcpSession> {
+  async newSession(backend: AcpBackend): Promise<AcpSession> {
     this.newSessionCalls += 1
+    this.backends.push(backend)
     if (this.newSessionImpl) return this.newSessionImpl()
     const session = new FakeSession(this.updates)
     this.sessions.push(session)
@@ -172,6 +174,17 @@ describe('ChatManager', () => {
     // Next turn spawns a genuinely new ACP session rather than reusing the disposed one.
     await manager.runTurn({ db, chatSessionId: fresh.id, paperSlug: slug, mdPath, text: 'q2' }, () => {})
     expect(client.newSessionCalls).toBe(2)
+  })
+
+  it('uses a session\'s selected Codex backend for its next turn', async () => {
+    const client = new FakeClient([doneUpdate])
+    const manager = new ChatManager(client)
+    const { session } = manager.openChat({ db, paperSlug: slug, backend: 'codex' })
+
+    await manager.runTurn({ db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'hi', backend: 'codex' }, () => {})
+
+    expect(session.backend).toBe('codex')
+    expect(client.backends).toEqual(['codex'])
   })
 
   it('surfaces an adapter spawn failure as an error event without crashing', async () => {

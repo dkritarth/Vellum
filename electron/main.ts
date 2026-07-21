@@ -2,6 +2,11 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { readFile } from 'node:fs/promises'
+import type { Database } from 'better-sqlite3'
+
+import { ingest } from '../core/ingest/index.js'
+import type { IngestResult } from '../core/ingest/index.js'
+import { openDb } from '../core/store/db.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -60,6 +65,29 @@ ipcMain.handle('vellum:read-paper-file', async (_event, slug: unknown): Promise<
   } catch {
     return null
   }
+})
+
+// [P1-06] Ingest IPC seam. Lazily opens the one app.db handle on first use
+// (schema-migrated via core/store/db.ts's openDb()) rather than at module
+// load — keeps `import`ing main.ts side-effect-free for tests, and means the
+// data/ dir isn't created until a paper is actually ingested.
+let db: Database | undefined
+function getDb(): Database {
+  if (!db) db = openDb()
+  return db
+}
+
+// Persists a paper end-to-end (classify -> fetch -> convert -> extract ->
+// write files + DB row — see core/ingest/index.ts). Re-ingesting the same
+// input is idempotent (upsert-by-slug). Rejects the renderer's promise on
+// failure (bad input, network error, ...) rather than swallowing it — unlike
+// read-paper-file's null-on-miss, ingest failures are actionable and the
+// caller should see them.
+ipcMain.handle('vellum:ingest', async (_event, input: unknown): Promise<IngestResult> => {
+  if (typeof input !== 'string' || input.trim().length === 0) {
+    throw new Error('vellum:ingest: input must be a non-empty string')
+  }
+  return ingest(input, { db: getDb() })
 })
 
 app.whenReady().then(() => {

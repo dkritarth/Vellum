@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vellum — your AI paper workspace, on your own plan</title>
+<meta name="description" content="Vellum is a local-first Electron desktop app for reading and chatting with research papers, powered by your own Claude or Codex plan via ACP. No API keys, no extra subscription." />
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div class="noise-overlay" aria-hidden="true"></div>
+
+<header class="nav" id="nav">
+  <div class="container nav-inner">
+    <a class="brand" href="#top">
+      <svg class="brand-mark" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="3" y="2" width="26" height="28" rx="4" fill="url(#g1)"/>
+        <path d="M9 9h14M9 15h14M9 21h9" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <defs>
+          <linearGradient id="g1" x1="3" y1="2" x2="29" y2="30" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#6D5EF7"/>
+            <stop offset="1" stop-color="#B06AF7"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <span>Vellum</span>
+    </a>
+    <nav class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#trust">Trust</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn btn-ghost" href="https://github.com/Kritarth-Dandapat/local-anara" target="_blank" rel="noopener">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.6.5.5 5.6.5 12c0 5.1 3.3 9.4 7.9 11 .6.1.8-.3.8-.6v-2.1c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2 1-.3 2-.4 3-.4s2 .1 3 .4c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.9 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.6 7.9-5.9 7.9-11C23.5 5.6 18.4.5 12 .5z"/></svg>
+        GitHub
+      </a>
+      <a class="btn btn-primary" href="#how">Get started</a>
+    </div>
+    <button class="nav-toggle" id="navToggle" aria-label="Toggle menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<main id="top">
+
+  <section class="hero">
+    <div class="container hero-inner">
+      <div class="pill fade-up">
+        <span class="dot"></span> Local-first · No API key · On your own plan
+      </div>
+      <h1 class="fade-up d1">Read papers.<br/>Chat with them.<br/><span class="grad-text">On your own plan.</span></h1>
+      <p class="lede fade-up d2">
+        Vellum is a desktop workspace for research papers — ingest, read, and ask
+        questions grounded in the actual document. It runs on the Claude or Codex
+        plan you already pay for, through the Agent Client Protocol. No hidden
+        API bill, no OAuth bridge, nothing to sign up for.
+      </p>
+      <div class="hero-actions fade-up d3">
+        <a class="btn btn-primary btn-lg" href="https://github.com/Kritarth-Dandapat/local-anara" target="_blank" rel="noopener">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v14m0 0-5-5m5 5 5-5M5 21h14"/></svg>
+          Clone the repo
+        </a>
+        <a class="btn btn-secondary btn-lg" href="#architecture">See how it's built</a>
+      </div>
+
+      <div class="hero-shot fade-up d4" role="img" aria-label="Vellum app preview showing library, reader, and ask panel">
+        <div class="shot-chrome">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="shot-body">
+          <aside class="shot-sidebar">
+            <div class="shot-tab active">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+              Library
+            </div>
+            <div class="shot-tab">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              Search
+            </div>
+            <div class="shot-tab">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+              Home
+            </div>
+          </aside>
+          <section class="shot-reader">
+            <div class="shot-line w-70"></div>
+            <div class="shot-line w-90"></div>
+            <div class="shot-line w-80"></div>
+            <div class="shot-line w-60"></div>
+            <div class="shot-line w-95"></div>
+            <div class="shot-line w-85"></div>
+            <div class="shot-line w-40 accent"></div>
+            <div class="shot-line w-90"></div>
+            <div class="shot-line w-70"></div>
+          </section>
+          <aside class="shot-ask">
+            <div class="shot-ask-head">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              Ask
+            </div>
+            <div class="shot-bubble user">What's the core contribution?</div>
+            <div class="shot-bubble ai">
+              <span class="typing"><i></i><i></i><i></i></span>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="logos">
+    <div class="container">
+      <p class="logos-label">Built on the tools you already trust</p>
+      <div class="logos-row">
+        <span class="logo-chip">Claude Agent SDK</span>
+        <span class="logo-chip">Codex CLI</span>
+        <span class="logo-chip">ACP</span>
+        <span class="logo-chip">Electron</span>
+        <span class="logo-chip">SQLite</span>
+        <span class="logo-chip">TypeScript</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="features">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow">Features</span>
+        <h2>Everything you need to actually read a paper</h2>
+        <p>No embeddings, no vector DB, no black box — the agent reads the file, the same way you would.</p>
+      </div>
+
+      <div class="grid-features">
+        <article class="card fx">
+          <div class="icon-wrap"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20V8m0 0 5 5m-5-5-5 5"/><path d="M4 20h16"/></svg></div>
+          <h3>Ingest anything</h3>
+          <p>Drop in an arXiv ID, a DOI, a raw PDF URL, or a local file. Vellum fetches it, converts it to clean markdown, and extracts sections and metadata with an agent — no fragile regex heuristics.</p>
+        </article>
+
+        <article class="card fx">
+          <div class="icon-wrap"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
+          <h3>Full PDF reader</h3>
+          <p>Paginated rendering, zoom, table of contents, and in-document search — with a selectable text layer, so highlighting and "ask about this" are one selection away.</p>
+        </article>
+
+        <article class="card fx">
+          <div class="icon-wrap"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+          <h3>Grounded chat</h3>
+          <p>Ask a question and the agent reads <code>paper.md</code> directly — no retrieval step, no chunking loss. Replies cite the sections and quotes they came from. History persists per paper.</p>
+        </article>
+
+        <article class="card fx">
+          <div class="icon-wrap"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3 4 7l4 4"/><path d="M4 7h11a5 5 0 0 1 5 5v1"/><path d="m16 21 4-4-4-4"/><path d="M20 17H9a5 5 0 0 1-5-5v-1"/></svg></div>
+          <h3>Switch models mid-read</h3>
+          <p>One dropdown flips the whole session between Claude and Codex, each spawned as a first-party ACP adapter. Ask the same question to both, on the same grounded context.</p>
+        </article>
+
+        <article class="card fx">
+          <div class="icon-wrap"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+          <h3>Your plan, not a new bill</h3>
+          <p>Auth comes straight from your signed-in Claude or Codex CLI. No <code>ANTHROPIC_API_KEY</code>, no OAuth bridging, no separate subscription to manage.</p>
+        </article>
+
+        <article class="card fx">
+          <div class="icon-wrap"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></div>
+          <h3>Your library, on disk</h3>
+          <p>Papers live as plain files under <code>data/papers/&lt;slug&gt;</code>; state lives in a local SQLite database. Nothing leaves your machine except the model call itself.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section alt" id="how">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow">How it works</span>
+        <h2>Ingest → read → ask, end to end</h2>
+        <p>The same vertical loop, proven on a real arXiv paper against a live Claude plan.</p>
+      </div>
+
+      <ol class="steps">
+        <li class="step">
+          <div class="step-num">01</div>
+          <div>
+            <h3>Ingest a source</h3>
+            <p>Paste an arXiv ID, DOI, PDF URL, or local path. Vellum classifies it, fetches the PDF, converts it to markdown, and runs an on-plan agent turn to pull out title, authors, year, abstract, and section structure.</p>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-num">02</div>
+          <div>
+            <h3>Open it in the reader</h3>
+            <p>The library card grid opens the paper in a new tab: paginated PDF, zoom, outline, and in-document search, side by side with the right panel.</p>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-num">03</div>
+          <div>
+            <h3>Ask, grounded</h3>
+            <p>The Ask panel sends your question through ACP with <code>paper.md</code> as context. The agent reads the file itself and streams back an answer that cites the paper — no vector index in sight.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section" id="architecture">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow">Architecture</span>
+        <h2>A small, honest stack</h2>
+        <p>One AI seam. One storage layer. No Python, no custom RAG.</p>
+      </div>
+
+      <div class="arch-wrap">
+        <pre class="arch-tree"><code>electron/
+  main.ts       <span class="c-dim">main process — window, IPC, spawns ACP subprocesses</span>
+  preload.ts    <span class="c-dim">typed window.vellum bridge</span>
+src/            <span class="c-dim">React renderer — tabs, library, reader, right panel</span>
+core/
+  acp/          <span class="c-accent">unified ACP client + claude/codex adapters</span>
+  ingest/       <span class="c-dim">arxiv/DOI/PDF → markdown + metadata</span>
+  store/        <span class="c-dim">SQLite (better-sqlite3) schema + migrations</span>
+  library/      <span class="c-dim">paper CRUD, collections, tags</span>
+data/           <span class="c-dim">papers/&lt;slug&gt;/{paper.pdf,paper.md}, app.db</span></code></pre>
+
+        <div class="arch-cards">
+          <div class="arch-card">
+            <h4>The AI seam</h4>
+            <p>Vellum is an ACP <strong>client</strong>. Each backend — <code>claude-code-acp</code> or <code>codex-acp</code> — runs as a subprocess over stdio. Swapping models means spawning a different adapter; the client code never changes.</p>
+          </div>
+          <div class="arch-card">
+            <h4>No RAG, on purpose</h4>
+            <p>Chat passes the paper's markdown file path as context. The agent reads and greps it with its own tools — grep-and-read beats a vector index at personal-library scale, and there's nothing to embed or re-index.</p>
+          </div>
+          <div class="arch-card">
+            <h4>Storage split</h4>
+            <p>Relational state (library, tags, chat history) lives in SQLite. Paper content lives as plain files on disk. Simple to inspect, simple to back up.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section alt" id="trust">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow">Trust &amp; guardrails</span>
+        <h2>What Vellum will never do</h2>
+      </div>
+
+      <div class="grid-trust">
+        <div class="trust-item">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6z"/><path d="m9 12 2 2 4-4"/></svg>
+          <p><strong>No OAuth bridging.</strong> Subscription tokens are never smuggled into a third-party harness — that path is actively blocked and prohibited by Anthropic.</p>
+        </div>
+        <div class="trust-item">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6z"/><path d="m9 12 2 2 4-4"/></svg>
+          <p><strong>No raw API keys.</strong> Auth always comes from your already-signed-in Claude or Codex CLI, never an <code>ANTHROPIC_API_KEY</code> or <code>OPENAI_API_KEY</code> env var.</p>
+        </div>
+        <div class="trust-item">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6z"/><path d="m9 12 2 2 4-4"/></svg>
+          <p><strong>No Python.</strong> Pure Node/TypeScript end to end — one runtime, one packaging story.</p>
+        </div>
+        <div class="trust-item">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6z"/><path d="m9 12 2 2 4-4"/></svg>
+          <p><strong>No custom RAG.</strong> Agent-native file tools replace embeddings — unless a real large-corpus wall shows up.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta">
+    <div class="container cta-inner">
+      <h2>Your papers. Your plan. Your machine.</h2>
+      <p>Vellum is local-first and open. Clone it, ingest a paper, and start asking questions.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary btn-lg" href="https://github.com/Kritarth-Dandapat/local-anara" target="_blank" rel="noopener">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.6.5.5 5.6.5 12c0 5.1 3.3 9.4 7.9 11 .6.1.8-.3.8-.6v-2.1c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2 1-.3 2-.4 3-.4s2 .1 3 .4c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.9 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.6 7.9-5.9 7.9-11C23.5 5.6 18.4.5 12 .5z"/></svg>
+          View on GitHub
+        </a>
+        <a class="btn btn-secondary btn-lg" href="https://github.com/Kritarth-Dandapat/local-anara/wiki" target="_blank" rel="noopener">Read the wiki</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="brand footer-brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="3" y="2" width="26" height="28" rx="4" fill="url(#g2)"/>
+        <path d="M9 9h14M9 15h14M9 21h9" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <defs>
+          <linearGradient id="g2" x1="3" y1="2" x2="29" y2="30" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#6D5EF7"/>
+            <stop offset="1" stop-color="#B06AF7"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <span>Vellum</span>
+    </div>
+    <p class="footer-copy">Local-first AI paper workspace, on your own plan. No API keys, no OAuth bridge.</p>
+    <div class="footer-links">
+      <a href="https://github.com/Kritarth-Dandapat/local-anara" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/Kritarth-Dandapat/local-anara/wiki" target="_blank" rel="noopener">Wiki</a>
+      <a href="#top">Back to top</a>
+    </div>
+  </div>
+</footer>
+
+<script src="js/script.js"></script>
+</body>
+</html>

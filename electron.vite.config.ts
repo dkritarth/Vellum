@@ -9,7 +9,10 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   main: {
     build: {
-      rollupOptions: { input: resolve('electron/main.ts') },
+      rollupOptions: {
+        input: resolve('electron/main.ts'),
+        output: { entryFileNames: 'index.js' },
+      },
     },
     resolve: {
       alias: { '@core': resolve('core') },
@@ -17,7 +20,10 @@ export default defineConfig({
   },
   preload: {
     build: {
-      rollupOptions: { input: resolve('electron/preload.ts') },
+      rollupOptions: {
+        input: resolve('electron/preload.ts'),
+        output: { entryFileNames: 'index.js' },
+      },
     },
   },
   renderer: {

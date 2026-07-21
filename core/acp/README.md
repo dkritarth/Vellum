@@ -1,6 +1,7 @@
 # core/acp — unified ACP client
 
-Vellum's single AI seam. See `client.ts` for the contract.
+Vellum's single AI seam. See `client.ts` for the contract, `stdio-client.ts`
+for the implementation ([P1-01] — done).
 
 ## Backends (both official, first-party — no OAuth bridge)
 
@@ -11,14 +12,44 @@ Vellum's single AI seam. See `client.ts` for the contract.
 
 Adding a backend later = spawn a different ACP server. No new client code.
 
-## First task before wiring
+## Dependency
 
-1. Add the verified ACP client dep to `package.json` (do not guess the name —
-   check npm; likely `@zed-industries/agent-client-protocol` or the current
-   canonical ACP TS lib).
-2. Implement `StdioAcpClient`.
-3. **Smoke test both backends respond over stdio on the local plan** before any
-   UI work. This is the highest-risk assumption in the project.
+`@agentclientprotocol/sdk` (npm, verified on the registry 2026-07-21). This is
+the **current canonical** ACP TypeScript library — `@zed-industries/agent-client-protocol`
+(the name suggested in the wiki card as a guess) is deprecated upstream and
+renamed to this package. Pinned to `1.2.1`.
+
+## `StdioAcpClient`
+
+Spawns the backend's adapter subprocess (`stdio: ['pipe', 'pipe', 'inherit']`
+— stderr passes straight through for adapter diagnostics), wraps its
+stdin/stdout in an ACP `ndJsonStream`, and drives `ClientSideConnection`
+through `initialize` → `session/new` → `session/prompt`. `session/update`
+notifications are routed by session id into a small per-prompt async queue
+that `AcpSession.prompt()` yields from, mapped onto `AcpUpdate` via
+`mapSessionUpdate`. The RPC promise from `session/prompt` settling pushes the
+terminal `done`/`error` update and closes the queue.
+
+The `requestPermission` client handler auto-allows (falls back to cancel if
+no allow option is offered) — there's no UI yet to ask a human, so headless
+tool-call permission is a deliberate placeholder until the Ask panel wires a
+real prompt.
+
+`SpawnAdapter` is an injectable seam: unit tests substitute a small
+dependency-free ndjson JSON-RPC script in place of the real adapter binary,
+so `npm test` never requires `claude-code-acp` / `codex-acp` to be installed.
+
+## Live on-plan smoke test
+
+```bash
+npm run smoke:acp             # both backends
+npm run smoke:acp -- claude   # just claude-code-acp
+npm run smoke:acp -- codex    # just codex-acp
+```
+
+Requires the adapter CLI(s) actually installed and signed in to your
+Claude Pro/Max or ChatGPT plan. This is **not** part of `npm test` / CI — it's
+a separate, honest check of the real sanctioned-plan path. See `smoke.ts`.
 
 ## Hard rules
 

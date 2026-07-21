@@ -1,12 +1,12 @@
 paper_slug: '1409.3215'
 title: Sequence to Sequence Learning with Neural Networks
-generated_at: '2026-07-18T13:40:14+00:00'
+generated_at: '2026-07-18T17:35:25+00:00'
 parse_method: claude-cli
 model: sonnet
 references_parsed: 31
 references:
-- raw: Auli, Galley, Quirk, Zweig. Joint language and translation modeling with recurrent neural networks.
-    EMNLP
+- raw: M. Auli, M. Galley, C. Quirk, and G. Zweig. Joint language and translation modeling with recurrent
+    neural networks. EMNLP, 2013.
   title: Joint language and translation modeling with recurrent neural networks
   authors:
   - M. Auli
@@ -14,14 +14,16 @@ references:
   - C. Quirk
   - G. Zweig
   year: 2013
-- raw: Bahdanau, Cho, Bengio. Neural machine translation by jointly learning to align and translate. arXiv:1409.0473
+- raw: D. Bahdanau, K. Cho, and Y. Bengio. Neural machine translation by jointly learning to align and
+    translate. arXiv:1409.0473, 2014.
   title: Neural machine translation by jointly learning to align and translate
   authors:
   - D. Bahdanau
   - K. Cho
   - Y. Bengio
   year: 2014
-- raw: Bengio, Ducharme, Vincent, Jauvin. A neural probabilistic language model. JMLR
+- raw: Y. Bengio, R. Ducharme, P. Vincent, and C. Jauvin. A neural probabilistic language model. JMLR,
+    2003.
   title: A neural probabilistic language model
   authors:
   - Y. Bengio
@@ -29,16 +31,16 @@ references:
   - P. Vincent
   - C. Jauvin
   year: 2003
-- raw: Bengio, Simard, Frasconi. Learning long-term dependencies with gradient descent is difficult. IEEE
-    Trans Neural Networks
+- raw: Y. Bengio, P. Simard, and P. Frasconi. Learning long-term dependencies with gradient descent is
+    difficult. IEEE Trans. Neural Networks, 1994.
   title: Learning long-term dependencies with gradient descent is difficult
   authors:
   - Y. Bengio
   - P. Simard
   - P. Frasconi
   year: 1994
-- raw: Cho, Merrienboer, Gulcehre, Bougares, Schwenk, Bengio. Learning phrase representations using RNN
-    encoder-decoder for statistical machine translation. arXiv:1406.1078
+- raw: K. Cho, B. Merrienboer, C. Gulcehre, F. Bougares, H. Schwenk, and Y. Bengio. Learning phrase representations
+    using RNN encoder-decoder for statistical machine translation. arXiv:1406.1078, 2014.
   title: Learning phrase representations using RNN encoder-decoder for statistical machine translation
   authors:
   - K. Cho
@@ -48,15 +50,16 @@ references:
   - H. Schwenk
   - Y. Bengio
   year: 2014
-- raw: Ciresan, Meier, Schmidhuber. Multi-column deep neural networks for image classification. CVPR
+- raw: D. Ciresan, U. Meier, and J. Schmidhuber. Multi-column deep neural networks for image classification.
+    CVPR, 2012.
   title: Multi-column deep neural networks for image classification
   authors:
   - D. Ciresan
   - U. Meier
   - J. Schmidhuber
   year: 2012
-- raw: Dahl, Yu, Deng, Acero. Context-dependent pre-trained deep neural networks for large vocabulary
-    speech recognition. IEEE Trans Audio Speech Lang Process
+- raw: G. E. Dahl, D. Yu, L. Deng, and A. Acero. Context-dependent pre-trained deep neural networks for
+    large vocabulary speech recognition. IEEE Trans. Audio, Speech, Language Processing, 2012.
   title: Context-dependent pre-trained deep neural networks for large vocabulary speech recognition
   authors:
   - G. E. Dahl
@@ -64,8 +67,8 @@ references:
   - L. Deng
   - A. Acero
   year: 2012
-- raw: Devlin, Zbib, Huang, Lamar, Schwartz, Makhoul. Fast and robust neural network joint models for
-    statistical machine translation. ACL
+- raw: J. Devlin, R. Zbib, Z. Huang, T. Lamar, R. Schwartz, and J. Makhoul. Fast and robust neural network
+    joint models for statistical machine translation. ACL, 2014.
   title: Fast and robust neural network joint models for statistical machine translation
   authors:
   - J. Devlin
@@ -75,8 +78,8 @@ references:
   - R. Schwartz
   - J. Makhoul
   year: 2014
-- raw: Durrani, Haddow, Koehn, Heafield. Edinburgh's phrase-based machine translation systems for WMT-14.
-    WMT
+- raw: Nadir Durrani, Barry Haddow, Philipp Koehn, and Kenneth Heafield. Edinburgh's phrase-based machine
+    translation systems for WMT-14. WMT, 2014.
   title: Edinburgh's phrase-based machine translation systems for WMT-14
   authors:
   - Nadir Durrani
@@ -84,13 +87,13 @@ references:
   - Philipp Koehn
   - Kenneth Heafield
   year: 2014
-- raw: Graves. Generating sequences with recurrent neural networks. arXiv:1308.0850
+- raw: A. Graves. Generating sequences with recurrent neural networks. arXiv:1308.0850, 2013.
   title: Generating sequences with recurrent neural networks
   authors:
   - A. Graves
   year: 2013
-- raw: 'Graves, Fernandez, Gomez, Schmidhuber. Connectionist temporal classification: labelling unsegmented
-    sequence data with recurrent neural networks. ICML'
+- raw: 'A. Graves, S. Fernandez, F. Gomez, and J. Schmidhuber. Connectionist temporal classification:
+    labelling unsegmented sequence data with recurrent neural networks. ICML, 2006.'
   title: 'Connectionist temporal classification: labelling unsegmented sequence data with recurrent neural
     networks'
   authors:
@@ -99,14 +102,16 @@ references:
   - F. Gomez
   - J. Schmidhuber
   year: 2006
-- raw: Hermann, Blunsom. Multilingual distributed representations without word alignment. ICLR
+- raw: K. M. Hermann and P. Blunsom. Multilingual distributed representations without word alignment.
+    ICLR, 2014.
   title: Multilingual distributed representations without word alignment
   authors:
   - K. M. Hermann
   - P. Blunsom
   year: 2014
-- raw: Hinton, Deng, Yu, Dahl, Mohamed, Jaitly, Senior, Vanhoucke, Nguyen, Sainath, Kingsbury. Deep neural
-    networks for acoustic modeling in speech recognition. IEEE Signal Processing Magazine
+- raw: G. Hinton, L. Deng, D. Yu, G. Dahl, A. Mohamed, N. Jaitly, A. Senior, V. Vanhoucke, P. Nguyen,
+    T. Sainath, and B. Kingsbury. Deep neural networks for acoustic modeling in speech recognition. IEEE
+    Signal Processing Magazine, 2012.
   title: Deep neural networks for acoustic modeling in speech recognition
   authors:
   - G. Hinton
@@ -121,13 +126,14 @@ references:
   - T. Sainath
   - B. Kingsbury
   year: 2012
-- raw: Hochreiter. Untersuchungen zu dynamischen neuronalen netzen. Master's thesis, TU Munchen
-  title: Untersuchungen zu dynamischen neuronalen netzen
+- raw: S. Hochreiter. Untersuchungen zu dynamischen neuronalen Netzen. Master's thesis, Institut fur Informatik,
+    Technische Universitat, Munchen, 1991.
+  title: Untersuchungen zu dynamischen neuronalen Netzen
   authors:
   - S. Hochreiter
   year: 1991
-- raw: 'Hochreiter, Bengio, Frasconi, Schmidhuber. Gradient flow in recurrent nets: the difficulty of
-    learning long-term dependencies'
+- raw: 'S. Hochreiter, Y. Bengio, P. Frasconi, and J. Schmidhuber. Gradient flow in recurrent nets: the
+    difficulty of learning long-term dependencies, 2001.'
   title: 'Gradient flow in recurrent nets: the difficulty of learning long-term dependencies'
   authors:
   - S. Hochreiter
@@ -135,34 +141,34 @@ references:
   - P. Frasconi
   - J. Schmidhuber
   year: 2001
-- raw: Hochreiter, Schmidhuber. Long short-term memory. Neural Computation
+- raw: S. Hochreiter and J. Schmidhuber. Long short-term memory. Neural Computation, 1997.
   title: Long short-term memory
   authors:
   - S. Hochreiter
   - J. Schmidhuber
   year: 1997
-- raw: Hochreiter, Schmidhuber. LSTM can solve hard long time lag problems
+- raw: S. Hochreiter and J. Schmidhuber. LSTM can solve hard long time lag problems. 1997.
   title: LSTM can solve hard long time lag problems
   authors:
   - S. Hochreiter
   - J. Schmidhuber
   year: 1997
-- raw: Kalchbrenner, Blunsom. Recurrent continuous translation models. EMNLP
+- raw: N. Kalchbrenner and P. Blunsom. Recurrent continuous translation models. EMNLP, 2013.
   title: Recurrent continuous translation models
   authors:
   - N. Kalchbrenner
   - P. Blunsom
   year: 2013
-- raw: Krizhevsky, Sutskever, Hinton. ImageNet classification with deep convolutional neural networks.
-    NIPS
+- raw: A. Krizhevsky, I. Sutskever, and G. E. Hinton. ImageNet classification with deep convolutional
+    neural networks. NIPS, 2012.
   title: ImageNet classification with deep convolutional neural networks
   authors:
   - A. Krizhevsky
   - I. Sutskever
   - G. E. Hinton
   year: 2012
-- raw: Le, Ranzato, Monga, Devin, Chen, Corrado, Dean, Ng. Building high-level features using large scale
-    unsupervised learning. ICML
+- raw: Q. V. Le, M. A. Ranzato, R. Monga, M. Devin, K. Chen, G. S. Corrado, J. Dean, and A. Y. Ng. Building
+    high-level features using large scale unsupervised learning. ICML, 2012.
   title: Building high-level features using large scale unsupervised learning
   authors:
   - Q. V. Le
@@ -174,8 +180,8 @@ references:
   - J. Dean
   - A. Y. Ng
   year: 2012
-- raw: LeCun, Bottou, Bengio, Haffner. Gradient-based learning applied to document recognition. Proceedings
-    of the IEEE
+- raw: Y. LeCun, L. Bottou, Y. Bengio, and P. Haffner. Gradient-based learning applied to document recognition.
+    Proceedings of the IEEE, 1998.
   title: Gradient-based learning applied to document recognition
   authors:
   - Y. LeCun
@@ -183,13 +189,14 @@ references:
   - Y. Bengio
   - P. Haffner
   year: 1998
-- raw: Mikolov. Statistical Language Models based on Neural Networks. PhD thesis, Brno University of Technology
+- raw: T. Mikolov. Statistical Language Models based on Neural Networks. PhD thesis, Brno University of
+    Technology, 2012.
   title: Statistical Language Models based on Neural Networks
   authors:
   - T. Mikolov
   year: 2012
-- raw: Mikolov, Karafiat, Burget, Cernocky, Khudanpur. Recurrent neural network based language model.
-    INTERSPEECH
+- raw: T. Mikolov, M. Karafiat, L. Burget, J. Cernocky, and S. Khudanpur. Recurrent neural network based
+    language model. INTERSPEECH, 2010.
   title: Recurrent neural network based language model
   authors:
   - T. Mikolov
@@ -198,7 +205,8 @@ references:
   - J. Cernocky
   - S. Khudanpur
   year: 2010
-- raw: 'Papineni, Roukos, Ward, Zhu. BLEU: a method for automatic evaluation of machine translation. ACL'
+- raw: 'K. Papineni, S. Roukos, T. Ward, and W. J. Zhu. BLEU: a method for automatic evaluation of machine
+    translation. ACL, 2002.'
   title: 'BLEU: a method for automatic evaluation of machine translation'
   authors:
   - K. Papineni
@@ -206,15 +214,16 @@ references:
   - T. Ward
   - W. J. Zhu
   year: 2002
-- raw: Pascanu, Mikolov, Bengio. On the difficulty of training recurrent neural networks. arXiv:1211.5063
+- raw: R. Pascanu, T. Mikolov, and Y. Bengio. On the difficulty of training recurrent neural networks.
+    arXiv:1211.5063, 2012.
   title: On the difficulty of training recurrent neural networks
   authors:
   - R. Pascanu
   - T. Mikolov
   - Y. Bengio
   year: 2012
-- raw: Pouget-Abadie, Bahdanau, van Merrienboer, Cho, Bengio. Overcoming the curse of sentence length
-    for neural machine translation using automatic segmentation. arXiv:1409.1257
+- raw: J. Pouget-Abadie, D. Bahdanau, B. van Merrienboer, K. Cho, and Y. Bengio. Overcoming the curse
+    of sentence length for neural machine translation using automatic segmentation. arXiv:1409.1257, 2014.
   title: Overcoming the curse of sentence length for neural machine translation using automatic segmentation
   authors:
   - J. Pouget-Abadie
@@ -223,19 +232,21 @@ references:
   - K. Cho
   - Y. Bengio
   year: 2014
-- raw: Razborov. On small depth threshold circuits. Proc. 3rd Scandinavian Workshop on Algorithm Theory
+- raw: A. Razborov. On small depth threshold circuits. Proc. 3rd Scandinavian Workshop on Algorithm Theory,
+    1992.
   title: On small depth threshold circuits
   authors:
   - A. Razborov
   year: 1992
-- raw: Rumelhart, Hinton, Williams. Learning representations by back-propagating errors. Nature
+- raw: D. Rumelhart, G. E. Hinton, and R. J. Williams. Learning representations by back-propagating errors.
+    Nature, 1986.
   title: Learning representations by back-propagating errors
   authors:
   - D. Rumelhart
   - G. E. Hinton
   - R. J. Williams
   year: 1986
-- raw: Schwenk. University le mans (LIUM CSLM joint paper webpage)
+- raw: H. Schwenk. University Le Mans. cslm_joint_paper, 2014.
   title: null
   authors:
   - H. Schwenk
@@ -257,7 +268,682 @@ cites:
   title: Neural Machine Translation by Jointly Learning to Align and Translate
   confidence: high
 semantic_scholar:
-  lookup_status: skipped
-  paper_id: null
-  matched_title: null
-cited_by_external: []
+  lookup_status: ok
+  paper_id: cea967b59209c6be22829699f05b8b1ac4dc092d
+  matched_title: Sequence to Sequence Learning with Neural Networks
+  citation_count: 22192
+  citing_lookup_status: ok
+cited_by_external:
+- title: Understanding Large Language Models
+  year: 2026
+  authors:
+  - Yannik Keller
+  - Thomas F. Eisenmann
+  paperId: 7c1537766ecff1904bf5be1849d202513ad3cee2
+  external_ids:
+    ArXiv: '2607.01006'
+    CorpusId: 289706321
+  citation_count: 7
+- title: Robustness Verification of Recurrent Neural Networks with Abstraction Refinement
+  year: 2026
+  authors:
+  - Li-Jen Lin
+  - Chih-Duo Hong
+  paperId: 1b1287ef4a89551b6b43c684e54957228f623bdd
+  external_ids:
+    ArXiv: '2606.12490'
+    CorpusId: 289186415
+  citation_count: 2
+- title: Uncertainty-aware vessel trajectory prediction for heterogeneous data fusion in internet of things-driven
+    smart waterways
+  year: 2026
+  authors:
+  - Yuxu Lu
+  - Kaisen Yang
+  - Dong Yang
+  - Haifeng Ding
+  - Jinxian Weng
+  - Mingyang Zhang
+  paperId: c8003d067b1f2c2691fc771ff3d016c43f76a123
+  external_ids:
+    DBLP: journals/eaai/LuYYDWZ26
+    DOI: 10.1016/j.engappai.2026.114930
+    CorpusId: 287822047
+  citation_count: 1
+- title: Cross-City Pretraining Transfer Learning Model for Traffic Flow Prediction
+  year: 2026
+  authors:
+  - Zhizhe Lin
+  - Zequan Li
+  - Chaozhi Yu
+  - Chunjie Cao
+  - Teng Zhou
+  - Guangyin Jin
+  paperId: e18d65db97ed194ac2e1be0d702b317c5417e638
+  external_ids:
+    DOI: 10.1109/JIOT.2026.3685259
+    CorpusId: 287643719
+  citation_count: 1
+- title: When are likely answers right? On Sequence Probability and Correctness in LLMs
+  year: 2026
+  authors:
+  - Johannes Zenn
+  - Jonas Geiping
+  paperId: de2b3aea73ead192d1c4b2c00e5018b76a227647
+  external_ids:
+    ArXiv: '2606.27359'
+    CorpusId: 289629721
+  citation_count: 1
+- title: 'Neural Networks as Linear Regression: An Introduction for Statisticians'
+  year: 2026
+  authors:
+  - Abigail Loe
+  - Susan Murray
+  - Zhenke Wu
+  paperId: d939b9b885924069f8e6192fcdc7ed686c65d1ec
+  external_ids:
+    ArXiv: '2606.23601'
+    CorpusId: 289624923
+  citation_count: 1
+- title: 'ShuntServe: Cost-Efficient LLM Serving on Heterogeneous Spot GPU Clusters'
+  year: 2026
+  authors:
+  - Seung-Woo Jeong
+  - Moohyun Song
+  - Juhyun Park
+  - Kyungyong Lee
+  paperId: befeafe184ec27b6175efda897bde32940ec68cd
+  external_ids:
+    ArXiv: '2606.18600'
+    CorpusId: 289621636
+  citation_count: 1
+- title: 'Reinforced Decoder: Toward Training Recurrent Neural Networks for Time-Series Forecasting'
+  year: 2026
+  authors:
+  - Qi Sima
+  - Yukun Bao
+  - Xinze Zhang
+  - Siyue Yang
+  - Liang Shen
+  paperId: ecdcef5ef150ad893f080cafe211f505c559753a
+  external_ids:
+    DBLP: journals/tii/SimaBZYS26
+    DOI: 10.1109/TII.2026.3662462
+    CorpusId: 285984179
+  citation_count: 1
+- title: Reinforcement learning for energy-efficient multi-objective dynamic planning of hot rolling production
+  year: 2026
+  authors:
+  - Gelegen Che
+  - Shengnan Zhao
+  - Guodong Zhao
+  - Yanyan Zhang
+  paperId: 705d084c8f6292741074614e03a6ca8bbcf56a51
+  external_ids:
+    DOI: 10.1016/j.jmsy.2026.03.012
+    CorpusId: 286890877
+  citation_count: 1
+- title: Resilient inland vessel trajectory prediction via visual-kinematic data imputation and interaction-aware
+    graph learning
+  year: 2026
+  authors:
+  - Mengwei Bao
+  - Yuxu Lu
+  - Xiaoyu Li
+  - Haifeng Ding
+  - Dong Yang
+  - Mingyang Zhang
+  paperId: 06505cf3e68385a2d731bb332b4cffdf6fad7cbc
+  external_ids:
+    DOI: 10.1016/j.oceaneng.2026.125842
+    CorpusId: 288159914
+  citation_count: 1
+- title: 'OctoT2I: A Self-Evolving Agentic Text-to-Image Router'
+  year: 2026
+  authors:
+  - Xu Jiang
+  - Bin Chen
+  - Gehui Li
+  - Yule Duan
+  - Ronggang Wang
+  - Jian Zhang
+  paperId: fec29e395ec7100ecf8ce2eaaf5b805ff7c2cd5b
+  external_ids:
+    ArXiv: '2606.01803'
+    CorpusId: 288861330
+  citation_count: 1
+- title: Geometric understanding in spatial contexts for image captioning
+  year: 2026
+  authors:
+  - Mohammad Alamgir Hossain
+  - M. Hossen
+  - Zhongfu Ye
+  - Md. Shohidul Islam
+  - Md.Ibrahim Abdullah
+  paperId: 0e9a08ec344e2fe7f19f234f9b1732b6facc894b
+  external_ids:
+    DOI: 10.1016/j.image.2026.117645
+    CorpusId: 289815353
+  citation_count: 0
+- title: A residual temporal convolutional network with dual attention for long-range solar sunspot number
+    forecasting
+  year: 2026
+  authors:
+  - M. R. Baker
+  - Ahmed Ghareeb
+  - Kamal H. Jihad
+  - E. Z. Mohammed
+  - Jun-Ki Choi
+  paperId: 33614b5571b40667eacd88fb17d0e592067d3954
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115609
+    CorpusId: 290001387
+  citation_count: 0
+- title: 'Streamlining risk assessment for predictive maintenance: Can AI be trusted as an assistant?'
+  year: 2026
+  authors:
+  - Mobolaji Shobanke
+  - Connor L. Roberts
+  - Ekundayo Shittu
+  paperId: 9402c43fd473ac820ad851bf58e8fb51c4984e2b
+  external_ids:
+    DBLP: journals/aei/ShobankeRS26
+    DOI: 10.1016/j.aei.2026.104803
+    CorpusId: 288367814
+  citation_count: 0
+- title: 'MA-STNet: A multi-scale adaptive spatio-temporal fusion algorithm for dynamic link weight prediction
+    in traffic flow networks'
+  year: 2026
+  authors:
+  - Junbi Xiao
+  - Tingting Liu
+  - Yuhao Zhou
+  paperId: b3da9c20b02d764e1489ec603e3659c394483800
+  external_ids:
+    DOI: 10.1016/j.physa.2026.131724
+    CorpusId: 289034431
+  citation_count: 0
+- title: AST-guided transformers for sustainable and reliable UML modeling
+  year: 2026
+  authors:
+  - Feisal Alaswad
+  - P. E.
+  - Batoul Aljaddouh
+  - Kadiyala Ramana
+  - A. Khan
+  - Natalia Kryvinska
+  paperId: a982846f963a737c9e291f0bc664c2145998691e
+  external_ids:
+    DOI: 10.1016/j.mlwa.2026.100940
+    CorpusId: 289600925
+  citation_count: 0
+- title: 'NeuralMetric: An accurate and efficient real-time safety metric for automated driving systems'
+  year: 2026
+  authors:
+  - Xintao Yan
+  - Haowei Sun
+  - Jialeng Ni
+  - Haojie Zhu
+  - Shuo Feng
+  - Henry X. Liu
+  paperId: b60a9455a98ca20cadc83cac1cab31bde9f27911
+  external_ids:
+    DOI: 10.1016/j.tra.2026.105019
+    CorpusId: 288053996
+  citation_count: 0
+- title: Short-term enterprise electricity consumption forecasting in the energy data space using ISSA-VWELM
+  year: 2026
+  authors:
+  - Yu Song
+  - Wen Yang
+  - Shengjie Wei
+  paperId: da9327a6adc0ffd0660d48c9203fd266ddca3f93
+  external_ids:
+    DOI: 10.1186/s44147-026-01123-2
+    CorpusId: 290188907
+  citation_count: 0
+- title: 'A Comparative Analysis of Machine Learning Models for Long and Short-Term Forecasting of the
+    Egyptian Stock Market: A Focus on EGX30'
+  year: 2026
+  authors:
+  - Muhammed Walid
+  - Ahmed El-Naeimy
+  - Hosam Moubarak
+  - Walid Gomaa
+  paperId: 2c686b91bd35b1bea8bd55ed095ff2ccade79393
+  external_ids:
+    ArXiv: '2607.14391'
+    CorpusId: 290213542
+  citation_count: 0
+- title: Optimizing drivable area detection for autonomous vehicles through shadow and road edge line
+    analysis in U-net-based models
+  year: 2026
+  authors:
+  - Chun Chen
+  - Xingfeng Li
+  paperId: c189b025271253c8a688f43b3b306001bb218076
+  external_ids:
+    DOI: 10.3389/ffutr.2026.1711068
+    CorpusId: 290059112
+  citation_count: 0
+- title: 'FlashTrie: A GPU-Accelerated Constrained Beam Search for Generative Retrieval'
+  year: 2026
+  authors:
+  - Dakshitha Anandakumar
+  - Anurag Mukkara
+  - Wenxiang Hu
+  - Jiusheng Chen
+  - M. A. Kumar
+  - Ting Ye
+  - Qiang Lou
+  - Jian Jiao
+  paperId: 3cab0b18da918c56db603843f3d27d3fd3bab1f4
+  external_ids:
+    ArXiv: '2607.10044'
+    CorpusId: 290135638
+  citation_count: 0
+- title: 'Beyond Modality Fusion: Deep Ensembles for Multimodal Classification'
+  year: 2026
+  authors:
+  - I. Burenko
+  - D. Vetrov
+  paperId: a6435c73220823a70d603e1402164d9e9c7bb2cf
+  external_ids:
+    ArXiv: '2607.05019'
+    CorpusId: 289934438
+  citation_count: 0
+- title: A competitive and cooperative spatio-temporal framework for urban traffic flow forecasting
+  year: 2026
+  authors:
+  - Haocheng Yu
+  - Kexin Liu
+  - Zhenqian Wang
+  - Shaolin Tan
+  - Jinhu Lü
+  paperId: b1debebdfa194e69eb2804c0defcde7730a9b907
+  external_ids:
+    DBLP: journals/eswa/YuLWTL26
+    DOI: 10.1016/j.eswa.2026.132096
+    CorpusId: 287157396
+  citation_count: 0
+- title: 'From pixels to text: A deep learning survey of scene text detection and recognition'
+  year: 2026
+  authors:
+  - Vijayakumar Kadha
+  - Bala Bhaskar Duddeti
+  - K. Srinadh
+  - Buddepu Santhosh Kumar
+  - L. Janjanam
+  - Kalyanbrat Medhi
+  paperId: 35f36eb6e84affb9f427e15bcf5608640bd31a7f
+  external_ids:
+    DBLP: journals/cee/KadhaDSKJM26
+    DOI: 10.1016/j.compeleceng.2026.111139
+    CorpusId: 287365280
+  citation_count: 0
+- title: 'Advancing sustainable development goals through multilingual text summarization: A transformer-based
+    approach'
+  year: 2026
+  authors:
+  - Atul Kumar
+  - Shashi Kant Gupta
+  - R. S. Yadav
+  - U. Yadav
+  - Shekhar Saroj
+  - Vivek Kumar
+  paperId: 4f50d1dca626fa31f38bea1a6a436b181ee4b912
+  external_ids:
+    DOI: 10.29333/ejosdr/18328
+    CorpusId: 287393719
+  citation_count: 0
+- title: Direction-aware deep policy learning for efficient capacitated arc routing
+  year: 2026
+  authors:
+  - Feng Xue
+  - Runze Guo
+  - Anlong Ming
+  - Nicu Sebe
+  paperId: 51fa41fcb2fa1c42ae4c5d6d995dc1d7ab386840
+  external_ids:
+    DBLP: journals/eaai/XueGMS26
+    DOI: 10.1016/j.engappai.2026.114695
+    CorpusId: 287516694
+  citation_count: 0
+- title: Optimal lift movement based on rest prediction
+  year: 2026
+  authors:
+  - Satish B. Ashwath Narayan
+  - Deekshitha Arasa
+  - Rachana M. Hullamani
+  - Ganesha Ganiga Channabasappa
+  - Rajath Gujjar Raviprakash
+  paperId: 7f38c55542804e412da6a73cc721579d27dc7ce5
+  external_ids:
+    DOI: 10.11591/ijres.v15.i2.pp291-305
+    CorpusId: 289667822
+  citation_count: 0
+- title: 'SynLaD: Latent Diffusion for Generating Synthesizable Molecules Conditioned on 3D Pharmacophore
+    Profiles'
+  year: 2026
+  authors:
+  - M. Cretu
+  - John Bradshaw
+  - Patricia A. Suriana
+  - Saeed Saremi
+  - Omar Mahmood
+  - Kirill Shmilovich
+  - Kangway V. Chuang
+  - Vishnu Sresht
+  - Colin A. Grambow
+  paperId: 507b35fcee9b0eb7eb0f77937c7311a1b5c5a21d
+  external_ids:
+    ArXiv: '2607.01105'
+    CorpusId: 289706173
+  citation_count: 0
+- title: Generative design of antigen-specific T-cell receptor sequences with a conditional diffusion
+    model
+  year: 2026
+  authors:
+  - Yumeng Zhang
+  - Wenhua Liang
+  - Shuting Xu
+  - Matthew J Witney
+  - Xiao-dong Su
+  - M. Andrews
+  - Jamie Rossjohn
+  - Anthony W. Purcell
+  - Feng Wang
+  - Jiangning Song
+  paperId: 1538361d8f0ecde35e308146d39f70063211681c
+  external_ids:
+    DOI: 10.64898/2026.06.10.730756
+    CorpusId: 289305989
+  citation_count: 0
+- title: One-Class Unsupervised Deep Autoencoder Framework for Multi-Defect Detection and Localization
+    in Aluminum Plates
+  year: 2026
+  authors:
+  - Manikanta Krishnamurthy
+  - Arkajit Kayal
+  - Shivam Ojha
+  - Anowarul Habib
+  paperId: ff8ef0c6ee26901ab0a6a927ebfa7e5d4be8b45a
+  external_ids:
+    DOI: 10.1016/j.rineng.2026.111829
+    CorpusId: 289855690
+  citation_count: 0
+- title: A hybrid dynamic model of wind turbine blades for effective wind speed estimation
+  year: 2026
+  authors:
+  - Zhonghe Huang
+  - Dayuan Ju
+  - Qiao Sun
+  paperId: 4c44138f28734d95ee4f95e8b720f38d08331c9b
+  external_ids:
+    DOI: 10.1016/j.cnsns.2026.110518
+    CorpusId: 289857968
+  citation_count: 0
+- title: 'DIGITIZATION OF PAYMENTS IN FRANCE: LESSONS FROM LARGE LANGUAGE MODELS'
+  year: 2026
+  authors:
+  - Sanvi Avouyi-Dovi
+  - Louis-Alexandre Bayol
+  - Lucas Devigne
+  - Ambre Geraut
+  - Christian Pfister
+  paperId: d3a93353167ed9f4caa241145056fc7f52fb494c
+  external_ids:
+    DOI: 10.1016/j.qref.2026.102176
+    CorpusId: 289872407
+  citation_count: 0
+- title: Theoretical analysis of the denoising autoencoder using Tweedie's formula.
+  year: 2026
+  authors:
+  - Yuta Aishima
+  - Kazushi Ikeda
+  paperId: 0a2f45bd54085cdaaeb780d6cbe6b8e1c2186520
+  external_ids:
+    DOI: 10.1016/j.neunet.2026.109287
+    CorpusId: 289901432
+    PubMed: '42413358'
+  citation_count: 0
+- title: PM2.5/PM10 Forecasting System with Benchmarking of 44 Machine Learning Algorithms and Ensemble
+    Learning Approaches
+  year: 2026
+  authors:
+  - Pedro Mamani-Suclla
+  - Sharon Villavicencio-Siu
+  - Antonio Arroyo-Paz
+  paperId: c9f37817280a0dbbb68663ee967d29d6876029d4
+  external_ids:
+    PubMedCentral: '13364004'
+    DOI: 10.3390/s26134315
+    CorpusId: 290021583
+    PubMed: '42451557'
+  citation_count: 0
+- title: A review of generative autoencoder frameworks and their latent modeling strategies
+  year: 2026
+  authors:
+  - Mousumi Behera
+  - P. Dey
+  paperId: 825a49b9c58a3d727cc6cfe50c0ca5d52f2a1feb
+  external_ids:
+    DOI: 10.1016/j.asoc.2026.115933
+    CorpusId: 290075017
+  citation_count: 0
+- title: 'From Deep Learning to Large Language Models: A Review of Visual Speech Recognition'
+  year: 2026
+  authors:
+  - Xiang Wang
+  - Xiangzhen He
+  - Wenhao Jiang
+  - Xue Ding
+  - Xianghe Meng
+  - Tingting Du
+  - Yangxu Ou
+  - Ruolei Shan
+  - Shibiao Shi
+  - Haotian Zhu
+  - Jingbin Hao
+  paperId: 39f9699586a9dd2f102b994d292eaf629f8d8347
+  external_ids:
+    DOI: 10.1016/j.iswa.2026.200704
+    CorpusId: 290127683
+  citation_count: 0
+- title: Prediction of the copper electrorefining process using a data-driven model oriented toward the
+    development of a digital twin
+  year: 2026
+  authors:
+  - Javiera Minder
+  - Juan Carlos Salas
+  - Felipe Núñez
+  paperId: 1950142cbadc4ce03195a3be6407e4a6886b4b97
+  external_ids:
+    DOI: 10.1016/j.hydromet.2026.106832
+    CorpusId: 290160754
+  citation_count: 0
+- title: Predicting short-term X-ray flux with deep learning model
+  year: 2026
+  authors:
+  - Xusheng Huang
+  - Xuebao Li
+  - Yanfang Zheng
+  - Liang Dong
+  - Hongwei Ye
+  - Shunhuang Zhang
+  - Yongshang Lv
+  - Honglei Jin
+  paperId: a422107b590a35da384d0eee97c3e27250cf6f81
+  external_ids:
+    DOI: 10.1016/j.ascom.2026.101166
+    CorpusId: 290170037
+  citation_count: 0
+- title: Toward accurate wave height prediction by developing an encoder–decoder long short-term memory
+    network with variational mode decomposition
+  year: 2026
+  authors:
+  - Zitang Zhang
+  - H. Yin
+  - N. Peng
+  - Ye Li
+  paperId: 9425e3089872d1248508c9a429ae6d34401396ea
+  external_ids:
+    DOI: 10.1063/5.0335896
+    CorpusId: 290240164
+  citation_count: 0
+- title: Evaluating the effectiveness of neural machine translation from Nyishi-to-English
+  year: 2026
+  authors:
+  - Nabam Kakum
+  - R. Kri
+  - Koj Sambyo
+  paperId: d39fdd10c7198d6fc1d6ad89d36586066d555e7f
+  external_ids:
+    DOI: 10.1007/s12046-026-03139-z
+    CorpusId: 289683016
+  citation_count: 0
+- title: Can Small Language Models Generate Therapist-Like Responses? A Lightweight Study of Therapist
+    Imitation in Mental Health Support
+  year: 2026
+  authors:
+  - Yifan Zhang
+  - Zhongwen Zhou
+  paperId: 59fb2af0a6da491dbbe64bb9c4faa9cf9e90a3d3
+  external_ids:
+    DOI: 10.51214/002026081913000
+    CorpusId: 289769460
+  citation_count: 0
+- title: Integrating Traditional Grammar Rules with AI for Enhanced Sandhi Split in Sanskrit
+  year: 2026
+  authors:
+  - Sharayu Mirasdar
+  - Mangesh V. Bedekar
+  - Balaji Magar
+  paperId: 1a952779c2c15a898c0920e770691d07148eff2f
+  external_ids:
+    DOI: 10.59543/jidmis.v3.462
+    CorpusId: 289782961
+  citation_count: 0
+- title: 'Bash-Commenter: Leveraging Syntax-Aware Preference Optimization to Reinforce Large Language
+    Model for Bash Code Comment Generation'
+  year: 2026
+  authors:
+  - Lei Yu
+  - Jingyuan Zhang
+  - Xin Wang
+  - Li Yang
+  - Fengjun Zhang
+  - Peng Wang
+  - Jia Xu
+  - Jiajia Ma
+  paperId: dd6aca51997cc8ec5e8e1a84564e663f0ecf2c72
+  external_ids:
+    ArXiv: '2606.29709'
+    DOI: 10.1145/3808102
+    CorpusId: 289684824
+  citation_count: 0
+- title: 'An Interaction Language Model: Mechanism Discovery from Statistical Patterns of Physical Interactions'
+  year: 2026
+  authors:
+  - T. Ganguly
+  - Hanqi Jiang
+  - Xinliang Li
+  - Yi Pan
+  - Junhao Chen
+  - Miyuki Karunathilaka
+  - Tianming Liu
+  - Yohannes Abate School of Computing
+  - U. Georgia
+  - Athens
+  - Usa
+  - Department of Applied Physics
+  - Astronomy
+  paperId: 2c5698446798947b4f466b7f088b67ab2d265770
+  external_ids:
+    ArXiv: '2606.30922'
+    CorpusId: 289690248
+  citation_count: 0
+- title: Prediction of heart sound using the xLSTM method for hypertrophic cardiomyopathy
+  year: 2026
+  authors:
+  - Shatiswaran Vigian
+  - Kanesaraj Ramasamy
+  - J. Abdullah
+  - R. Ramasamy
+  paperId: f0c1214bf878da7b042d5f10450b6f7c23d8a8bc
+  external_ids:
+    DOI: 10.59400/sv1706
+    CorpusId: 289731435
+  citation_count: 0
+- title: 'BashCoder-R1: Towards Robust and Explainable Bash Code Generation with Robustness-Aware Group
+    Relative Policy Optimization'
+  year: 2026
+  authors:
+  - Lei Yu
+  - Peng Wang
+  - Jia Xu
+  - Jingyuan Zhang
+  - Xin Wang
+  - Jiajia Ma
+  - Li Yang
+  - Changzhi Deng
+  - Zeng Wang
+  - Fengjun Zhang
+  paperId: 02d33b69e37960a8014cf9d4b922b84dbf9d8599
+  external_ids:
+    ArXiv: '2606.27733'
+    CorpusId: 289669208
+  citation_count: 0
+- title: 'GCMCNN: a geographically conditioned multiscale convolutional neural network for downscaling
+    land surface temperature'
+  year: 2026
+  authors:
+  - Yu Ma
+  - Manchun Li
+  - Chen Zhou
+  paperId: 5a8f8e4dcd52a326834b83c24da3ab31b5aafa7e
+  external_ids:
+    DOI: 10.1080/13658816.2026.2693888
+    CorpusId: 289591644
+  citation_count: 0
+- title: 'CANDLE: Character-level Arabic Noise Deduplication using Lightweight Encoder'
+  year: 2026
+  authors:
+  - Faris Alasmary
+  - Taif Nono
+  - Orjuwan Zaafarani
+  - Kholood Al Tabash
+  - Ahmad Ghannam
+  - A. Salamah
+  - Shouq A Sadah
+  - L. Ghouti
+  paperId: 5d4ff7d090898654ad707c7b6ad5c7476451a7a4
+  external_ids:
+    ArXiv: '2606.24758'
+    CorpusId: 289630095
+  citation_count: 0
+- title: 'Machine Translation in Natural Language Processing (1948–2025): a Systematic Survey of Methods,
+    Benchmarks, Neural Machine Translation Advances, Challenges and Future Directions'
+  year: 2026
+  authors:
+  - C. B. Lavanya
+  - H. S. Nagendraswamy
+  - K. N. Manjunath
+  - M. P. P. Kumar
+  paperId: aba340eaa558838e9be8bf3fca7fd8ec01ff963d
+  external_ids:
+    DOI: 10.1007/s42979-026-05181-4
+    CorpusId: 289449652
+  citation_count: 0
+- title: Data Selection Through Iterative Self-Filtering for Vision-Language Settings
+  year: 2026
+  authors:
+  - Andrei Liviu Nicolicioiu
+  - Sarvjeet Ghotra
+  - Morgane M Moss
+  - Aaron C. Courville
+  paperId: 9e6d19b166beb966a911a6dc32f2e2904c8b37c1
+  external_ids:
+    ArXiv: '2606.23611'
+    CorpusId: 289629171
+  citation_count: 0

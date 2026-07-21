@@ -1,6 +1,6 @@
 paper_slug: '1512.03385'
 title: Deep Residual Learning for Image Recognition
-generated_at: '2026-07-18T13:41:49+00:00'
+generated_at: '2026-07-18T17:37:14+00:00'
 parse_method: claude-cli
 model: sonnet
 references_parsed: 50
@@ -93,6 +93,11 @@ references:
   - X. Zhang
   - J. Sun
   year: 2015
+- raw: B. D. Ripley. Pattern recognition and neural networks. Cambridge university press, 1996.
+  title: Pattern recognition and neural networks
+  authors:
+  - B. D. Ripley
+  year: 1996
 - raw: S. Gidaris and N. Komodakis. Object detection via a multi-region & semantic segmentation-aware
     cnn model. In ICCV, 2015.
   title: Object detection via a multi-region & semantic segmentation-aware cnn model
@@ -100,11 +105,6 @@ references:
   - S. Gidaris
   - N. Komodakis
   year: 2015
-- raw: B. D. Ripley. Pattern recognition and neural networks. Cambridge university press, 1996.
-  title: Pattern recognition and neural networks
-  authors:
-  - B. D. Ripley
-  year: 1996
 - raw: 'A. Romero, N. Ballas, S. E. Kahou, A. Chassang, C. Gatta, and Y. Bengio. Fitnets: Hints for thin
     deep nets. In ICLR, 2015.'
   title: 'Fitnets: Hints for thin deep nets'
@@ -130,6 +130,63 @@ references:
   - T. Darrell
   - J. Malik
   year: 2014
+- raw: X. Glorot and Y. Bengio. Understanding the difficulty of training deep feedforward neural networks.
+    In AISTATS, 2010.
+  title: Understanding the difficulty of training deep feedforward neural networks
+  authors:
+  - X. Glorot
+  - Y. Bengio
+  year: 2010
+- raw: I. J. Goodfellow, D. Warde-Farley, M. Mirza, A. Courville, and Y. Bengio. Maxout networks. arXiv:1302.4389,
+    2013.
+  title: Maxout networks
+  authors:
+  - I. J. Goodfellow
+  - D. Warde-Farley
+  - M. Mirza
+  - A. Courville
+  - Y. Bengio
+  year: 2013
+- raw: K. He and J. Sun. Convolutional neural networks at constrained time cost. In CVPR, 2015.
+  title: Convolutional neural networks at constrained time cost
+  authors:
+  - K. He
+  - J. Sun
+  year: 2015
+- raw: K. He, X. Zhang, S. Ren, and J. Sun. Spatial pyramid pooling in deep convolutional networks for
+    visual recognition. In ECCV, 2014.
+  title: Spatial pyramid pooling in deep convolutional networks for visual recognition
+  authors:
+  - K. He
+  - X. Zhang
+  - S. Ren
+  - J. Sun
+  year: 2014
+- raw: 'K. He, X. Zhang, S. Ren, and J. Sun. Delving deep into rectifiers: Surpassing human-level performance
+    on imagenet classification. In ICCV, 2015.'
+  title: 'Delving deep into rectifiers: Surpassing human-level performance on imagenet classification'
+  authors:
+  - K. He
+  - X. Zhang
+  - S. Ren
+  - J. Sun
+  year: 2015
+- raw: G. E. Hinton, N. Srivastava, A. Krizhevsky, I. Sutskever, and R. R. Salakhutdinov. Improving neural
+    networks by preventing co-adaptation of feature detectors. arXiv:1207.0580, 2012.
+  title: Improving neural networks by preventing co-adaptation of feature detectors
+  authors:
+  - G. E. Hinton
+  - N. Srivastava
+  - A. Krizhevsky
+  - I. Sutskever
+  - R. R. Salakhutdinov
+  year: 2012
+- raw: S. Hochreiter and J. Schmidhuber. Long short-term memory. Neural computation, 9(8):1735-1780, 1997.
+  title: Long short-term memory
+  authors:
+  - S. Hochreiter
+  - J. Schmidhuber
+  year: 1997
 - raw: O. Russakovsky, J. Deng, H. Su, J. Krause, S. Satheesh, S. Ma, Z. Huang, A. Karpathy, A. Khosla,
     M. Bernstein, et al. Imagenet large scale visual recognition challenge. arXiv:1409.0575, 2014.
   title: Imagenet large scale visual recognition challenge
@@ -145,13 +202,6 @@ references:
   - A. Khosla
   - M. Bernstein
   year: 2014
-- raw: X. Glorot and Y. Bengio. Understanding the difficulty of training deep feedforward neural networks.
-    In AISTATS, 2010.
-  title: Understanding the difficulty of training deep feedforward neural networks
-  authors:
-  - X. Glorot
-  - Y. Bengio
-  year: 2010
 - raw: A. M. Saxe, J. L. McClelland, and S. Ganguli. Exact solutions to the nonlinear dynamics of learning
     in deep linear neural networks. arXiv:1312.6120, 2013.
   title: Exact solutions to the nonlinear dynamics of learning in deep linear neural networks
@@ -160,43 +210,18 @@ references:
   - J. L. McClelland
   - S. Ganguli
   year: 2013
-- raw: I. J. Goodfellow, D. Warde-Farley, M. Mirza, A. Courville, and Y. Bengio. Maxout networks. arXiv:1302.4389,
-    2013.
-  title: Maxout networks
-  authors:
-  - I. J. Goodfellow
-  - D. Warde-Farley
-  - M. Mirza
-  - A. Courville
-  - Y. Bengio
-  year: 2013
 - raw: N. N. Schraudolph. Accelerated gradient descent by factor-centering decomposition. Technical report,
     1998.
   title: Accelerated gradient descent by factor-centering decomposition
   authors:
   - N. N. Schraudolph
   year: 1998
-- raw: K. He and J. Sun. Convolutional neural networks at constrained time cost. In CVPR, 2015.
-  title: Convolutional neural networks at constrained time cost
-  authors:
-  - K. He
-  - J. Sun
-  year: 2015
 - raw: 'N. N. Schraudolph. Centering neural network gradient factors. In Neural Networks: Tricks of the
     Trade, pages 207-226. Springer, 1998.'
   title: Centering neural network gradient factors
   authors:
   - N. N. Schraudolph
   year: 1998
-- raw: K. He, X. Zhang, S. Ren, and J. Sun. Spatial pyramid pooling in deep convolutional networks for
-    visual recognition. In ECCV, 2014.
-  title: Spatial pyramid pooling in deep convolutional networks for visual recognition
-  authors:
-  - K. He
-  - X. Zhang
-  - S. Ren
-  - J. Sun
-  year: 2014
 - raw: 'P. Sermanet, D. Eigen, X. Zhang, M. Mathieu, R. Fergus, and Y. LeCun. Overfeat: Integrated recognition,
     localization and detection using convolutional networks. In ICLR, 2014.'
   title: 'Overfeat: Integrated recognition, localization and detection using convolutional networks'
@@ -208,15 +233,6 @@ references:
   - R. Fergus
   - Y. LeCun
   year: 2014
-- raw: 'K. He, X. Zhang, S. Ren, and J. Sun. Delving deep into rectifiers: Surpassing human-level performance
-    on imagenet classification. In ICCV, 2015.'
-  title: 'Delving deep into rectifiers: Surpassing human-level performance on imagenet classification'
-  authors:
-  - K. He
-  - X. Zhang
-  - S. Ren
-  - J. Sun
-  year: 2015
 - raw: K. Simonyan and A. Zisserman. Very deep convolutional networks for large-scale image recognition.
     In ICLR, 2015.
   title: Very deep convolutional networks for large-scale image recognition
@@ -224,16 +240,6 @@ references:
   - K. Simonyan
   - A. Zisserman
   year: 2015
-- raw: G. E. Hinton, N. Srivastava, A. Krizhevsky, I. Sutskever, and R. R. Salakhutdinov. Improving neural
-    networks by preventing co-adaptation of feature detectors. arXiv:1207.0580, 2012.
-  title: Improving neural networks by preventing co-adaptation of feature detectors
-  authors:
-  - G. E. Hinton
-  - N. Srivastava
-  - A. Krizhevsky
-  - I. Sutskever
-  - R. R. Salakhutdinov
-  year: 2012
 - raw: R. K. Srivastava, K. Greff, and J. Schmidhuber. Highway networks. arXiv:1505.00387, 2015.
   title: Highway networks
   authors:
@@ -241,12 +247,6 @@ references:
   - K. Greff
   - J. Schmidhuber
   year: 2015
-- raw: S. Hochreiter and J. Schmidhuber. Long short-term memory. Neural computation, 9(8):1735-1780, 1997.
-  title: Long short-term memory
-  authors:
-  - S. Hochreiter
-  - J. Schmidhuber
-  year: 1997
 - raw: R. K. Srivastava, K. Greff, and J. Schmidhuber. Training very deep net...
   title: null
   authors:
@@ -255,7 +255,7 @@ references:
   - J. Schmidhuber
   year: null
 - raw: 'S. Ioffe and C. Szegedy. Batch normalization: Accelerating deep network training by reducing internal
-    covariate shift. In ICML, 2015.'
+    covariate shift. ICML, 2015.'
   title: 'Batch normalization: Accelerating deep network training by reducing internal covariate shift'
   authors:
   - S. Ioffe
@@ -299,7 +299,7 @@ references:
   - A. Krizhevsky
   year: 2009
 - raw: A. Krizhevsky, I. Sutskever, and G. Hinton. Imagenet classification with deep convolutional neural
-    networks. In NIPS, 2012.
+    networks. NIPS, 2012.
   title: Imagenet classification with deep convolutional neural networks
   authors:
   - A. Krizhevsky
@@ -345,7 +345,7 @@ references:
   - S. Yan
   year: 2013
 - raw: C. Szegedy, W. Liu, Y. Jia, P. Sermanet, S. Reed, D. Anguelov, D. Erhan, V. Vanhoucke, and A. Rabinovich.
-    Going deeper with convolutions. In CVPR, 2015.
+    Going deeper with convolutions. CVPR, 2015.
   title: Going deeper with convolutions
   authors:
   - C. Szegedy
@@ -363,13 +363,13 @@ references:
   authors:
   - R. Szeliski
   year: 1990
-- raw: R. Szeliski. Locally adapted hierarchical basis preconditioning. In SIGGRAPH, 2006.
+- raw: R. Szeliski. Locally adapted hierarchical basis preconditioning. SIGGRAPH, 2006.
   title: Locally adapted hierarchical basis preconditioning
   authors:
   - R. Szeliski
   year: 2006
 - raw: T. Vatanen, T. Raiko, H. Valpola, and Y. LeCun. Pushing stochastic gradient towards second-order
-    methods - backpropagation learning with transformations in nonlinearities. In Neural Information Processing,
+    methods - backpropagation learning with transformations in nonlinearities. Neural Information Processing,
     2013.
   title: Pushing stochastic gradient towards second-order methods - backpropagation learning with transformations
     in nonlinearities
@@ -392,15 +392,15 @@ references:
   - W. Venables
   - B. Ripley
   year: 1999
-- raw: M. D. Zeiler and R. Fergus. Visualizing and understanding convolutional neural networks. In ECCV,
+- raw: M. D. Zeiler and R. Fergus. Visualizing and understanding convolutional neural networks. ECCV,
     2014.
   title: Visualizing and understanding convolutional neural networks
   authors:
   - M. D. Zeiler
   - R. Fergus
   year: 2014
-- raw: 'T.-Y. Lin, M. Maire, S. Belongie, J. Hays, P. Perona, D. Ramanan, P. Dollár, and C. L. Zitnick.
-    Microsoft COCO: Common objects in context. In ECCV. 2014.'
+- raw: 'T.-Y. Lin, M. Maire, S. Belongie, J. Hays, P. Perona, D. Ramanan, P. Dollár, and C.L. Zitnick.
+    Microsoft COCO: Common objects in context. In ECCV, 2014.'
   title: 'Microsoft COCO: Common objects in context'
   authors:
   - T.-Y. Lin
@@ -410,10 +410,10 @@ references:
   - P. Perona
   - D. Ramanan
   - P. Dollár
-  - C. L. Zitnick
+  - C.L. Zitnick
   year: 2014
-- raw: '[27] J. Long, E. Shelhamer, and T. Darrell. Fully convolutional networks for semantic segmentation.
-    In CVPR, 2015.'
+- raw: J. Long, E. Shelhamer, and T. Darrell. Fully convolutional networks for semantic segmentation.
+    In CVPR, 2015.
   title: Fully convolutional networks for semantic segmentation
   authors:
   - J. Long
@@ -422,7 +422,724 @@ references:
   year: 2015
 cites: []
 semantic_scholar:
-  lookup_status: skipped
-  paper_id: null
-  matched_title: null
-cited_by_external: []
+  lookup_status: ok
+  paper_id: 2c03df8b48bf3fa39054345bafabfeff15bfd11d
+  matched_title: Deep Residual Learning for Image Recognition
+  citation_count: 233799
+  citing_lookup_status: ok
+cited_by_external:
+- title: Multi-modal learning for automatic breast cancer diagnostics from mammography and ultrasound
+  year: 2026
+  authors:
+  - Yhonatan Kvich
+  - Adi Kalamaro
+  - Shachar Ashkenasy
+  - Adi Wegerhoff
+  - Yishai M. Elyada
+  - A. Grubstein
+  - Eli Atar
+  - Y. Eldar
+  paperId: b3e5361b3cab9ed5602fb954c856b42c72a0cdfd
+  external_ids:
+    DBLP: journals/bspc/KvichKAWEGAE26
+    DOI: 10.1016/j.bspc.2026.110574
+    CorpusId: 288354311
+  citation_count: 2
+- title: 'Weaver: Kronecker product approximations of spatiotemporal attention for traffic network forecasting'
+  year: 2026
+  authors:
+  - Christopher H. Cheong
+  - Gary Davis
+  - Seongjin Choi
+  paperId: a751e0e8e308fcd549eba93853dd40c24bb46016
+  external_ids:
+    DOI: 10.1016/j.trc.2026.105825
+    CorpusId: 290038611
+  citation_count: 1
+- title: A Mamba-Transformer-based deep learning framework for photovoltaic fault diagnosis in infrared
+    images
+  year: 2026
+  authors:
+  - Weiliang Zeng
+  - Yuhan Cai
+  - Jingmin Fan
+  paperId: 867cd22558f7a5b70c194b48b3a4591f3676d86e
+  external_ids:
+    DBLP: journals/aei/ZengCF26
+    DOI: 10.1016/j.aei.2026.104633
+    CorpusId: 286967529
+  citation_count: 1
+- title: 'MoST: A Foundation Model for Multi-modality Spatio-temporal Traffic Prediction'
+  year: 2026
+  authors:
+  - Ronghui Xu
+  - Jihao Chen
+  - Jindong Tian
+  - Chenjuan Guo
+  - Bin Yang
+  paperId: 6fec679bc66dfa2cbc847c3815c183a790bfc87e
+  external_ids:
+    DBLP: conf/kdd/XuCTGY26
+    DOI: 10.1145/3770854.3780162
+    CorpusId: 287619171
+  citation_count: 1
+- title: On Saddle Point Avoidance and Stationary Distribution of Sharpness-Aware Minimization
+  year: 2026
+  authors:
+  - Tao Sun
+  - Fan Jia
+  - Bao Wang
+  paperId: bc65af6eaa40db3474ecc64f9659da52d8e6ba0b
+  external_ids:
+    DBLP: conf/kdd/SunJW26
+    DOI: 10.1145/3770854.3780209
+    CorpusId: 287619177
+  citation_count: 1
+- title: A hybrid transformer deep Q-network for path planning
+  year: 2026
+  authors:
+  - Jiawei Guo
+  - Yichuan Cao
+  - Ge Song
+  - Junlin Ou
+  - Yi Wang
+  paperId: 3bb32236fb1d6a915e8d1b75d31c9a8859a53ff2
+  external_ids:
+    DBLP: journals/ijon/GuoCSOW26
+    DOI: 10.1016/j.neucom.2026.134135
+    CorpusId: 288889795
+  citation_count: 0
+- title: A visionary dual-scale hybrid network for abdominal multi-organ segmentation
+  year: 2026
+  authors:
+  - Miao Liao
+  - Shiyuan Gong
+  - Xiong Li
+  - S. Di
+  - Weihong Lai
+  - Xiaomei Jiang
+  paperId: 36d3800759107da8ca40a96c5e792b7e618131d6
+  external_ids:
+    DBLP: journals/eaai/LiaoGLDLJ26
+    DOI: 10.1016/j.engappai.2026.115246
+    CorpusId: 289050872
+  citation_count: 0
+- title: 'Towards high-quality embeddings: An automated cross-gated framework for click-through rate prediction'
+  year: 2026
+  authors:
+  - Caihong Mu
+  - Yunfei Fang
+  - Yi Liu
+  - Yunlong Chen
+  - Xianwu Cao
+  paperId: ce6f204c2920f03ce27f943ae72d73f486acdb4c
+  external_ids:
+    DBLP: journals/ijon/MuFLCC26
+    DOI: 10.1016/j.neucom.2026.134209
+    CorpusId: 289058966
+  citation_count: 0
+- title: Improving local association in end-to-end tracking via Hard Negative Confusion-aware Denoising
+  year: 2026
+  authors:
+  - Danyang Cao
+  - Haoyu Zhang
+  paperId: 1f00d0765f003405ca850e2808e8201e1cfe5000
+  external_ids:
+    DBLP: journals/eaai/CaoZ26
+    DOI: 10.1016/j.engappai.2026.115389
+    CorpusId: 289297265
+  citation_count: 0
+- title: 'MMLNB: Multi-Modal Learning for Neuroblastoma subtyping classification assisted with textual
+    description generation'
+  year: 2026
+  authors:
+  - Huangwei Chen
+  - Yifei Chen
+  - Zhenyu Yan
+  - Mingyang Ding
+  - Chenlei Li
+  - Feiwei Qin
+  - Daxing Zhang
+  - Zhu Zhu
+  paperId: 0a3aeeefbbf4d01dbe9d0366d57e0e27d76cf4b5
+  external_ids:
+    DOI: 10.1016/j.bspc.2026.110798
+    CorpusId: 289531627
+  citation_count: 0
+- title: Uncertainty-guided vertex-parameter bidirectional refinement for hand pose and shape estimation
+  year: 2026
+  authors:
+  - Haofan Lu
+  - Ruimin Li
+  - Shuiping Gou
+  - Yalong Jiang
+  - Yu Sha
+  - Yingping Li
+  paperId: 3f29e98a42b08aaae7be7bf16e950ed93c9e7c76
+  external_ids:
+    DOI: 10.1016/j.neucom.2026.134336
+    CorpusId: 289543113
+  citation_count: 0
+- title: 'Beyond accuracy: a clinically safe, uncertainty-aware EfficientNetB3 framework for interpretable
+    pneumonia screening'
+  year: 2026
+  authors:
+  - Fakhar Ayub
+  - Irfan Javid
+  - Muhammad Kashif Khattak
+  - Aamir Hayyat
+  paperId: cf3e849f7d3af358145b8275017d061287183acc
+  external_ids:
+    DOI: 10.1016/j.bspc.2026.110852
+    CorpusId: 289662230
+  citation_count: 0
+- title: Fine-scale mapping of urban evergreen and deciduous forests with high-resolution JL-1 multispectral
+    satellite images using a weakly supervised deep neural network model
+  year: 2026
+  authors:
+  - Yuan Zhang
+  - Chentian Ge
+  - Wenjia Yan
+  - Guilian Zhang
+  - Zhekui Fan
+  - Chao Zhang
+  paperId: 05de9b9fd53b022811e3b46968a88ee37bab0da6
+  external_ids:
+    DOI: 10.1016/j.ufug.2026.129581
+    CorpusId: 289678291
+  citation_count: 0
+- title: 'SynergyHPE: Robust semi-supervised head pose estimation via long-tail distribution priors and
+    geometric-aware representations'
+  year: 2026
+  authors:
+  - Fengshan Wang
+  - Chunman Yan
+  paperId: 79e29f36dae529e6c948e7bf36f776fa68dfd2fb
+  external_ids:
+    DOI: 10.1016/j.neucom.2026.134337
+    CorpusId: 289763491
+  citation_count: 0
+- title: Standardization of breast radiotherapy structure nomenclature using transformer-based multi-modal
+    feature learning
+  year: 2026
+  authors:
+  - F. Alam
+  - M. Field
+  - D. A. Mouiee
+  - P. Chlap
+  - Geoff P. Delaney
+  - S. Vinod
+  - Shivani Kumar
+  - Janet Cui
+  - Ali Haidar
+  - Vicky Chin
+  - J. Sykes
+  - Simon Ashworth
+  - Verity Ahern
+  - Kirsty Stuart
+  - M. Bailey
+  - Senthilkumar Gandhidasan
+  - Prabhakar Ramachandran
+  - J. Selvaraj
+  - A. Rezo
+  - Nicholas Hardcastle
+  - Lois Holloway
+  paperId: 42d5882d534af1de99787df1f8ba42fc461072ff
+  external_ids:
+    DOI: 10.1016/j.bspc.2026.110906
+    CorpusId: 289801058
+  citation_count: 0
+- title: A channel separation-based interpretable fault diagnosis network explained by a feature-sparse
+    subspace framework
+  year: 2026
+  authors:
+  - Biao He
+  - Qin Bie
+  - Yi Qin
+  paperId: 24db54e4ceba95bfe3ab7931dca5cabb12ddd4d7
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115591
+    CorpusId: 289864308
+  citation_count: 0
+- title: 'A Digital Twin framework for layer-wise dimensional control in wire-arc directed energy deposition:
+    Towards adaptive and sustainable production'
+  year: 2026
+  authors:
+  - Srihari Chitral
+  - Sneha Madiwala Srinivas
+  - Khushwanth Kumar Pal
+  - Abhisek Nayak
+  - Rama Krishna Sai Subrahmanyam Gorthi
+  - D. V. Kiran
+  paperId: b33577c51cb7dfc0f9b04aa0be4af941bfdc3d9a
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115579
+    CorpusId: 289866251
+  citation_count: 0
+- title: Multimodal learning for early hypertension burden detection using OCT angiography and electronic
+    medical records
+  year: 2026
+  authors:
+  - Benny Wei-Yun Hsu
+  - Yu-Chan Chen
+  - Chun-Kai Chen
+  - Chih-Kuo Lee
+  - V. S. Tseng
+  paperId: 20684954138ed3a6f122b5b3e4d9f3f8236f65c6
+  external_ids:
+    DOI: 10.1016/j.bspc.2026.110917
+    CorpusId: 289867313
+  citation_count: 0
+- title: Class-conditional GAN augmentation and transfer learning for measurement-reliable MRI-based Alzheimer’s
+    disease stage assessment
+  year: 2026
+  authors:
+  - Muhammad Ali Azam Khattak
+  paperId: c5e8917341e688a07089d8eb846022a65302bd57
+  external_ids:
+    DOI: 10.1016/j.measurement.2026.122427
+    CorpusId: 289967814
+  citation_count: 0
+- title: 'LEGDeeplab: A lightweight edge-guided model for semantic segmentation of maize leaf rust'
+  year: 2026
+  authors:
+  - Zhenbang Zhou
+  - Haipeng Niu
+  - Guangsheng Zhang
+  - Longfei Zhou
+  - Jingwei Qi
+  - Guijun Yang
+  - Tengyue Cui
+  - Yinghua Jiao
+  - Changchun Li
+  paperId: 5178441ecfe171b46fc65207f09c3d796e6b8101
+  external_ids:
+    DOI: 10.1016/j.compag.2026.112132
+    CorpusId: 290001433
+  citation_count: 0
+- title: Automated extraction of elevation profiles from limited imagery for bridge design
+  year: 2026
+  authors:
+  - Morris Florek
+  - Maximilian Kellner
+  - Johannes Reimer
+  - Steffen Marx
+  - A. Reiterer
+  - Chongjie Kang
+  paperId: 959c9cec10eacb866e9e110d915510e3e0b84a1a
+  external_ids:
+    DOI: 10.1016/j.autcon.2026.107126
+    CorpusId: 290001156
+  citation_count: 0
+- title: 'A survey on deep learning-based livestock and poultry behavior recognition: Methods, dataset
+    and prospects'
+  year: 2026
+  authors:
+  - Jianjun Guo
+  - Yudian Xu
+  - Beibei Zhang
+  - Piao Zhou
+  - Shangwen Luo
+  - Yuhan Zhuo
+  - Jingyu Ji
+  - Lijun Lin
+  - Xin Xu
+  paperId: e39a20793b288fb55770595da9287fbe01cf1f49
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115608
+    CorpusId: 290034479
+  citation_count: 0
+- title: Boosting lung nodule detection by reconstruction-based data augmentation
+  year: 2026
+  authors:
+  - Yan Wang
+  - Gaoxiang Chen
+  - Chaofeng Wang
+  - Xiangmei Liu
+  paperId: a6c6409c2ad9ad2fab0796e7c55874087833ac52
+  external_ids:
+    DOI: 10.1016/j.bspc.2026.110992
+    CorpusId: 290068950
+  citation_count: 0
+- title: 'FPL-AD: Fine-grained perception and localization for image anomaly detection'
+  year: 2026
+  authors:
+  - Liqin Huang
+  - Haozhe Zhang
+  - Hanyu Zheng
+  - Mingjing Yang
+  - Lin Pan
+  paperId: e8042e1cd4da8e07e2a12959269a83e76a122813
+  external_ids:
+    DOI: 10.1016/j.knosys.2026.116602
+    CorpusId: 290074801
+  citation_count: 0
+- title: A dual-sensor measurement system integrating bio-speckle laser imaging and multispectral reflectance
+    for non-destructive quantification of drought-induced physiological changes in soybean
+  year: 2026
+  authors:
+  - Juseung Kim
+  - Moonsub Lee
+  - Hoonsoo Lee
+  paperId: 861173cdd801381978c4e004604a05db53cd8da0
+  external_ids:
+    DOI: 10.1016/j.measurement.2026.122504
+    CorpusId: 290077749
+  citation_count: 0
+- title: 'AVA: Adaptive Vein Attention-enhanced GhostNet–ViT hybrid for low-latency palm vein-based patient
+    identification'
+  year: 2026
+  authors:
+  - M. Y. Al-Ridha
+  - H. Koyuncu
+  paperId: 91e553d4edac85a4bf08565c53e0aa772ecc8090
+  external_ids:
+    DOI: 10.1016/j.bspc.2026.110979
+    CorpusId: 290105171
+  citation_count: 0
+- title: Pest-induced damage detection in corn leaves using improved Faster R-CNN
+  year: 2026
+  authors:
+  - Suresh Timilsina
+  - Sandhya Sharma
+  - Kazuhiko Sato
+  - Yoshifumi Okada
+  - Shinya Watanabe
+  - Satoshi Kondo
+  paperId: 74e25e0522a9e4ebb61e892bfa62daa9457c38fd
+  external_ids:
+    DOI: 10.1016/j.compag.2026.112158
+    CorpusId: 290112524
+  citation_count: 0
+- title: Quality Electroluminescence image curation and benchmark dataset for photovoltaic diagnostics
+  year: 2026
+  authors:
+  - Umair Naeem
+  - Ken Chaddha
+  - Xiaodong Li
+  - S. Vahaji
+  - Ehsan Asadi
+  paperId: 6e3e7433f2ebd5c74c1835b4d7002a5cf9074c6a
+  external_ids:
+    DOI: 10.1016/j.solmat.2026.114555
+    CorpusId: 290124408
+  citation_count: 0
+- title: Vision–language collaborative framework for construction state recognition, spatial semantic
+    parsing, and decision support in concrete placement workfaces
+  year: 2026
+  authors:
+  - Hongyu Liang
+  - Bingying Wu
+  - Suiyi Qian
+  - Xiaoxi Zhao
+  - Sheng Qiang
+  paperId: 06804aab35176bec115f77b61d4b0f227b011d7f
+  external_ids:
+    DOI: 10.1016/j.autcon.2026.107146
+    CorpusId: 290150529
+  citation_count: 0
+- title: 'Intelligent rock classification from a mesoscopic perspective: A computer vision approach based
+    on thin section images'
+  year: 2026
+  authors:
+  - Weiqi Kong
+  - Peng Hou
+  - Quansheng Liu
+  - Zhijun Wu
+  - M. Rabatuly
+  - Fakai Dou
+  paperId: 33e3ec4af7de37029cc14be3204812aedfabc71b
+  external_ids:
+    DOI: 10.1016/j.ijrmms.2026.106640
+    CorpusId: 290156316
+  citation_count: 0
+- title: Attention interaction and multiple residual integration network for salient object detection
+    in remote sensing images
+  year: 2026
+  authors:
+  - Yanzhao Wang
+  - Jingbo Xia
+  - Zhuying Chen
+  - Tongchi Zhou
+  - Zhongyun Liu
+  - Li Yan
+  paperId: 1a326cadc328365c32067dc71003f9cf86102d9a
+  external_ids:
+    DOI: 10.1016/j.imavis.2026.106117
+    CorpusId: 290162342
+  citation_count: 0
+- title: Multi-prototype dual-memory for integrated electrode sheet segmentation and defect detection
+    with industrial deployment
+  year: 2026
+  authors:
+  - Feng Ye
+  - Xinyu Song
+  - Shuo Li
+  - Mingzhe Yuan
+  - Wenhong Wang
+  - Tianwei Mu
+  - Duotao Pan
+  paperId: cb5eb45890220b296e2a9f523504c421b9d31e0e
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115605
+    CorpusId: 290191719
+  citation_count: 0
+- title: A class-incremental learning-based spectral fingerprint framework for rice germplasm conservation
+  year: 2026
+  authors:
+  - Kai Gao
+  - Tianying Yan
+  - Xiaoyu Fu
+  - Wenjie Liu
+  - Yuxin Xiao
+  - Xincheng Zhang
+  - Xiaoping Wu
+  - Hengnian Qi
+  - Chu Zhang
+  paperId: c9f9eacad85b545167ad427b7655f8f18d6f43f8
+  external_ids:
+    DOI: 10.1016/j.engappai.2026.115614
+    CorpusId: 290190654
+  citation_count: 0
+- title: Upscaling micro-mechanical heterogeneity to predict macroscopic failure in coal using deep learning
+    and grain-based DEM
+  year: 2026
+  authors:
+  - Zihao Wang
+  - Yidong Cai
+  - Dameng Liu
+  - D. Elsworth
+  - R. Gamage
+  - Yingfang Zhou
+  - Z. Pan
+  - Jun Matsushima
+  - Hui Wang
+  paperId: a48cce086eae8f0bf65a8f5a5a7984a7b6c510eb
+  external_ids:
+    DOI: 10.1016/j.ijrmms.2026.106629
+    CorpusId: 290207033
+  citation_count: 0
+- title: Multi-scale quantitative characterization of macropores in Loess Plateau soils from CT images
+    based on U-net and its variants
+  year: 2026
+  authors:
+  - Fei Chen
+  - Dantong Lin
+  - Yunfeng Wang
+  - Baoqing Zhang
+  paperId: 17d0cb582235ffcb4f16353753ccd09731e058f4
+  external_ids:
+    DOI: 10.1016/j.still.2026.107182
+    CorpusId: 286732646
+  citation_count: 0
+- title: 'Revolutionising breast cancer diagnosis: Cutting-edge AI techniques in image processing and
+    classification'
+  year: 2026
+  authors:
+  - Mariam M. Askar
+  - Mahmoud A. Shawky
+  - Amgad A. Salama
+  - Samy Darwish
+  - Marian Wagdy
+  - Sameh Zarif
+  - A. G. Abdellatif
+  paperId: 391ee45bd639f02f8bfd8cc95333361ee3d6456a
+  external_ids:
+    DBLP: journals/cnsns/AskarSSDWZA26
+    DOI: 10.1016/j.cnsns.2026.109954
+    CorpusId: 286757719
+  citation_count: 0
+- title: 'Few-shot assembly action recognition in smart manufacturing: A cross-domain metric framework'
+  year: 2026
+  authors:
+  - Yan Zhang
+  - Xinyuan Jiang
+  - Xinlong Qi
+  - E. Cui
+  - Hongyong Fu
+  paperId: 53df73390885a4873029cfad4b8d73b265e1cac2
+  external_ids:
+    DBLP: journals/aei/ZhangJQCF26
+    DOI: 10.1016/j.aei.2026.104610
+    CorpusId: 286864072
+  citation_count: 0
+- title: Synergistic in-domain and out-of-domain learning to strengthen visual scene understanding in
+    data-scarce, imbalanced construction settings
+  year: 2026
+  authors:
+  - Jinwoo Kim
+  paperId: 00649c14daa6f5c49d242f0d8250c100c28c2ae1
+  external_ids:
+    DBLP: journals/aei/Kim26
+    DOI: 10.1016/j.aei.2026.104616
+    CorpusId: 286883229
+  citation_count: 0
+- title: A unified approach for maintaining MRI reconstruction quality and quantifying both aleatoric
+    and epistemic uncertainty.
+  year: 2026
+  authors:
+  - Satoshi Kuroki
+  - Naoto Fujita
+  - Y. Terada
+  paperId: e1ebc7812c066eb14e4c66b3c8783075a752970d
+  external_ids:
+    DOI: 10.1016/j.mri.2026.110680
+    CorpusId: 287370692
+    PubMed: '41966495'
+  citation_count: 0
+- title: 'DDA-Net: Dynamic differential attention network for accurate pediatric pneumonia detection in
+    chest radiographs'
+  year: 2026
+  authors:
+  - Shanshan Lin
+  - Zhaoran Liu
+  - Yizhi Cao
+  - Yilin Liao
+  paperId: 2e963aa6701161b100f15481a73eced4f9ab6680
+  external_ids:
+    DBLP: journals/isci/LinLCL26
+    DOI: 10.1016/j.ins.2026.123537
+    CorpusId: 287804674
+  citation_count: 0
+- title: 'TCHFNet: Topic-guided cross-modal alignment and hidden layer-optimized fusion network for multimodal
+    sentiment classification'
+  year: 2026
+  authors:
+  - Yongxing Hu
+  - Zhixia Yang
+  - Xue Yang
+  - Jie Li
+  paperId: 5c8ce437da1b315e620631d694d9cb9d4f240ce9
+  external_ids:
+    DBLP: journals/ijon/HuYYL26
+    DOI: 10.1016/j.neucom.2026.133844
+    CorpusId: 288031768
+  citation_count: 0
+- title: 'RESGRU model: brain-region-specific EEG diagnosis for T2DM-MCI'
+  year: 2026
+  authors:
+  - Youqing Luo
+  - Xin Li
+  - Rui Su
+  - Liyong Yin
+  - Zipeng Li
+  - Zhongjie Qu
+  paperId: 29101ba94fe37ebcb7c142a04c0b637c2c10d34a
+  external_ids:
+    DBLP: journals/bspc/LuoLSYLQ26
+    DOI: 10.1016/j.bspc.2026.110432
+    CorpusId: 288061690
+  citation_count: 0
+- title: Difficulty-aware and relational decoupled knowledge distillation
+  year: 2026
+  authors:
+  - Zhiqiang Bao
+  - Siyu Ding
+  - Baocheng Chen
+  - Pengshuo Zhang
+  paperId: 873bd2b13a1f46844bd31b27f4f932eb17e49f7b
+  external_ids:
+    DBLP: journals/ijon/BaoDCZ26
+    DOI: 10.1016/j.neucom.2026.133850
+    CorpusId: 288061744
+  citation_count: 0
+- title: 'TL-QCHResnet: Quantum transfer learning based on heart rate variability data'
+  year: 2026
+  authors:
+  - Ziwen Zhu
+  - Ri-gui Zhou
+  paperId: 0988a0541533246f825c83dba6a6612a886b04a0
+  external_ids:
+    DBLP: journals/bspc/ZhuZ26
+    DOI: 10.1016/j.bspc.2026.110563
+    CorpusId: 288099436
+  citation_count: 0
+- title: 'Assessment of avocado water stress using multispectral imaging and deep learning: Toward scalable,
+    cost-effective irrigation monitoring'
+  year: 2026
+  authors:
+  - J. Estrada
+  - Necati Çetin
+  - Kamil Sacilik
+  - Banu Ulu
+  - Burak Ulu
+  - Fernando Auat Cheein
+  paperId: 2593eb90fdcd3a8cc63d487eb506c9d7d527e579
+  external_ids:
+    DBLP: journals/eswa/EstradaCSUUC26
+    DOI: 10.1016/j.eswa.2026.132688
+    CorpusId: 288155315
+  citation_count: 0
+- title: 'UDMNet: a generalizable deep learning system for integrated thyroid nodule analysis across clinical
+    settings'
+  year: 2026
+  authors:
+  - Tianhao Xiang
+  - Zhenyuan Hu
+  paperId: 1185c8022f881780ba3a5b56941e76d9cb0c535a
+  external_ids:
+    DBLP: journals/bspc/XiangH26
+    DOI: 10.1016/j.bspc.2026.110618
+    CorpusId: 288194967
+  citation_count: 0
+- title: Manifold structure preservation of latent domain and category diversity of target domain for
+    unsupervised domain adaptation
+  year: 2026
+  authors:
+  - Mengru Wang
+  - Jinglei Liu
+  paperId: cdfc7d5594c6a00545c6ed50c5d6c4f152f78c35
+  external_ids:
+    DBLP: journals/ijon/WangL26d
+    DOI: 10.1016/j.neucom.2026.133902
+    CorpusId: 288198655
+  citation_count: 0
+- title: Synergizing Mamba semantic alignment and knowledge distillation for human and machine vision
+    in the compression domain
+  year: 2026
+  authors:
+  - Shipei Wang
+  - Jiao Wei
+  - Kunqiang Huang
+  - Chao Yang
+  - Xinpeng Huang
+  - Ping An
+  paperId: 07b3b23d943d562bcd1f52e61ef50f32f56fd60b
+  external_ids:
+    DBLP: journals/dsp/WangWHYHA26
+    DOI: 10.1016/j.dsp.2026.106241
+    CorpusId: 288204007
+  citation_count: 0
+- title: Ordinal-aware logit adjustment and balanced representation learning for diabetic retinopathy
+    grading
+  year: 2026
+  authors:
+  - Luhu Li
+  - Xuya Liu
+  - Xinguo Hou
+  - Li Chen
+  - Ziyu Wang
+  - Qingfeng Ding
+  - Shujun Fu
+  paperId: 6f39be598197eb5451dd41a79113519102c71fde
+  external_ids:
+    DBLP: journals/bspc/LiLHCWDF26
+    DOI: 10.1016/j.bspc.2026.110522
+    CorpusId: 288213091
+  citation_count: 0
+- title: Early detection of diabetic foot complications via multi-dataset thermography and optimized deep
+    learning
+  year: 2026
+  authors:
+  - Syed Tahmid
+  - Nowmi Islam
+  - Zajaul Ehsan Sajid
+  - C. M. Rahman
+  - Wais Kafia Chowdhury
+  - Md Kamrul Hasan Foysal
+  paperId: 6a72e44de06870272a0685b4ad766d8ffe5bc39d
+  external_ids:
+    DBLP: journals/bspc/TahmidISRCF26
+    DOI: 10.1016/j.bspc.2026.110595
+    CorpusId: 288219485
+  citation_count: 0

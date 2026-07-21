@@ -95,9 +95,28 @@ describe('AskPanel', () => {
 
     await user.click(screen.getByRole('button', { name: /new chat/i }))
 
-    await waitFor(() => expect(askNewChat).toHaveBeenCalledWith('p1'))
+    await waitFor(() => expect(askNewChat).toHaveBeenCalledWith({ slug: 'p1', backend: 'claude' }))
     expect(screen.queryByText('old question')).not.toBeInTheDocument()
     expect(screen.getByText(/ask a question about this paper/i)).toBeInTheDocument()
+  })
+
+  it('switches backend by creating a persisted fresh chat before next turn', async () => {
+    const user = userEvent.setup()
+    askNewChat.mockResolvedValue({
+      session: { id: 2, paperSlug: 'p1', backend: 'codex', title: null, createdAt: 't2' },
+      messages: [],
+    })
+    render(<AskPanel slug="p1" />)
+
+    await waitFor(() => expect(askOpen).toHaveBeenCalled())
+    await user.selectOptions(screen.getByLabelText(/model backend/i), 'codex')
+
+    await waitFor(() => expect(askNewChat).toHaveBeenCalledWith({ slug: 'p1', backend: 'codex' }))
+    await user.type(screen.getByLabelText(/ask a question/i), 'Summarize this.')
+    await user.click(screen.getByRole('button', { name: /send/i }))
+    await waitFor(() =>
+      expect(askStart).toHaveBeenCalledWith({ chatSessionId: 2, slug: 'p1', text: 'Summarize this.' }),
+    )
   })
 
   it('surfaces an error update without crashing the panel', async () => {

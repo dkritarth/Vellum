@@ -14,6 +14,8 @@
 //   3. "New chat": `askNewChat(slug)` starts a fresh session + fresh agent
 //      conversation (main process disposes the cached ACP session).
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { ModelSelector } from './ModelSelector'
+import type { ChatBackend } from './ModelSelector'
 import styles from './AskPanel.module.css'
 
 type Role = 'user' | 'assistant'
@@ -41,6 +43,8 @@ export function AskPanel({ slug }: AskPanelProps): JSX.Element {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [backend, setBackend] = useState<ChatBackend>('claude')
+  const [switchingSession, setSwitchingSession] = useState(false)
   const activeRequestId = useRef<string | null>(null)
 
   // Reload history whenever the open paper changes.
@@ -57,6 +61,7 @@ export function AskPanel({ slug }: AskPanelProps): JSX.Element {
       .then((result) => {
         if (cancelled) return
         setSessionId(result.session.id)
+        setBackend(result.session.backend === 'codex' ? 'codex' : 'claude')
         setMessages(result.messages.map((m) => ({ id: m.id, role: m.role, content: m.content })))
       })
       .catch((err: unknown) => {
@@ -119,26 +124,37 @@ export function AskPanel({ slug }: AskPanelProps): JSX.Element {
     }
   }, [input, sessionId, sending, slug])
 
-  const startNewChat = useCallback(() => {
+  const startNewChat = useCallback((nextBackend: ChatBackend = backend) => {
     setError(null)
     setSending(false)
+    setSwitchingSession(true)
     activeRequestId.current = null
 
     window.vellum
-      .askNewChat(slug)
+      .askNewChat({ slug, backend: nextBackend })
       .then((result) => {
         setSessionId(result.session.id)
+        setBackend(result.session.backend === 'codex' ? 'codex' : 'claude')
         setMessages([])
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
-  }, [slug])
+      .finally(() => setSwitchingSession(false))
+  }, [backend, slug])
 
-  const disabled = sessionId === null || sending
+  const selectBackend = useCallback(
+    (nextBackend: ChatBackend) => {
+      if (nextBackend !== backend) startNewChat(nextBackend)
+    },
+    [backend, startNewChat],
+  )
+
+  const disabled = sessionId === null || sending || switchingSession
 
   return (
     <div className={styles.askPanel}>
       <div className={styles.header}>
-        <button type="button" className={styles.newChatButton} onClick={startNewChat}>
+        <ModelSelector backend={backend} disabled={disabled} onChange={selectBackend} />
+        <button type="button" className={styles.newChatButton} disabled={disabled} onClick={() => startNewChat()}>
           New chat
         </button>
       </div>

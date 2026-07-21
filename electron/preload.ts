@@ -3,6 +3,7 @@ import type { IpcRendererEvent } from 'electron'
 import type { AskOpenResult, AskStartParams, AskStreamEvent } from '../core/chat/manager.js'
 import type { IngestResult } from '../core/ingest/index.js'
 import type { ListPapersOptions, PaperRecord } from '../core/library/repo.js'
+import type { AcpBackend } from '../core/acp/client.js'
 
 export interface AskUpdatePayload {
   requestId: string
@@ -33,7 +34,8 @@ const api = {
   // Open (or reload) the most recent chat session + history for a paper.
   askOpen: (slug: string): Promise<AskOpenResult> => ipcRenderer.invoke('vellum:ask-open', slug),
   // "New chat": fresh session, empty history, fresh agent conversation.
-  askNewChat: (slug: string): Promise<AskOpenResult> => ipcRenderer.invoke('vellum:ask-new-chat', slug),
+  askNewChat: (params: { slug: string; backend: AcpBackend }): Promise<AskOpenResult> =>
+    ipcRenderer.invoke('vellum:ask-new-chat', params),
   // Starts a turn; resolves immediately with a requestId once the turn is
   // *started* (not once it's done) — the reply streams over `onAskUpdate`.
   askStart: (params: AskStartParams): Promise<{ requestId: string }> =>

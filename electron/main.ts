@@ -8,6 +8,7 @@ import type { Database } from 'better-sqlite3'
 
 import { StdioAcpClient } from '../core/acp/stdio-client.js'
 import type { AskOpenResult, AskStartParams, AskStreamEvent } from '../core/chat/manager.js'
+import type { AcpBackend } from '../core/acp/client.js'
 import { ChatManager } from '../core/chat/manager.js'
 import { getChatSession } from '../core/chat/repo.js'
 import { ingest } from '../core/ingest/index.js'
@@ -154,9 +155,25 @@ ipcMain.handle('vellum:ask-open', (_event, slug: unknown): AskOpenResult => {
 
 // "New chat" action: fresh chat_sessions row + disposes any cached ACP
 // session for this paper so the agent has no memory of the prior thread.
-ipcMain.handle('vellum:ask-new-chat', async (_event, slug: unknown): Promise<AskOpenResult> => {
-  const paperSlug = requireSlug(slug, 'vellum:ask-new-chat')
-  const session = await getChatManager().newChat({ db: getDb(), paperSlug })
+function requireBackend(value: unknown, channel: string): AcpBackend {
+  if (value === 'claude' || value === 'codex') return value
+  throw new Error(`${channel}: backend must be 'claude' or 'codex'`)
+}
+
+function parseAskNewChatParams(value: unknown): { slug: string; backend: AcpBackend } {
+  if (typeof value !== 'object' || value === null) {
+    throw new Error('vellum:ask-new-chat: params must be an object')
+  }
+  const candidate = value as Record<string, unknown>
+  return {
+    slug: requireSlug(candidate['slug'], 'vellum:ask-new-chat'),
+    backend: requireBackend(candidate['backend'], 'vellum:ask-new-chat'),
+  }
+}
+
+ipcMain.handle('vellum:ask-new-chat', async (_event, params: unknown): Promise<AskOpenResult> => {
+  const { slug: paperSlug, backend } = parseAskNewChatParams(params)
+  const session = await getChatManager().newChat({ db: getDb(), paperSlug, backend })
   return { session, messages: [] }
 })
 
@@ -208,8 +225,9 @@ ipcMain.handle('vellum:ask-start', (event: IpcMainInvokeEvent, params: unknown):
     if (!sender.isDestroyed()) sender.send('vellum:ask-update', { requestId, event: update })
   }
 
+  const backend = requireBackend(chatSession.backend, 'vellum:ask-start')
   getChatManager()
-    .runTurn({ db, chatSessionId: parsed.chatSessionId, paperSlug: parsed.slug, mdPath, text: parsed.text }, send)
+    .runTurn({ db, chatSessionId: parsed.chatSessionId, paperSlug: parsed.slug, mdPath, text: parsed.text, backend }, send)
     .catch((err: unknown) => {
       send({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
     })

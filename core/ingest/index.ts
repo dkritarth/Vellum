@@ -34,6 +34,7 @@ import type { ClassifiedInput, InputKind } from './classify.js'
 import { convertPdfToMarkdown } from './convert.js'
 import { extractPaper } from './extract.js'
 import { fetchSource } from './fetch.js'
+import { summarizePaper } from './summary.js'
 
 export type { InputKind }
 
@@ -100,6 +101,7 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
   await Promise.all([writeFile(pdfPath, fetched.pdfBytes), writeFile(mdPath, markdown)])
 
   const extracted = await extractPaper(mdPath, { client: options.client, backend: options.backend })
+  const summary = await summarizePaper(mdPath, { client: options.client, backend: options.backend })
 
   // Prefer the agent's paper.md-derived metadata (extract.ts); fall back to
   // the raw fetch-time metadata (arXiv/Crossref) for whatever the agent
@@ -122,6 +124,7 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
     doi: classified.kind === 'doi' ? classified.value : undefined,
     arxivId: classified.kind === 'arxiv' ? classified.value : undefined,
     abstract: metadata.abstract,
+    summary,
     mdPath,
     pdfPath,
     sections: extracted.sections,

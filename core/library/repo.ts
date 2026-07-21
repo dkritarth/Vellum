@@ -22,6 +22,7 @@ export interface PaperRecord {
   doi?: string
   arxivId?: string
   abstract?: string
+  summary?: string
   mdPath?: string
   pdfPath?: string
   /** Section outline from core/ingest/extract.ts's ExtractResult.sections. */
@@ -38,6 +39,7 @@ interface PaperRow {
   doi: string | null
   arxiv_id: string | null
   abstract: string | null
+  summary: string | null
   md_path: string | null
   pdf_path: string | null
   sections: string | null
@@ -54,6 +56,7 @@ function toRecord(row: PaperRow): PaperRecord {
     doi: row.doi ?? undefined,
     arxivId: row.arxiv_id ?? undefined,
     abstract: row.abstract ?? undefined,
+    summary: row.summary ?? undefined,
     mdPath: row.md_path ?? undefined,
     pdfPath: row.pdf_path ?? undefined,
     sections: row.sections ? (JSON.parse(row.sections) as unknown[]) : [],
@@ -68,8 +71,8 @@ function toRecord(row: PaperRow): PaperRecord {
  */
 export function upsertPaper(db: Database, paper: PaperRecord): void {
   db.prepare(
-    `INSERT INTO papers (slug, title, authors, year, venue, doi, arxiv_id, abstract, md_path, pdf_path, sections, added_at)
-     VALUES (@slug, @title, @authors, @year, @venue, @doi, @arxivId, @abstract, @mdPath, @pdfPath, @sections, @addedAt)
+    `INSERT INTO papers (slug, title, authors, year, venue, doi, arxiv_id, abstract, summary, md_path, pdf_path, sections, added_at)
+     VALUES (@slug, @title, @authors, @year, @venue, @doi, @arxivId, @abstract, @summary, @mdPath, @pdfPath, @sections, @addedAt)
      ON CONFLICT(slug) DO UPDATE SET
        title     = excluded.title,
        authors   = excluded.authors,
@@ -78,6 +81,7 @@ export function upsertPaper(db: Database, paper: PaperRecord): void {
        doi       = excluded.doi,
        arxiv_id  = excluded.arxiv_id,
        abstract  = excluded.abstract,
+       summary   = excluded.summary,
        md_path   = excluded.md_path,
        pdf_path  = excluded.pdf_path,
        sections  = excluded.sections,
@@ -91,6 +95,7 @@ export function upsertPaper(db: Database, paper: PaperRecord): void {
     doi: paper.doi ?? null,
     arxivId: paper.arxivId ?? null,
     abstract: paper.abstract ?? null,
+    summary: paper.summary ?? null,
     mdPath: paper.mdPath ?? null,
     pdfPath: paper.pdfPath ?? null,
     sections: JSON.stringify(paper.sections ?? []),

@@ -14,8 +14,8 @@
 //   - No raw ANTHROPIC_API_KEY / OPENAI_API_KEY path. Auth comes from the
 //     already-signed-in CLIs.
 //
-// This file defines the contract only. The first ACP task card wires the real
-// transport (add the verified ACP dep to package.json first).
+// This file defines the contract only. See stdio-client.ts for the real
+// transport ([P1-01] — StdioAcpClient, over @agentclientprotocol/sdk).
 
 export type AcpBackend = 'claude' | 'codex'
 
@@ -42,6 +42,3 @@ export interface AcpClient {
   newSession(backend: AcpBackend): Promise<AcpSession>
 }
 
-// TODO(acp-task-1): implement StdioAcpClient — spawn the adapter subprocess,
-// speak ACP JSON-RPC over stdio, map events onto AcpUpdate. Prove both
-// backends respond before any UI wiring (the on-plan smoke test).

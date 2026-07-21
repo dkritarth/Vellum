@@ -26,10 +26,12 @@
 // run smoke:acp`.
 //
 // Hang note: every ACP call StdioAcpClient makes (handshake + each turn) now
-// has a timeout (defaults: 15s handshake, 60s turn — see
-// StdioAcpClientTimeouts). A stalled adapter fails loud with a timeout
-// error instead of hanging this script forever; no external alarm/kill
-// needed.
+// has a timeout (defaults: 60s handshake, 60s turn — see
+// StdioAcpClientTimeouts). The handshake budget is deliberately generous:
+// measured against a real cold-start claude-code-acp, `session/new` alone
+// legitimately takes ~16s (it loads a large skill/command set). A stalled
+// adapter still fails loud with a timeout error instead of hanging this
+// script forever; no external alarm/kill needed.
 
 import { StdioAcpClient } from './stdio-client.js'
 import type { AcpBackend } from './client.js'

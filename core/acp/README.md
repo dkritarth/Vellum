@@ -56,13 +56,20 @@ through untouched.
 ### Per-operation timeouts
 
 `StdioAcpClient` takes an optional second constructor arg,
-`StdioAcpClientTimeouts` (`{ handshakeMs?, turnMs? }`, defaulting to 15s /
+`StdioAcpClientTimeouts` (`{ handshakeMs?, turnMs? }`, defaulting to 60s /
 60s). `newSession()` races the `initialize` + `session/new` handshake against
 `handshakeMs`; `prompt()` races each turn against `turnMs`. On timeout the
 child adapter process is killed and the caller gets a thrown error
 (`newSession`) or a terminal `{ kind: 'error' }` update (`prompt`) instead of
 hanging forever — this is what protects against a stalled adapter (e.g. an
 errored codex-acp turn, or any other hang mid-session).
+
+The handshake default is deliberately generous, not tight: measured against
+a real cold-start `claude-code-acp` (`CLAUDECODE` stripped), `initialize`
+returns in ~226ms but `session/new` alone legitimately takes ~16.2s — it
+loads a large skill/command set (a huge `available_commands_update` dump,
+dozens of skills). A too-tight budget here would regress a path that worked
+fine (if slowly) before this timeout existed.
 
 ## Live on-plan smoke test
 

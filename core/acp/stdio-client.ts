@@ -182,8 +182,13 @@ function childFailure(child: AdapterChildProcess, command: string, tracker: { me
  * StdioAcpClient(spawnAdapter)` callers are unaffected. */
 export interface StdioAcpClientTimeouts {
   /** Budget for `initialize` + `session/new` before `newSession()` rejects
-   * and the child is killed. Shorter than the turn budget — a hung handshake
-   * means the adapter never came up, not that it's doing slow work. */
+   * and the child is killed. NOT shorter than the turn budget — measured
+   * against a real cold-start `claude-code-acp` (CLAUDECODE stripped):
+   * `initialize` returns in ~226ms, but `session/new` legitimately takes
+   * ~16.2s (it loads a large skill/command set — a huge
+   * `available_commands_update` dump, dozens of skills). A tighter budget
+   * here regresses a previously-working (if slow) path. Default leaves
+   * comfortable margin above that measured cold-start cost. */
   handshakeMs?: number
   /** Budget for a single `prompt()` turn (send to a terminal done/error)
    * before it's force-failed with an `error` update and the child is
@@ -192,7 +197,7 @@ export interface StdioAcpClientTimeouts {
   turnMs?: number
 }
 
-const DEFAULT_HANDSHAKE_TIMEOUT_MS = 15_000
+const DEFAULT_HANDSHAKE_TIMEOUT_MS = 60_000
 const DEFAULT_TURN_TIMEOUT_MS = 60_000
 
 /** Rejects with `message` after `ms`. `cancel()` clears the underlying timer

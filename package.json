@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.2.1",
-    "better-sqlite3": "^11.0.0"
+    "better-sqlite3": "^13.0.1"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
@@ -40,5 +40,5 @@
     "vite": "^5.4.0",
     "vitest": "^2.1.0"
   },
-  "//": "@agentclientprotocol/sdk is the current canonical ACP TS lib (verified on npm 2026-07-21). @zed-industries/agent-client-protocol is deprecated and renamed to this package."
+  "//": "@agentclientprotocol/sdk is the current canonical ACP TS lib (verified on npm 2026-07-21). @zed-industries/agent-client-protocol is deprecated and renamed to this package. better-sqlite3 bumped 11->13: v11's prebuilt/native build doesn't compile against newer V8 (Node 26) — v13 fixes the V8 API compat, no behavior change for our usage."
 }

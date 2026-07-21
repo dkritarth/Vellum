@@ -1,0 +1,66 @@
+:global(html),
+:global(body),
+:global(#root) {
+  height: 100%;
+  margin: 0;
+}
+
+:global(body) {
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  background: var(--vellum-bg, #101010);
+  color: var(--vellum-text, #eaeaea);
+}
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.centerPane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--vellum-bg, #101010);
+}
+
+.centerEmpty {
+  text-align: center;
+  color: var(--vellum-text-dim, #8a8a8a);
+}
+
+.centerEmpty p {
+  margin: 4px 0;
+}
+
+.centerEmptyHint {
+  font-size: 13px;
+}
+
+.statusBar {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  font-size: 11px;
+  color: var(--vellum-text-dim, #8a8a8a);
+  border-top: 1px solid var(--vellum-border, #2a2a2a);
+  background: var(--vellum-surface, #1a1a1a);
+  flex-shrink: 0;
+}
+
+.statusBarSpacer {
+  flex: 1;
+}

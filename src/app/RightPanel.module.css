@@ -1,0 +1,48 @@
+.rightPanel {
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--vellum-border, #2a2a2a);
+  background: var(--vellum-surface, #1a1a1a);
+  overflow: hidden;
+}
+
+.tabList {
+  display: flex;
+  border-bottom: 1px solid var(--vellum-border, #2a2a2a);
+  flex-shrink: 0;
+}
+
+.tabButton {
+  flex: 1;
+  padding: 10px 4px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--vellum-text-dim, #8a8a8a);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tabButton:hover {
+  color: var(--vellum-text, #eaeaea);
+}
+
+.tabButtonActive {
+  color: var(--vellum-text, #eaeaea);
+  border-bottom-color: var(--vellum-accent, #6d8cff);
+}
+
+.tabPanel {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.placeholder {
+  padding: 24px 16px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--vellum-text-dim, #8a8a8a);
+  text-align: center;
+}

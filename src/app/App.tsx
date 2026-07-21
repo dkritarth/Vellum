@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react'
+import { Sidebar } from './Sidebar'
+import { TabStrip } from './TabStrip'
+import { RightPanel } from './RightPanel'
+import styles from './App.module.css'
 
-// Vellum shell skeleton.
+// Vellum shell — [P1-07] anara-style frame:
+//   top: TabStrip (open papers as tabs)
+//   left: Sidebar (Create / Home / Library / Search + folder tree)
+//   center: paper pane (reader lands in [P1-09]; empty state until then)
+//   right: RightPanel (Ask | Notes | Details | Annotations)
 //
-// The real anara-style layout is built here per the Phase-1 wiki task cards:
-//   - top tab strip (open papers as tabs)
-//   - left sidebar (Create / Home / Library / Search, folder tree)
-//   - center: PDF reader (render, page nav, zoom, TOC, in-doc search)
-//   - right panel: Ask | Notes | Details | Annotations, model selector (ACP switch)
-//
-// This placeholder just proves the renderer + preload IPC bridge boot.
+// Layout-only: no papers, no IPC wiring beyond the boot-time ping check
+// carried over from the scaffold. Renders fine with zero papers, the only
+// state that exists right now.
 export function App(): JSX.Element {
   const [pong, setPong] = useState<string>('…')
 
@@ -17,10 +21,23 @@ export function App(): JSX.Element {
   }, [])
 
   return (
-    <main style={{ fontFamily: 'system-ui', padding: 24 }}>
-      <h1>Vellum</h1>
-      <p>Local-first AI paper workspace. Shell scaffold — features land per the wiki backlog.</p>
-      <p>IPC bridge: {pong}</p>
-    </main>
+    <div className={styles.shell}>
+      <TabStrip />
+      <div className={styles.body}>
+        <Sidebar />
+        <main className={styles.centerPane} aria-label="Paper view">
+          <div className={styles.centerEmpty}>
+            <p>No paper open</p>
+            <p className={styles.centerEmptyHint}>Open a paper from Library to start reading.</p>
+          </div>
+        </main>
+        <RightPanel />
+      </div>
+      <footer className={styles.statusBar}>
+        <span>Vellum</span>
+        <span className={styles.statusBarSpacer} />
+        <span>bridge: {pong}</span>
+      </footer>
+    </div>
   )
 }

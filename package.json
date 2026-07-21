@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Vellum — local-first AI paper workspace that runs on your own Claude/Codex plan via ACP. No extra API key.",
   "author": "Kritarth Dandapat",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "main": "out/main/index.js",
   "type": "module",
   "scripts": {

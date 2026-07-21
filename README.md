@@ -33,4 +33,5 @@ Requires `claude-code-acp` / `codex-acp` on PATH and their CLIs signed in
 
 anara.com is great but wants its own subscription. Vellum reuses the plan you
 already pay for, keeps your papers local, and is swappable across AI backends
-via ACP. MIT-licensed.
+via ACP. Licensed for personal and non-commercial use; commercial use needs
+prior written permission. See [LICENSE](LICENSE).

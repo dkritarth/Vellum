@@ -1,0 +1,63 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 220px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--vellum-border, #2a2a2a);
+  background: var(--vellum-surface, #1a1a1a);
+  padding: 12px 8px;
+  overflow-y: auto;
+}
+
+.navList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.navItem {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vellum-text-dim, #8a8a8a);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.navItem:hover {
+  background: var(--vellum-surface-hover, #222222);
+}
+
+.navItemActive {
+  background: var(--vellum-surface-active, #262626);
+  color: var(--vellum-text, #eaeaea);
+  font-weight: 500;
+}
+
+.folderTree {
+  flex: 1;
+  border-top: 1px solid var(--vellum-border, #2a2a2a);
+  padding-top: 12px;
+}
+
+.folderTreeHeading {
+  margin: 0 0 6px;
+  padding: 0 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--vellum-text-dim, #8a8a8a);
+}
+
+.folderTreeEmpty {
+  margin: 0;
+  padding: 0 10px;
+  font-size: 12px;
+  color: var(--vellum-text-dim, #8a8a8a);
+}

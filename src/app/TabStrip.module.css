@@ -1,0 +1,47 @@
+.tabStrip {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 8px;
+  gap: 4px;
+  border-bottom: 1px solid var(--vellum-border, #2a2a2a);
+  background: var(--vellum-surface, #1a1a1a);
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.empty {
+  font-size: 13px;
+  color: var(--vellum-text-dim, #8a8a8a);
+  padding: 0 8px;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--vellum-text-dim, #8a8a8a);
+  white-space: nowrap;
+  cursor: default;
+}
+
+.tabActive {
+  background: var(--vellum-surface-active, #262626);
+  color: var(--vellum-text, #eaeaea);
+}
+
+.newTabButton {
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vellum-text-dim, #8a8a8a);
+  font-size: 16px;
+  line-height: 1;
+  cursor: not-allowed;
+}

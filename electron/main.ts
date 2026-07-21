@@ -6,6 +6,8 @@ import type { Database } from 'better-sqlite3'
 
 import { ingest } from '../core/ingest/index.js'
 import type { IngestResult } from '../core/ingest/index.js'
+import { listPapers } from '../core/library/repo.js'
+import type { ListPapersOptions, PaperRecord, PaperSortColumn } from '../core/library/repo.js'
 import { openDb } from '../core/store/db.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -89,6 +91,32 @@ ipcMain.handle('vellum:ingest', async (_event, input: unknown): Promise<IngestRe
     throw new Error('vellum:ingest: input must be a non-empty string')
   }
   return ingest(input, { db: getDb() })
+})
+
+const SORT_COLUMN_VALUES: readonly PaperSortColumn[] = ['addedAt', 'year', 'title']
+
+// [P1-08] Library IPC seam. `options` arrives from the renderer as untyped
+// `unknown` — narrowed field-by-field here rather than trusted via a cast.
+// core/library/repo.ts's listPapers() is independently defensive about a bad
+// `sort` value (falls back to the added_at default), so this narrowing is
+// belt-and-suspenders, not the only guard against sort-column injection.
+function toListPapersOptions(value: unknown): ListPapersOptions {
+  if (typeof value !== 'object' || value === null) return {}
+  const candidate = value as Record<string, unknown>
+
+  const search = typeof candidate['search'] === 'string' ? candidate['search'] : undefined
+  const sort = SORT_COLUMN_VALUES.includes(candidate['sort'] as PaperSortColumn)
+    ? (candidate['sort'] as PaperSortColumn)
+    : undefined
+  const order = candidate['order'] === 'asc' || candidate['order'] === 'desc' ? candidate['order'] : undefined
+
+  return { search, sort, order }
+}
+
+// Library grid data [P1-08]. Read-only, no slug/path handling needed (unlike
+// read-paper-file) — just forwards a sanitized query to the repo.
+ipcMain.handle('vellum:list-papers', (_event, options: unknown): PaperRecord[] => {
+  return listPapers(getDb(), toListPapersOptions(options))
 })
 
 app.whenReady().then(() => {

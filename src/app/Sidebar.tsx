@@ -9,7 +9,7 @@ import styles from './Sidebar.module.css'
 import { WorkspaceSwitcher } from './WorkspaceSwitcher'
 
 const NAV_ITEMS = ['Create', 'Home', 'Library', 'Search'] as const
-type NavItem = (typeof NAV_ITEMS)[number]
+export type NavItem = (typeof NAV_ITEMS)[number]
 
 const LIBRARY_VIEWS = ['Files', 'Chats'] as const
 type LibraryView = (typeof LIBRARY_VIEWS)[number]
@@ -22,7 +22,14 @@ const FOOTER_NOTES: Record<FooterItem, string> = {
   Usage: 'Plan-credit / token usage — wiki card [P2-09]',
 }
 
-export function Sidebar(): JSX.Element {
+interface SidebarProps {
+  /** [P1-08] App.tsx listens for nav changes to swap the center pane to the
+   * Library grid when 'Library' is selected — everything else (Create/Home/
+   * Search) is out of this card's scope and just keeps the current pane. */
+  onNavChange?: (item: NavItem) => void
+}
+
+export function Sidebar({ onNavChange }: SidebarProps = {}): JSX.Element {
   const [active, setActive] = useState<NavItem>('Home')
   const [libraryView, setLibraryView] = useState<LibraryView>('Files')
   const [footerView, setFooterView] = useState<FooterItem | null>(null)
@@ -41,6 +48,7 @@ export function Sidebar(): JSX.Element {
               onClick={() => {
                 setActive(item)
                 setFooterView(null)
+                onNavChange?.(item)
               }}
             >
               {item}

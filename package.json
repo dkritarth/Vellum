@@ -19,6 +19,7 @@
   "dependencies": {
     "@agentclientprotocol/sdk": "1.2.1",
     "better-sqlite3": "^13.0.1",
+    "pdfjs-dist": "^6.1.200",
     "unpdf": "^1.6.2"
   },
   "devDependencies": {

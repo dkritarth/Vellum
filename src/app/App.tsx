@@ -62,7 +62,7 @@ export function App(): JSX.Element {
             </>
           )}
         </main>
-        <RightPanel />
+        <RightPanel slug={activeTabId ?? undefined} />
       </div>
       <footer className={styles.statusBar}>
         <span>Vellum</span>

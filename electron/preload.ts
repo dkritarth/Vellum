@@ -1,6 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { IpcRendererEvent } from 'electron'
+import type { AskOpenResult, AskStartParams, AskStreamEvent } from '../core/chat/manager.js'
 import type { IngestResult } from '../core/ingest/index.js'
 import type { ListPapersOptions, PaperRecord } from '../core/library/repo.js'
+
+export interface AskUpdatePayload {
+  requestId: string
+  event: AskStreamEvent
+}
 
 // Safe, typed bridge between the renderer (React UI) and the main process.
 // Renderer never touches Node/Electron directly — only this allowlisted API.
@@ -22,6 +29,23 @@ const api = {
   // listPapers default).
   listPapers: (options?: ListPapersOptions): Promise<PaperRecord[]> =>
     ipcRenderer.invoke('vellum:list-papers', options ?? {}),
+  // [P1-10] Ask tab — grounded chat over ACP. -----------------------------
+  // Open (or reload) the most recent chat session + history for a paper.
+  askOpen: (slug: string): Promise<AskOpenResult> => ipcRenderer.invoke('vellum:ask-open', slug),
+  // "New chat": fresh session, empty history, fresh agent conversation.
+  askNewChat: (slug: string): Promise<AskOpenResult> => ipcRenderer.invoke('vellum:ask-new-chat', slug),
+  // Starts a turn; resolves immediately with a requestId once the turn is
+  // *started* (not once it's done) — the reply streams over `onAskUpdate`.
+  askStart: (params: AskStartParams): Promise<{ requestId: string }> =>
+    ipcRenderer.invoke('vellum:ask-start', params),
+  // Subscribes to every streamed Ask update; the renderer filters by
+  // `requestId` (the one `askStart` returned) to route events to the right
+  // in-flight turn. Returns an unsubscribe function.
+  onAskUpdate: (callback: (payload: AskUpdatePayload) => void): (() => void) => {
+    const listener = (_event: IpcRendererEvent, payload: AskUpdatePayload): void => callback(payload)
+    ipcRenderer.on('vellum:ask-update', listener)
+    return () => ipcRenderer.removeListener('vellum:ask-update', listener)
+  },
 }
 
 contextBridge.exposeInMainWorld('vellum', api)

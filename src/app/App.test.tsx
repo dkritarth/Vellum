@@ -29,6 +29,12 @@ beforeEach(() => {
       listPapers: vi.fn().mockResolvedValue([
         { slug: 'arxiv-1706.03762', title: 'Attention Is All You Need', authors: ['Ashish Vaswani'], year: 2017, addedAt: '2026-01-01T00:00:00.000Z' },
       ]),
+      // Opening a paper mounts RightPanel's AskPanel ([P1-10]) bound to its
+      // slug — this test only cares about tab/pane shell behavior, so a
+      // never-resolving promise keeps AskPanel harmlessly in its loading
+      // state without asserting on it.
+      askOpen: vi.fn(() => new Promise(() => {})),
+      onAskUpdate: vi.fn(() => () => {}),
     },
   })
 })

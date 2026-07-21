@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IngestResult } from '../core/ingest/index.js'
+import type { ListPapersOptions, PaperRecord } from '../core/library/repo.js'
 
 // Safe, typed bridge between the renderer (React UI) and the main process.
 // Renderer never touches Node/Electron directly — only this allowlisted API.
@@ -16,6 +17,11 @@ const api = {
   // core/ingest/classify.ts sorts out which. Rejects on failure (bad input,
   // network error, extract failure) rather than returning null.
   ingest: (input: string): Promise<IngestResult> => ipcRenderer.invoke('vellum:ingest', input),
+  // [P1-08] Library grid data — DB rows only (no file bytes). `options`
+  // omitted = full list, most-recently-added first (core/library/repo.ts's
+  // listPapers default).
+  listPapers: (options?: ListPapersOptions): Promise<PaperRecord[]> =>
+    ipcRenderer.invoke('vellum:list-papers', options ?? {}),
 }
 
 contextBridge.exposeInMainWorld('vellum', api)

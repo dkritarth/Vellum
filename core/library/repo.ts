@@ -104,9 +104,59 @@ export function getPaper(db: Database, slug: string): PaperRecord | undefined {
   return row ? toRecord(row) : undefined
 }
 
-/** All papers, most-recently-added first (library grid default order —
- * [P1-08] will add search/sort variants; this is the base query). */
-export function listPapers(db: Database): PaperRecord[] {
-  const rows = db.prepare('SELECT * FROM papers ORDER BY added_at DESC').all() as PaperRow[]
+/** Sortable columns exposed to callers — the only columns `listPapers` will
+ * ever place in an `ORDER BY` clause. */
+export type PaperSortColumn = 'addedAt' | 'year' | 'title'
+
+/** `PaperSortColumn` -> actual SQL column name. This is the ONLY place a sort
+ * column reaches the query string, and it always comes from this map's
+ * values (fixed string literals), never from `options.sort` directly — an
+ * unrecognized/hostile value (e.g. smuggled through the `vellum:list-papers`
+ * IPC channel as untyped `unknown`) falls through to the `addedAt` default
+ * below rather than ever being interpolated. Sort-column SQL injection is a
+ * real class of bug; this map is the fix. */
+const SORT_COLUMNS: Record<PaperSortColumn, string> = {
+  addedAt: 'added_at',
+  year: 'year',
+  title: 'title',
+}
+
+export interface ListPapersOptions {
+  /** Case-insensitive substring match against title. Omitted/empty = no filter. */
+  search?: string
+  /** Column to sort by. Defaults to `addedAt`. */
+  sort?: PaperSortColumn
+  /** Sort direction. Defaults to `desc`. */
+  order?: 'asc' | 'desc'
+}
+
+/** Escape SQLite LIKE metacharacters (`%`, `_`) plus the escape char itself
+ * so a search term is matched literally — a title containing a real `%` or
+ * `_` shouldn't act as a wildcard. Paired with `ESCAPE '\'` in the query. */
+function escapeLikeTerm(term: string): string {
+  return term.replace(/[\\%_]/g, (ch) => `\\${ch}`)
+}
+
+/**
+ * Papers for the library grid — optionally filtered by title substring and
+ * sorted by a whitelisted column. Defaults to all papers, most-recently-added
+ * first (same behavior as the pre-[P1-08] base query).
+ *
+ * `options.sort` is resolved through `SORT_COLUMNS` (never interpolated
+ * directly) and `options.search` is passed as a bound parameter with LIKE
+ * metacharacters escaped — this function is safe to call with a caller-typed
+ * `options` object even if it originated as `unknown` at an IPC boundary.
+ */
+export function listPapers(db: Database, options: ListPapersOptions = {}): PaperRecord[] {
+  const sortColumn = SORT_COLUMNS[options.sort as PaperSortColumn] ?? SORT_COLUMNS.addedAt
+  const direction = options.order === 'asc' ? 'ASC' : 'DESC'
+  const search = typeof options.search === 'string' ? options.search.trim() : ''
+
+  const rows = search
+    ? (db
+        .prepare(`SELECT * FROM papers WHERE title LIKE ? ESCAPE '\\' ORDER BY ${sortColumn} ${direction}`)
+        .all(`%${escapeLikeTerm(search)}%`) as PaperRow[])
+    : (db.prepare(`SELECT * FROM papers ORDER BY ${sortColumn} ${direction}`).all() as PaperRow[])
+
   return rows.map(toRecord)
 }

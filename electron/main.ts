@@ -1,12 +1,18 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
+import type { IpcMainInvokeEvent } from 'electron'
+import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { readFile } from 'node:fs/promises'
 import type { Database } from 'better-sqlite3'
 
+import { StdioAcpClient } from '../core/acp/stdio-client.js'
+import type { AskOpenResult, AskStartParams, AskStreamEvent } from '../core/chat/manager.js'
+import { ChatManager } from '../core/chat/manager.js'
+import { getChatSession } from '../core/chat/repo.js'
 import { ingest } from '../core/ingest/index.js'
 import type { IngestResult } from '../core/ingest/index.js'
-import { listPapers } from '../core/library/repo.js'
+import { getPaper, listPapers } from '../core/library/repo.js'
 import type { ListPapersOptions, PaperRecord, PaperSortColumn } from '../core/library/repo.js'
 import { openDb } from '../core/store/db.js'
 
@@ -119,6 +125,98 @@ ipcMain.handle('vellum:list-papers', (_event, options: unknown): PaperRecord[] =
   return listPapers(getDb(), toListPapersOptions(options))
 })
 
+// [P1-10] Ask tab — grounded chat over ACP. -------------------------------
+//
+// One ChatManager for the process lifetime: it caches an AcpSession per
+// paper slug (session/new cold start is ~16s — see core/acp/stdio-client.ts)
+// so follow-up turns in the same chat don't re-pay that cost. Lazily
+// constructed for the same reason `db` is lazy — no adapter spawned, no
+// window created, until a paper's Ask tab actually does something.
+let chatManager: ChatManager | undefined
+function getChatManager(): ChatManager {
+  if (!chatManager) chatManager = new ChatManager(new StdioAcpClient())
+  return chatManager
+}
+
+function requireSlug(value: unknown, channel: string): string {
+  if (typeof value !== 'string' || !SLUG_PATTERN.test(value)) {
+    throw new Error(`${channel}: invalid slug`)
+  }
+  return value
+}
+
+// Open (or reload) the Ask tab for a paper: returns the most recent chat
+// session for this slug + its full history, creating a fresh session if
+// none exists yet. Cheap — never touches the ACP layer.
+ipcMain.handle('vellum:ask-open', (_event, slug: unknown): AskOpenResult => {
+  return getChatManager().openChat({ db: getDb(), paperSlug: requireSlug(slug, 'vellum:ask-open') })
+})
+
+// "New chat" action: fresh chat_sessions row + disposes any cached ACP
+// session for this paper so the agent has no memory of the prior thread.
+ipcMain.handle('vellum:ask-new-chat', async (_event, slug: unknown): Promise<AskOpenResult> => {
+  const paperSlug = requireSlug(slug, 'vellum:ask-new-chat')
+  const session = await getChatManager().newChat({ db: getDb(), paperSlug })
+  return { session, messages: [] }
+})
+
+function parseAskStartParams(value: unknown): AskStartParams {
+  if (typeof value !== 'object' || value === null) {
+    throw new Error('vellum:ask-start: params must be an object')
+  }
+  const candidate = value as Record<string, unknown>
+  const chatSessionId = candidate['chatSessionId']
+  const text = candidate['text']
+  if (typeof chatSessionId !== 'number' || !Number.isInteger(chatSessionId)) {
+    throw new Error('vellum:ask-start: chatSessionId must be an integer')
+  }
+  if (typeof text !== 'string' || text.trim().length === 0) {
+    throw new Error('vellum:ask-start: text must be a non-empty string')
+  }
+  return { chatSessionId, slug: requireSlug(candidate['slug'], 'vellum:ask-start'), text }
+}
+
+// Starts a turn and returns immediately with a `requestId` — the turn itself
+// runs async and streams `AskStreamEvent`s back over `vellum:ask-update`
+// (renderer subscribes via preload's `onAskUpdate`, keyed by that id). This
+// is the streaming half of [P1-10]: AcpSession.prompt() yields updates in
+// this (main) process; ipcMain.handle can only return one value, so the
+// reply itself can't carry the stream — a push channel does.
+ipcMain.handle('vellum:ask-start', (event: IpcMainInvokeEvent, params: unknown): { requestId: string } => {
+  const parsed = parseAskStartParams(params)
+  const db = getDb()
+
+  // `chatSessionId` and `slug` arrive as two independent IPC params — verify
+  // the session actually belongs to that paper before running a turn on it.
+  // Without this, a mismatched pair (renderer bug, or a hostile page) could
+  // write turns onto another paper's chat history.
+  const chatSession = getChatSession(db, parsed.chatSessionId)
+  if (!chatSession || chatSession.paperSlug !== parsed.slug) {
+    throw new Error(`vellum:ask-start: chat session ${parsed.chatSessionId} does not belong to paper '${parsed.slug}'`)
+  }
+
+  const paper = getPaper(db, parsed.slug)
+  if (!paper?.mdPath) {
+    throw new Error(`vellum:ask-start: paper '${parsed.slug}' has no markdown to ground on`)
+  }
+  const mdPath = paper.mdPath
+
+  const requestId = randomUUID()
+  const sender = event.sender
+
+  function send(update: AskStreamEvent): void {
+    if (!sender.isDestroyed()) sender.send('vellum:ask-update', { requestId, event: update })
+  }
+
+  getChatManager()
+    .runTurn({ db, chatSessionId: parsed.chatSessionId, paperSlug: parsed.slug, mdPath, text: parsed.text }, send)
+    .catch((err: unknown) => {
+      send({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
+    })
+
+  return { requestId }
+})
+
 app.whenReady().then(() => {
   createWindow()
   app.on('activate', () => {
@@ -128,4 +226,10 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
+})
+
+// Dispose cached ACP sessions (kills the adapter subprocesses) rather than
+// leaving them to be reaped by process exit.
+app.on('before-quit', () => {
+  chatManager?.disposeAll().catch(() => undefined)
 })

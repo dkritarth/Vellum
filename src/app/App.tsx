@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ReaderToolbar } from './ReaderToolbar'
 import { Sidebar } from './Sidebar'
 import { TabStrip } from './TabStrip'
 import { RightPanel } from './RightPanel'
@@ -12,7 +13,8 @@ import styles from './App.module.css'
 //
 // Layout-only: no papers, no IPC wiring beyond the boot-time ping check
 // carried over from the scaffold. Renders fine with zero papers, the only
-// state that exists right now.
+// state that exists right now. [P1-14] adds the reader toolbar's highlight
+// stub to the center pane so it's visible even before [P1-09] lands.
 export function App(): JSX.Element {
   const [pong, setPong] = useState<string>('…')
 
@@ -26,6 +28,7 @@ export function App(): JSX.Element {
       <div className={styles.body}>
         <Sidebar />
         <main className={styles.centerPane} aria-label="Paper view">
+          <ReaderToolbar />
           <div className={styles.centerEmpty}>
             <p>No paper open</p>
             <p className={styles.centerEmptyHint}>Open a paper from Library to start reading.</p>

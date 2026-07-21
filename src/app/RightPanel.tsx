@@ -4,7 +4,9 @@
 //     grounded chat, [P1-13]/metadata for Details).
 //   - Notes, Annotations are Phase-2 and render a visible "coming soon" stub
 //     linking their wiki card — never a dead/invisible button.
+// [P1-14] adds the Ask input bar (stubbed `/` skills + `@` context, [P2-11]).
 import { useState } from 'react'
+import { AskInput } from './AskInput'
 import { ComingSoon } from './ComingSoon'
 import styles from './RightPanel.module.css'
 
@@ -57,7 +59,12 @@ function renderTabContent(tab: RightPanelTab): JSX.Element {
   // DEFERRED_TABS.
   switch (tab as 'Ask' | 'Details') {
     case 'Ask':
-      return <p className={styles.placeholder}>Open a paper to start asking questions.</p>
+      return (
+        <div className={styles.askTab}>
+          <p className={styles.placeholder}>Open a paper to start asking questions.</p>
+          <AskInput />
+        </div>
+      )
     case 'Details':
       return <p className={styles.placeholder}>No paper open — metadata will show here.</p>
   }

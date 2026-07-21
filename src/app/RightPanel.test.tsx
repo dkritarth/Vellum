@@ -16,6 +16,13 @@ describe('RightPanel', () => {
     expect(screen.getByText(/start asking questions/i)).toBeInTheDocument()
   })
 
+  it('renders the stubbed Ask input bar with `/` skills and `@` context triggers', () => {
+    render(<RightPanel />)
+    expect(screen.getByLabelText(/ask a question/i)).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Skills' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Context' })).toBeInTheDocument()
+  })
+
   it('switches to Details on click and shows its empty state', async () => {
     const user = userEvent.setup()
     render(<RightPanel />)

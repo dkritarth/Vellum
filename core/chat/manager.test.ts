@@ -185,6 +185,7 @@ describe('ChatManager', () => {
 
     expect(session.backend).toBe('codex')
     expect(client.backends).toEqual(['codex'])
+    expect(client.sessions[0]?.requests[0]?.contextFiles).toEqual([mdPath])
   })
 
   it('surfaces an adapter spawn failure as an error event without crashing', async () => {

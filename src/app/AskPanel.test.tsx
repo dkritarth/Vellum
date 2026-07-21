@@ -119,6 +119,14 @@ describe('AskPanel', () => {
     )
   })
 
+  it('sends a canned quick-action prompt into the Ask thread', async () => {
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    await waitFor(() => expect(askOpen).toHaveBeenCalled())
+    await user.click(screen.getByRole('button', { name: 'Breakdown' }))
+    await waitFor(() => expect(askStart).toHaveBeenCalledWith(expect.objectContaining({ chatSessionId: 1, slug: 'p1', text: expect.stringMatching(/Break down/) })))
+  })
+
   it('surfaces an error update without crashing the panel', async () => {
     const user = userEvent.setup()
     render(<AskPanel slug="p1" />)

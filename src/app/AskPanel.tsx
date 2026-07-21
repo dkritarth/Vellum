@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ModelSelector } from './ModelSelector'
 import type { ChatBackend } from './ModelSelector'
+import { QuickActions } from './QuickActions'
 import styles from './AskPanel.module.css'
 
 type Role = 'user' | 'assistant'
@@ -106,12 +107,12 @@ export function AskPanel({ slug }: AskPanelProps): JSX.Element {
     })
   }, [])
 
-  const sendTurn = useCallback(async () => {
-    const text = input.trim()
+  const sendTurn = useCallback(async (prompt?: string) => {
+    const text = (prompt ?? input).trim()
     if (!text || sessionId === null || sending) return
 
     setError(null)
-    setInput('')
+    if (!prompt) setInput('')
     setSending(true)
     setMessages((current) => [...current, { id: `local-user-${Date.now()}`, role: 'user', content: text }])
 
@@ -182,6 +183,8 @@ export function AskPanel({ slug }: AskPanelProps): JSX.Element {
           </p>
         ) : null}
       </div>
+
+      <QuickActions disabled={disabled} onPrompt={(prompt) => void sendTurn(prompt)} />
 
       <form
         className={styles.inputRow}

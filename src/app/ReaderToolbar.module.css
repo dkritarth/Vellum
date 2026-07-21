@@ -1,0 +1,35 @@
+.readerToolbar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+}
+
+.toolbarRow {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--vellum-border, #2a2a2a);
+  border-radius: 8px;
+  background: var(--vellum-surface, #1a1a1a);
+}
+
+.highlightButton {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vellum-text-dim, #8a8a8a);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.highlightButton:hover,
+.highlightButton[aria-pressed='true'] {
+  background: var(--vellum-surface-hover, #222222);
+  color: var(--vellum-text, #eaeaea);
+}

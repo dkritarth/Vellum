@@ -1,0 +1,44 @@
+.askInput {
+  border-top: 1px solid var(--vellum-border, #2a2a2a);
+  flex-shrink: 0;
+}
+
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+}
+
+.triggerButton {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--vellum-border, #2a2a2a);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vellum-text-dim, #8a8a8a);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.triggerButton:hover,
+.triggerButton[aria-pressed='true'] {
+  background: var(--vellum-surface-hover, #222222);
+  color: var(--vellum-text, #eaeaea);
+}
+
+.textInput {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--vellum-border, #2a2a2a);
+  border-radius: 6px;
+  background: var(--vellum-bg, #101010);
+  color: var(--vellum-text-dim, #8a8a8a);
+  font-size: 13px;
+}
+
+.textInput:disabled {
+  cursor: not-allowed;
+}

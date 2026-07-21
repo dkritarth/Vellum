@@ -1,0 +1,38 @@
+.workspaceSwitcher {
+  border-bottom: 1px solid var(--vellum-border, #2a2a2a);
+  margin: -12px -8px 12px;
+  padding: 8px;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vellum-text, #eaeaea);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.trigger:hover,
+.trigger[aria-expanded='true'] {
+  background: var(--vellum-surface-hover, #222222);
+}
+
+.name {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  color: var(--vellum-text-dim, #8a8a8a);
+  font-size: 12px;
+}

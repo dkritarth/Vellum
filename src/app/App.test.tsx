@@ -20,5 +20,9 @@ describe('App shell', () => {
     expect(screen.getByText(/No paper open/i)).toBeInTheDocument()
     // Right panel default tab.
     expect(screen.getByRole('tab', { name: 'Ask' })).toBeInTheDocument()
+    // Reader toolbar highlight stub, visible even with no paper open.
+    expect(screen.getByRole('button', { name: /highlight/i })).toBeInTheDocument()
+    // Workspace switcher.
+    expect(screen.getByRole('button', { name: /switch workspace/i })).toBeInTheDocument()
   })
 })

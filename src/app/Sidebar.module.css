@@ -40,24 +40,65 @@
   font-weight: 500;
 }
 
-.folderTree {
-  flex: 1;
+.viewToggle {
+  display: flex;
+  gap: 2px;
   border-top: 1px solid var(--vellum-border, #2a2a2a);
-  padding-top: 12px;
+  padding-top: 10px;
 }
 
-.folderTreeHeading {
-  margin: 0 0 6px;
-  padding: 0 10px;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.viewToggleButton {
+  flex: 1;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
   color: var(--vellum-text-dim, #8a8a8a);
-}
-
-.folderTreeEmpty {
-  margin: 0;
-  padding: 0 10px;
   font-size: 12px;
+  cursor: pointer;
+}
+
+.viewToggleButton:hover {
+  background: var(--vellum-surface-hover, #222222);
+}
+
+.viewToggleButtonActive {
+  background: var(--vellum-surface-active, #262626);
+  color: var(--vellum-text, #eaeaea);
+  font-weight: 500;
+}
+
+.viewPanel {
+  flex: 1;
+  min-height: 0;
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-top: 1px solid var(--vellum-border, #2a2a2a);
+  padding-top: 8px;
+}
+
+.footerItem {
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
   color: var(--vellum-text-dim, #8a8a8a);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.footerItem:hover {
+  background: var(--vellum-surface-hover, #222222);
+}
+
+.footerItemActive {
+  background: var(--vellum-surface-active, #262626);
+  color: var(--vellum-text, #eaeaea);
+  font-weight: 500;
 }

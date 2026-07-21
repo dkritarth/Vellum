@@ -39,6 +39,12 @@
   overflow-y: auto;
 }
 
+.askTab {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
 .placeholder {
   padding: 24px 16px;
   margin: 0;

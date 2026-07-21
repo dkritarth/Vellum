@@ -10,6 +10,7 @@ import { useState } from 'react'
 import { AskInput } from './AskInput'
 import { AskPanel } from './AskPanel'
 import { ComingSoon } from './ComingSoon'
+import { DetailsPanel } from './DetailsPanel'
 import styles from './RightPanel.module.css'
 
 const RIGHT_PANEL_TABS = ['Ask', 'Notes', 'Details', 'Annotations'] as const
@@ -72,6 +73,6 @@ function renderTabContent(tab: RightPanelTab, slug: string | undefined): JSX.Ele
         </div>
       )
     case 'Details':
-      return <p className={styles.placeholder}>No paper open — metadata will show here.</p>
+      return <DetailsPanel slug={slug} />
   }
 }

@@ -30,6 +30,7 @@ const api = {
   // listPapers default).
   listPapers: (options?: ListPapersOptions): Promise<PaperRecord[]> =>
     ipcRenderer.invoke('vellum:list-papers', options ?? {}),
+  getPaper: (slug: string): Promise<PaperRecord | null> => ipcRenderer.invoke('vellum:get-paper', slug),
   // [P1-10] Ask tab — grounded chat over ACP. -----------------------------
   // Open (or reload) the most recent chat session + history for a paper.
   askOpen: (slug: string): Promise<AskOpenResult> => ipcRenderer.invoke('vellum:ask-open', slug),

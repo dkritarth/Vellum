@@ -29,7 +29,7 @@ describe('runMigrations', () => {
     runMigrations(db)
 
     const version = db.pragma('user_version', { simple: true })
-    expect(version).toBe(1)
+    expect(version).toBe(2)
   })
 
   it('re-running is a no-op: applying twice does not error or reset data', () => {
@@ -44,7 +44,7 @@ describe('runMigrations', () => {
     runMigrations(db)
 
     const version = db.pragma('user_version', { simple: true })
-    expect(version).toBe(1)
+    expect(version).toBe(2)
 
     const row = db.prepare('SELECT * FROM papers WHERE slug = ?').get('a')
     expect(row).toBeTruthy()

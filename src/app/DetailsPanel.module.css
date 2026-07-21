@@ -1,0 +1,5 @@
+.panel { padding: 16px; color: var(--vellum-text, #eaeaea); font-size: 13px; line-height: 1.5; }
+.panel h2, .panel h3 { font-size: 14px; margin: 0 0 8px; }
+.panel p { margin: 0 0 10px; white-space: pre-wrap; }
+.panel ul { margin: 0; padding-left: 18px; }
+.placeholder { padding: 24px 16px; margin: 0; font-size: 13px; color: var(--vellum-text-dim, #8a8a8a); text-align: center; }

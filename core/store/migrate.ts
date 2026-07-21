@@ -20,7 +20,10 @@ export interface Migration {
 }
 
 /** Ordered migration list. Append new entries; never reorder or edit landed ones. */
-export const MIGRATIONS: Migration[] = [{ version: 1, sql: SCHEMA_V1 }]
+export const MIGRATIONS: Migration[] = [
+  { version: 1, sql: SCHEMA_V1 },
+  { version: 2, sql: 'ALTER TABLE papers ADD COLUMN summary TEXT;' },
+]
 
 /**
  * Apply every migration newer than the DB's current `user_version`, in

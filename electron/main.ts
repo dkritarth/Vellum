@@ -126,6 +126,10 @@ ipcMain.handle('vellum:list-papers', (_event, options: unknown): PaperRecord[] =
   return listPapers(getDb(), toListPapersOptions(options))
 })
 
+ipcMain.handle('vellum:get-paper', (_event, slug: unknown): PaperRecord | null => {
+  return getPaper(getDb(), requireSlug(slug, 'vellum:get-paper')) ?? null
+})
+
 // [P1-10] Ask tab — grounded chat over ACP. -------------------------------
 //
 // One ChatManager for the process lifetime: it caches an AcpSession per

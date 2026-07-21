@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+
+# build output
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# runtime data (papers, sqlite db) — Vellum starts empty
+data/
+
+# electron-builder artifacts
+release/
+
+# logs / env
+*.log
+.env
+.env.local
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# claude runtime
+.claude/worktrees/

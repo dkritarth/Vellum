@@ -13,6 +13,25 @@
 // This script deliberately does NOT run as part of `npm test` / CI — the
 // mocked unit tests in stdio-client.test.ts cover the transport logic
 // without requiring a live, signed-in adapter.
+//
+// Nested-session note: `claude-code-acp` refuses to launch when the
+// CLAUDECODE env var is set (i.e. when this smoke runs from inside a Claude
+// Code terminal/agent). StdioAcpClient now strips CLAUDECODE /
+// CLAUDE_CODE_SSE_PORT from the adapter's child env by default (see
+// `buildAdapterEnv` in stdio-client.ts), so this smoke no longer needs
+// `env -u CLAUDECODE` to pass when run nested. If you still hit the "cannot
+// be launched inside another Claude Code session" error, it means something
+// upstream of StdioAcpClient is re-adding CLAUDECODE to the environment —
+// as a manual workaround you can still re-run with `env -u CLAUDECODE npm
+// run smoke:acp`.
+//
+// Hang note: every ACP call StdioAcpClient makes (handshake + each turn) now
+// has a timeout (defaults: 60s handshake, 60s turn — see
+// StdioAcpClientTimeouts). The handshake budget is deliberately generous:
+// measured against a real cold-start claude-code-acp, `session/new` alone
+// legitimately takes ~16s (it loads a large skill/command set). A stalled
+// adapter still fails loud with a timeout error instead of hanging this
+// script forever; no external alarm/kill needed.
 
 import { StdioAcpClient } from './stdio-client.js'
 import type { AcpBackend } from './client.js'

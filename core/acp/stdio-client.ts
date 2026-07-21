@@ -53,9 +53,30 @@ const ADAPTERS: Record<AcpBackend, { command: string; args: string[] }> = {
  * ACP-agent script in place of the real adapter. */
 export type SpawnAdapter = (backend: AcpBackend) => AdapterChildProcess
 
+/** `claude-code-acp` refuses to launch when it sees `CLAUDECODE` set (the
+ * signal a parent process is itself a Claude Code session) — it hard-exits
+ * with "Claude Code cannot be launched inside another Claude Code session
+ * ... To bypass this check, unset the CLAUDECODE environment variable."
+ * That env var (and its companion `CLAUDE_CODE_SSE_PORT`) leaks into any
+ * child spawned from inside a Claude Code terminal — a developer shell, one
+ * of our own agents, or the smoke test itself — even though Vellum's own
+ * Electron process never sets it. Stripping both from the adapter's env
+ * makes the client robust to running nested, with no behavior change for
+ * the normal (non-nested) case. Everything else the adapter needs for auth
+ * (PATH, HOME, the CLI's own creds/config env) passes through untouched.
+ * Exported standalone so the stripping is unit-testable without a
+ * subprocess. */
+export function buildAdapterEnv(sourceEnv: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const { CLAUDECODE, CLAUDE_CODE_SSE_PORT, ...rest } = sourceEnv
+  return rest
+}
+
 const defaultSpawnAdapter: SpawnAdapter = (backend) => {
   const { command, args } = ADAPTERS[backend]
-  return spawn(command, args, { stdio: ['pipe', 'pipe', 'inherit'] }) as AdapterChildProcess
+  return spawn(command, args, {
+    stdio: ['pipe', 'pipe', 'inherit'],
+    env: buildAdapterEnv(),
+  }) as AdapterChildProcess
 }
 
 /** Maps a raw ACP `SessionUpdate` onto Vellum's `AcpUpdate` contract.
@@ -156,16 +177,61 @@ function childFailure(child: AdapterChildProcess, command: string, tracker: { me
   })
 }
 
+/** Per-operation timeout budgets. Both are optional constructor args with
+ * sane defaults — existing `new StdioAcpClient()` / `new
+ * StdioAcpClient(spawnAdapter)` callers are unaffected. */
+export interface StdioAcpClientTimeouts {
+  /** Budget for `initialize` + `session/new` before `newSession()` rejects
+   * and the child is killed. NOT shorter than the turn budget — measured
+   * against a real cold-start `claude-code-acp` (CLAUDECODE stripped):
+   * `initialize` returns in ~226ms, but `session/new` legitimately takes
+   * ~16.2s (it loads a large skill/command set — a huge
+   * `available_commands_update` dump, dozens of skills). A tighter budget
+   * here regresses a previously-working (if slow) path. Default leaves
+   * comfortable margin above that measured cold-start cost. */
+  handshakeMs?: number
+  /** Budget for a single `prompt()` turn (send to a terminal done/error)
+   * before it's force-failed with an `error` update and the child is
+   * killed. Guards against a stalled adapter (e.g. an errored codex-acp
+   * turn, or any other hang) leaving callers awaiting forever. */
+  turnMs?: number
+}
+
+const DEFAULT_HANDSHAKE_TIMEOUT_MS = 60_000
+const DEFAULT_TURN_TIMEOUT_MS = 60_000
+
+/** Rejects with `message` after `ms`. `cancel()` clears the underlying timer
+ * — always call it once the raced-against operation settles, otherwise the
+ * timer keeps the process alive and the rejection still fires (harmlessly,
+ * since nothing awaits it, but it's a leak). */
+function timeoutAfter(ms: number, message: string): { promise: Promise<never>; cancel(): void } {
+  let timer: ReturnType<typeof setTimeout>
+  const promise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms)
+  })
+  // Swallow-if-uncaught: if the raced-against operation wins, nothing ever
+  // awaits this promise, and an unhandled rejection would otherwise surface.
+  promise.catch(() => undefined)
+  return {
+    promise,
+    cancel: () => clearTimeout(timer),
+  }
+}
+
 class StdioAcpSession implements AcpSession {
   // Set only while a prompt() call is in flight — one prompt at a time per
   // session, mirroring the ACP protocol (a session has one active turn).
   private queue: UpdateQueue | undefined
   private disposed = false
+  // Set only while a prompt() call is in flight; cleared by dispose() too so
+  // an external dispose mid-turn doesn't leave a dangling timer.
+  private turnTimeout: { cancel(): void } | undefined
 
   constructor(
     private readonly connection: ClientSideConnection,
     private readonly sessionId: string,
     private readonly child: AdapterChildProcess,
+    private readonly turnMs: number,
   ) {}
 
   /** Routes a `session/update` notification to the in-flight prompt's queue,
@@ -184,27 +250,53 @@ class StdioAcpSession implements AcpSession {
     const queue = new UpdateQueue()
     this.queue = queue
 
+    let settled = false
+    const timeout = timeoutAfter(this.turnMs, `ACP turn timed out after ${this.turnMs}ms`)
+    this.turnTimeout = timeout
+
     this.connection
       .prompt({ sessionId: this.sessionId, prompt: toPromptBlocks(req) })
       .then((res) => {
+        if (settled) return
+        settled = true
+        timeout.cancel()
         queue.push({ kind: 'done', data: { stopReason: res.stopReason } })
         queue.close()
       })
       .catch((err: unknown) => {
+        if (settled) return
+        settled = true
+        timeout.cancel()
         queue.push({ kind: 'error', data: { message: err instanceof Error ? err.message : String(err) } })
         queue.close()
       })
+
+    // Turn timeout: if neither branch above settles first, force-fail the
+    // turn, dispose the child (a stalled adapter isn't going to recover mid
+    // process lifetime) so this and any future prompt on this session error
+    // out immediately rather than hang.
+    timeout.promise.catch((err: Error) => {
+      if (settled) return
+      settled = true
+      queue.push({ kind: 'error', data: { message: err.message } })
+      queue.close()
+      this.disposed = true
+      this.child.kill()
+    })
 
     try {
       yield* queue
     } finally {
       if (this.queue === queue) this.queue = undefined
+      if (this.turnTimeout === timeout) this.turnTimeout = undefined
     }
   }
 
   async dispose(): Promise<void> {
     if (this.disposed) return
     this.disposed = true
+    this.turnTimeout?.cancel()
+    this.turnTimeout = undefined
     this.queue?.close()
     this.queue = undefined
     this.child.kill()
@@ -214,13 +306,18 @@ class StdioAcpSession implements AcpSession {
 /** Real ACP transport: spawns the backend's first-party adapter subprocess
  * and drives it over stdio JSON-RPC via `@agentclientprotocol/sdk`. */
 export class StdioAcpClient implements AcpClient {
-  constructor(private readonly spawnAdapter: SpawnAdapter = defaultSpawnAdapter) {}
+  constructor(
+    private readonly spawnAdapter: SpawnAdapter = defaultSpawnAdapter,
+    private readonly timeouts: StdioAcpClientTimeouts = {},
+  ) {}
 
   async newSession(backend: AcpBackend): Promise<AcpSession> {
     const command = ADAPTERS[backend].command
     const child = this.spawnAdapter(backend)
     const tracker = describeChildFailure(child, command)
     const failure = childFailure(child, command, tracker)
+    const handshakeMs = this.timeouts.handshakeMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS
+    const handshake = timeoutAfter(handshakeMs, `ACP handshake timed out after ${handshakeMs}ms`)
 
     // Set once the session below is created; sessionUpdate notifications
     // that arrive before then (shouldn't happen pre-handshake) are dropped.
@@ -261,21 +358,32 @@ export class StdioAcpClient implements AcpClient {
           clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
         }),
         failure,
+        handshake.promise,
       ])
 
       const newSessionResult = await Promise.race([
         connection.newSession({ cwd: process.cwd(), mcpServers: [] }),
         failure,
+        handshake.promise,
       ])
-      session = new StdioAcpSession(connection, newSessionResult.sessionId, child)
+      handshake.cancel()
+      const turnMs = this.timeouts.turnMs ?? DEFAULT_TURN_TIMEOUT_MS
+      session = new StdioAcpSession(connection, newSessionResult.sessionId, child, turnMs)
       return session
     } catch (err) {
+      handshake.cancel()
       child.kill()
       // Whether the transport's generic "connection closed" error or the
       // child's own exit/spawn diagnostic wins the race above is a timing
       // accident. `failure` settles once the child actually exits/errors
       // (already underway, since something just made the connection fail) —
-      // wait for it so the more actionable child diagnostic wins.
+      // wait for it so the more actionable child diagnostic wins. A
+      // handshake timeout is its own clear diagnostic, so don't wait on
+      // `failure` for that case (the child may just sit there, never
+      // exiting, until `child.kill()` above takes effect).
+      if (err instanceof Error && err.message.startsWith('ACP handshake timed out')) {
+        throw err
+      }
       await failure.catch(() => undefined)
       const message = tracker.message()
       throw message ? new Error(message) : err

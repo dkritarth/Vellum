@@ -13,7 +13,7 @@ import type { Readable, Writable } from 'node:stream'
 import { describe, expect, it } from 'vitest'
 
 import type { AcpBackend, AcpUpdate } from './client.js'
-import { StdioAcpClient, mapSessionUpdate, type SpawnAdapter } from './stdio-client.js'
+import { StdioAcpClient, buildAdapterEnv, mapSessionUpdate, type SpawnAdapter } from './stdio-client.js'
 
 type AdapterChildProcess = ChildProcessByStdio<Writable, Readable, null>
 
@@ -39,6 +39,9 @@ rl.on('line', (line) => {
   if (!line.trim()) return
   const msg = JSON.parse(line)
   if (msg.method === 'initialize') {
+    // 'stall-handshake' never answers initialize, simulating a hung adapter
+    // before the handshake completes.
+    if (mode === 'stall-handshake') return
     send({ jsonrpc: '2.0', id: msg.id, result: { protocolVersion: 1, agentCapabilities: {} } })
   } else if (msg.method === 'session/new') {
     send({ jsonrpc: '2.0', id: msg.id, result: { sessionId: 'sess-1' } })
@@ -47,6 +50,9 @@ rl.on('line', (line) => {
       send({ jsonrpc: '2.0', id: msg.id, error: { code: -32000, message: 'boom' } })
       return
     }
+    // 'stall' never answers session/prompt, simulating an adapter that hangs
+    // mid-turn (e.g. an errored codex-acp turn, or any other stall).
+    if (mode === 'stall') return
     send({
       jsonrpc: '2.0',
       method: 'session/update',
@@ -155,5 +161,42 @@ describe('StdioAcpClient', () => {
 
     const updates = await collect(session.prompt({ text: 'hi after dispose' }))
     expect(updates).toEqual([{ kind: 'error', data: { message: 'session disposed' } }])
+  })
+
+  it('fails a stalled prompt() via the turn timeout instead of hanging forever', async () => {
+    const client = new StdioAcpClient(spawnFakeAgent('stall'), { turnMs: 50 })
+    const session = await client.newSession('claude')
+    try {
+      const updates = await collect(session.prompt({ text: 'hi' }))
+      expect(updates).toHaveLength(1)
+      expect(updates[0]).toEqual({ kind: 'error', data: { message: 'ACP turn timed out after 50ms' } })
+    } finally {
+      await session.dispose()
+    }
+  })
+
+  it('fails newSession() via the handshake timeout when the adapter never answers initialize', async () => {
+    const client = new StdioAcpClient(spawnFakeAgent('stall-handshake'), { handshakeMs: 50 })
+    await expect(client.newSession('claude')).rejects.toThrow('ACP handshake timed out after 50ms')
+  })
+})
+
+describe('buildAdapterEnv', () => {
+  it('strips CLAUDECODE and CLAUDE_CODE_SSE_PORT from the adapter child env', () => {
+    const sourceEnv = {
+      CLAUDECODE: '1',
+      CLAUDE_CODE_SSE_PORT: '54321',
+      PATH: '/usr/bin',
+      HOME: '/home/vellum',
+    }
+    const result = buildAdapterEnv(sourceEnv)
+    expect(result).not.toHaveProperty('CLAUDECODE')
+    expect(result).not.toHaveProperty('CLAUDE_CODE_SSE_PORT')
+    expect(result).toEqual({ PATH: '/usr/bin', HOME: '/home/vellum' })
+  })
+
+  it('leaves the env untouched when CLAUDECODE / CLAUDE_CODE_SSE_PORT are absent', () => {
+    const sourceEnv = { PATH: '/usr/bin' }
+    expect(buildAdapterEnv(sourceEnv)).toEqual({ PATH: '/usr/bin' })
   })
 })

@@ -49,6 +49,9 @@ export interface IngestMetadata {
   year?: number
   venue?: string
   abstract?: string
+  /** Bare ORCID ids positionally aligned to `authors`; fetch-only signal
+   * (Crossref), never agent-extracted. Undefined when the source has none. */
+  authorOrcids?: (string | null)[]
 }
 
 export interface IngestResult {
@@ -107,12 +110,31 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
   // the raw fetch-time metadata (arXiv/Crossref) for whatever the agent
   // didn't find, and finally to the classified input value so `title` is
   // never empty even in a fully degraded extraction.
+  const finalAuthors = extracted.metadata.authors ?? fetched.metadata?.authors ?? []
+
+  // ORCIDs are a fetch-only signal (Crossref), positionally aligned to
+  // fetched.metadata.authors — NOT to whatever the agent-extracted authors
+  // array ends up being. If the agent's author list wins and diverges from
+  // Crossref's (reorder, different formatting, truncation, extra/missing
+  // author), keeping the Crossref-aligned ORCIDs would attach badges to the
+  // wrong author. Only trust authorOrcids when the persisted authors array
+  // is content-equal (same length + order + strings) to the Crossref list
+  // it was aligned to; otherwise drop it (undefined -> DB column NULL). No
+  // fuzzy re-matching — conservative "aligned or nothing".
+  const fetchedAuthors = fetched.metadata?.authors
+  const authorsMatchFetched =
+    fetchedAuthors !== undefined &&
+    finalAuthors.length === fetchedAuthors.length &&
+    finalAuthors.every((a, i) => a === fetchedAuthors[i])
+  const authorOrcids = authorsMatchFetched ? fetched.metadata?.authorOrcids : undefined
+
   const metadata: IngestMetadata = {
     title: extracted.metadata.title ?? fetched.metadata?.title ?? classified.value,
-    authors: extracted.metadata.authors ?? fetched.metadata?.authors ?? [],
+    authors: finalAuthors,
     year: extracted.metadata.year ?? fetched.metadata?.year,
     venue: extracted.metadata.venue ?? fetched.metadata?.venue,
     abstract: extracted.metadata.abstract ?? fetched.metadata?.abstract,
+    authorOrcids,
   }
 
   const record: PaperRecord = {
@@ -129,6 +151,7 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
     pdfPath,
     sections: extracted.sections,
     addedAt: new Date().toISOString(),
+    authorOrcids: metadata.authorOrcids,
   }
   upsertPaper(options.db, record)
 

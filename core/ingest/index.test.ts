@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { AcpClient, AcpPromptRequest, AcpSession, AcpUpdate } from '../acp/client.js'
 import { getPaper, listPapers } from '../library/repo.js'
@@ -127,6 +127,110 @@ describe('ingest', () => {
       expect(result.metadata.authors).toEqual([])
     } finally {
       db.close()
+    }
+  })
+
+  // Shared Crossref fixture for the authorOrcids alignment tests below.
+  const CROSSREF_ORCID_BODY = JSON.stringify({
+    message: {
+      title: ['Crossref Title'],
+      author: [
+        { given: 'Ada', family: 'Lovelace', ORCID: 'http://orcid.org/0000-0002-1825-0097' },
+        { given: 'Alan', family: 'Turing' },
+      ],
+      published: { 'date-parts': [[2022, 1, 1]] },
+    },
+  })
+
+  function stubCrossrefFetch(pdfBytes: Buffer) {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes('api.crossref.org/works/')) {
+        return Promise.resolve(
+          new Response(CROSSREF_ORCID_BODY, {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+        )
+      }
+      if (url.startsWith('https://doi.org/')) {
+        return Promise.resolve(new Response(new Uint8Array(pdfBytes), { status: 200 }))
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+  }
+
+  it('drops authorOrcids when agent-extracted authors diverge from the Crossref list they were aligned to', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-'))
+    const db = openDb({ path: ':memory:' })
+    // AGENT_JSON's authors (['Agent Author']) differ from the Crossref
+    // fixture's authors (['Ada Lovelace', 'Alan Turing']) — agent authors win
+    // per the extracted-first merge, so the Crossref-aligned ORCIDs would
+    // misalign if kept.
+    const client = new FakeClient([textUpdate(AGENT_JSON), doneUpdate])
+    stubCrossrefFetch(readFileSync(FIXTURE_PDF))
+
+    try {
+      const result = await ingest('10.1234/orcid-divergent-test', { db, dataDir: tmpDir, client })
+
+      expect(result.metadata.authors).toEqual(['Agent Author'])
+      expect(result.metadata.authorOrcids).toBeUndefined()
+
+      const row = getPaper(db, result.slug)
+      expect(row?.authorOrcids).toBeUndefined()
+    } finally {
+      db.close()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('retains authorOrcids when agent-extracted authors are content-equal to the Crossref list', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-'))
+    const db = openDb({ path: ':memory:' })
+    const agentJsonMatchingCrossref = JSON.stringify({
+      sections: [{ title: 'Sample Paper Title', startOffset: 0, endOffset: 20 }],
+      metadata: {
+        title: 'Sample Paper Title (agent-refined)',
+        authors: ['Ada Lovelace', 'Alan Turing'],
+        year: 2026,
+      },
+    })
+    const client = new FakeClient([textUpdate(agentJsonMatchingCrossref), doneUpdate])
+    stubCrossrefFetch(readFileSync(FIXTURE_PDF))
+
+    try {
+      const result = await ingest('10.1234/orcid-aligned-test', { db, dataDir: tmpDir, client })
+
+      expect(result.metadata.authors).toEqual(['Ada Lovelace', 'Alan Turing'])
+      expect(result.metadata.authorOrcids).toEqual(['0000-0002-1825-0097', null])
+
+      const row = getPaper(db, result.slug)
+      expect(row?.authorOrcids).toEqual(['0000-0002-1825-0097', null])
+    } finally {
+      db.close()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('retains authorOrcids when the agent extracts no authors (falls back to the Crossref-aligned list)', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-'))
+    const db = openDb({ path: ':memory:' })
+    // Agent returns nothing usable -> extractPaper degrades to {}, so
+    // metadata.authors falls back to fetched.metadata.authors verbatim.
+    const client = new FakeClient([textUpdate('no json here'), doneUpdate])
+    stubCrossrefFetch(readFileSync(FIXTURE_PDF))
+
+    try {
+      const result = await ingest('10.1234/orcid-fallback-test', { db, dataDir: tmpDir, client })
+
+      expect(result.metadata.authors).toEqual(['Ada Lovelace', 'Alan Turing'])
+      expect(result.metadata.authorOrcids).toEqual(['0000-0002-1825-0097', null])
+
+      const row = getPaper(db, result.slug)
+      expect(row?.authorOrcids).toEqual(['0000-0002-1825-0097', null])
+    } finally {
+      db.close()
+      vi.unstubAllGlobals()
     }
   })
 

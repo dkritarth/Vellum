@@ -96,3 +96,16 @@ CREATE TABLE IF NOT EXISTS highlights (
 );
 CREATE INDEX IF NOT EXISTS idx_highlights_paper ON highlights(paper_slug);
 `
+
+// [P2-04] ORCID author badges. Authors stay a plain `authors TEXT` JSON
+// array (see SCHEMA_V1) — this migration does NOT touch that column. ORCIDs
+// live in a new, additive, nullable parallel column: a JSON array of
+// `(string | null)` entries, positionally aligned to `authors` (index i of
+// `author_orcids` is the ORCID for `authors[i]`, or null if that author's
+// ORCID is unknown). Existing rows get NULL (no backfill) — NULL means "no
+// ORCID data known for this paper," distinct from an array of all-null
+// entries ("we checked, none of these authors have an ORCID on file").
+// Same purely-additive shape as the v2 `summary` column.
+export const SCHEMA_V5_AUTHOR_ORCIDS = `
+ALTER TABLE papers ADD COLUMN author_orcids TEXT;
+`

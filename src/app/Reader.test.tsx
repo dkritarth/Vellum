@@ -10,7 +10,18 @@ import '@testing-library/jest-dom/vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { anchorFromRange, clampPage, clampScale, countOccurrences, rangeFromAnchor, Reader } from './Reader'
+import {
+  anchorFromRange,
+  buildReferenceIndex,
+  clampPage,
+  clampScale,
+  countOccurrences,
+  expandCitationNumbers,
+  injectCitationMarkers,
+  rangeFromAnchor,
+  Reader,
+  type ReferenceIndex,
+} from './Reader'
 
 interface FakePage {
   getViewport: () => { width: number; height: number }
@@ -125,6 +136,110 @@ describe('pure helpers', () => {
     expect(countOccurrences('Vellum reads PDFs. vellum is local-first.', 'vellum')).toBe(2)
     expect(countOccurrences('nothing here', 'xyz')).toBe(0)
     expect(countOccurrences('anything', '')).toBe(0)
+  })
+})
+
+describe('expandCitationNumbers [P2-03]', () => {
+  it('expands a single number', () => {
+    expect(expandCitationNumbers('4')).toEqual([4])
+  })
+
+  it('expands a comma-separated list', () => {
+    expect(expandCitationNumbers('1, 2, 3')).toEqual([1, 2, 3])
+  })
+
+  it('expands a dash range', () => {
+    expect(expandCitationNumbers('3-5')).toEqual([3, 4, 5])
+  })
+
+  it('expands a mix of bare numbers and ranges', () => {
+    expect(expandCitationNumbers('1, 3-5, 7')).toEqual([1, 3, 4, 5, 7])
+  })
+
+  it('drops malformed fragments rather than throwing', () => {
+    expect(expandCitationNumbers('1, x, 2')).toEqual([1, 2])
+  })
+
+  it('drops an oversized range instead of allocating it (garbled-PDF guard)', () => {
+    expect(expandCitationNumbers('1-999999999')).toEqual([])
+  })
+
+  it('still expands other well-formed fragments alongside a dropped oversized range', () => {
+    expect(expandCitationNumbers('1, 1-999999999, 2')).toEqual([1, 2])
+  })
+
+  it('expands a range right at the cap boundary', () => {
+    expect(expandCitationNumbers('1-101')).toHaveLength(101)
+  })
+})
+
+describe('buildReferenceIndex [P2-03]', () => {
+  it('maps reference numbers to the page they appear on with their citation text', () => {
+    const pages = [
+      ['This paper cites [1] and [2].'],
+      ['References'],
+      ['[1] Smith, J. Title A.', '[2] Doe, J. Title B.'],
+    ]
+
+    const index = buildReferenceIndex(pages)
+
+    expect(index.get(1)).toEqual({ number: 1, page: 3, text: 'Smith, J. Title A.' })
+    expect(index.get(2)).toEqual({ number: 2, page: 3, text: 'Doe, J. Title B.' })
+  })
+
+  it('finds a reference list sharing a page with its heading', () => {
+    const pages = [['Intro text.'], ['References', '[1] Smith, J. Title A.']]
+
+    const index = buildReferenceIndex(pages)
+
+    expect(index.get(1)).toEqual({ number: 1, page: 2, text: 'Smith, J. Title A.' })
+  })
+
+  it('returns an empty index when no references/bibliography heading is found', () => {
+    const pages = [['This paper cites [1] but has no reference list.']]
+
+    expect(buildReferenceIndex(pages).size).toBe(0)
+  })
+})
+
+describe('injectCitationMarkers [P2-03]', () => {
+  function buildContainer(text: string): HTMLDivElement {
+    const container = document.createElement('div')
+    const span = document.createElement('span')
+    span.textContent = text
+    container.appendChild(span)
+    document.body.appendChild(container)
+    return container
+  }
+
+  it('wraps a resolved [n] marker in a clickable button carrying its number', () => {
+    const container = buildContainer('Supported by prior work [1].')
+    const index: ReferenceIndex = new Map([[1, { number: 1, page: 3, text: 'Smith, J.' }]])
+
+    injectCitationMarkers(container, index)
+
+    const button = container.querySelector('button[data-citation-number="1"]')
+    expect(button).not.toBeNull()
+    expect(button?.textContent).toBe('[1]')
+    expect(container.textContent).toBe('Supported by prior work [1].')
+  })
+
+  it('leaves an unresolved [n] marker as plain text', () => {
+    const container = buildContainer('Cites [9] which has no reference entry.')
+    const index: ReferenceIndex = new Map([[1, { number: 1, page: 3, text: 'Smith, J.' }]])
+
+    injectCitationMarkers(container, index)
+
+    expect(container.querySelector('button')).toBeNull()
+    expect(container.textContent).toBe('Cites [9] which has no reference entry.')
+  })
+
+  it('does nothing when the reference index is empty (no references section found)', () => {
+    const container = buildContainer('Cites [1] before any index is built.')
+
+    injectCitationMarkers(container, new Map())
+
+    expect(container.querySelector('button')).toBeNull()
   })
 })
 
@@ -434,5 +549,126 @@ describe('Reader jump/flash seam [P2-02]', () => {
     })
 
     await waitFor(() => expect(rect.className.trim().split(/\s+/)).toHaveLength(1))
+  })
+})
+
+// Fake docs used by the [P2-03] inline citation click-through tests below —
+// distinct from `fakePdfDoc`/`PAGE_TEXT` above (which have no `[n]` markers
+// at all), so these override `getDocumentMock`'s return per-test.
+function citationPdfDoc(): unknown {
+  const pages = ['This claim is supported by prior work [1].', 'References\n[1] Author, A. Some Paper Title.']
+  return {
+    numPages: 2,
+    getPage: (pageNumber: number) =>
+      Promise.resolve({
+        getViewport: () => ({ width: 100, height: 100 }),
+        render: () => ({ promise: Promise.resolve() }),
+        getTextContent: () => Promise.resolve({ items: [{ str: pages[pageNumber - 1] ?? '' }] }),
+      }),
+    getOutline: () => Promise.resolve(null),
+  }
+}
+
+function noReferencesPdfDoc(): unknown {
+  const text = 'This claim cites [1] but there is no bibliography in this document.'
+  return {
+    numPages: 1,
+    getPage: () =>
+      Promise.resolve({
+        getViewport: () => ({ width: 100, height: 100 }),
+        render: () => ({ promise: Promise.resolve() }),
+        getTextContent: () => Promise.resolve({ items: [{ str: text }] }),
+      }),
+    getOutline: () => Promise.resolve(null),
+  }
+}
+
+async function findCitationMarker(container: HTMLElement, number: number): Promise<HTMLElement> {
+  const textLayer = getTextLayer(container)
+  return waitFor(() => {
+    const el = textLayer.querySelector(`[data-citation-number="${number}"]`)
+    expect(el).not.toBeNull()
+    return el as HTMLElement
+  })
+}
+
+describe('Reader inline citation click-through [P2-03]', () => {
+  it('renders a resolved [n] marker as a clickable button and jumps to its reference page on click', async () => {
+    getDocumentMock.mockReturnValue({ promise: Promise.resolve(citationPdfDoc()) })
+    const user = userEvent.setup()
+
+    const { container } = render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2'))
+
+    const marker = await findCitationMarker(container, 1)
+    expect(marker.tagName).toBe('BUTTON')
+
+    await user.click(marker)
+
+    await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('2 of 2'))
+  })
+
+  it('shows the reference text in a tooltip on hover', async () => {
+    getDocumentMock.mockReturnValue({ promise: Promise.resolve(citationPdfDoc()) })
+
+    const { container } = render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2'))
+
+    const marker = await findCitationMarker(container, 1)
+
+    fireEvent.mouseOver(marker)
+
+    await waitFor(() => expect(screen.getByRole('tooltip')).toHaveTextContent(/Author, A\. Some Paper Title\./))
+  })
+
+  it('leaves [n] markers as plain text when no references section is found (feature stays inert, no crash)', async () => {
+    getDocumentMock.mockReturnValue({ promise: Promise.resolve(noReferencesPdfDoc()) })
+
+    const { container } = render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 1'))
+
+    const textLayer = getTextLayer(container)
+    await waitFor(() => expect(textLayer.textContent).toContain('[1]'))
+    expect(textLayer.querySelector('button[data-citation-number]')).toBeNull()
+  })
+})
+
+describe('Reader highlight overlay + citation marker interaction [P2-02 x P2-03]', () => {
+  it('still resolves the highlight overlay rect after injectCitationMarkers splits the page text nodes', async () => {
+    // Page 1 text: "This claim is supported by prior work [1]." — a highlight
+    // anchored over "claim" (offsets 5..10) shares this page with a `[1]`
+    // citation marker that resolves against page 2's references. Regression
+    // for the highest-risk P2-02 x P2-03 interaction: `injectCitationMarkers`
+    // replaces the page's single text node with several (plain-text +
+    // button) nodes — `rangeFromAnchor`'s character-offset walk over the
+    // container's text nodes must still land on the same characters
+    // afterwards, since total text content is unchanged, just re-split.
+    getDocumentMock.mockReturnValue({ promise: Promise.resolve(citationPdfDoc()) })
+    const highlight = {
+      id: 'h1',
+      paperSlug: 'my-paper',
+      page: 1,
+      color: 'yellow',
+      quote: 'claim',
+      anchor: JSON.stringify({ start: 5, end: 10 }),
+      createdAt: 't',
+    }
+    window.vellum.highlightsList = vi.fn().mockResolvedValue([highlight])
+
+    const { container } = render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2'))
+
+    // Confirms the citation marker actually got injected (splitting the
+    // text node) before asserting the highlight overlay still resolves.
+    await findCitationMarker(container, 1)
+
+    const textLayer = getTextLayer(container)
+    expect(textLayer.textContent).toBe('This claim is supported by prior work [1].')
+
+    const overlayContainer = getOverlayContainer(container)
+    await waitFor(() => expect(overlayContainer.children.length).toBe(1))
+
+    const rect = overlayContainer.firstElementChild as HTMLElement
+    expect(rect.style.background).toBe('yellow')
   })
 })

@@ -21,6 +21,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { GlobalWorkerOptions, TextLayer, getDocument, type PDFDocumentProxy } from 'pdfjs-dist'
 import workerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url'
+import type { HighlightColor } from './ReaderToolbar'
+import type { HighlightRecord } from '../../core/highlights/repo'
 import styles from './Reader.module.css'
 
 GlobalWorkerOptions.workerSrc = workerSrc
@@ -53,6 +55,73 @@ export function countOccurrences(text: string, query: string): number {
     index = haystack.indexOf(needle, index + needle.length)
   }
   return count
+}
+
+/** [P2-02] Opaque anchor shape stored (JSON-stringified) as `HighlightRecord.anchor` —
+ * character offsets into the current page's text layer container, walking
+ * text nodes in DOM order. Re-locatable via `rangeFromAnchor` as long as the
+ * page's text layer renders the same text content in the same order (true
+ * for a fixed PDF page — scale/zoom only affects layout, not text-node
+ * order). Kept as plain offsets (not e.g. a CSS selector) so it survives
+ * across zoom levels without re-derivation. */
+export interface HighlightAnchor {
+  start: number
+  end: number
+}
+
+/**
+ * Serialize a DOM `Range` inside `container` into character offsets over
+ * `container`'s text nodes (document order) — the opaque anchor a highlight
+ * is stored under and later re-located from (`rangeFromAnchor`). Returns
+ * null if the range's start/end containers aren't found while walking
+ * `container`'s text nodes (e.g. the selection isn't actually inside it).
+ */
+export function anchorFromRange(container: Node, range: Range): HighlightAnchor | null {
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
+  let offset = 0
+  let start = -1
+  let end = -1
+  let node: Node | null = walker.nextNode()
+  while (node) {
+    const length = (node as Text).data.length
+    if (start === -1 && node === range.startContainer) start = offset + range.startOffset
+    if (node === range.endContainer) end = offset + range.endOffset
+    offset += length
+    node = walker.nextNode()
+  }
+  if (start === -1 || end === -1 || end <= start) return null
+  return { start, end }
+}
+
+/**
+ * Inverse of `anchorFromRange`: reconstruct a `Range` covering `anchor`'s
+ * character span inside `container`'s current text nodes. Returns null if
+ * the anchor no longer fits (e.g. the page re-rendered with different/less
+ * text than when the highlight was created) rather than throwing — a stale
+ * highlight should be silently skipped, not crash the reader.
+ */
+export function rangeFromAnchor(container: Node, anchor: HighlightAnchor): Range | null {
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
+  let offset = 0
+  let startSet = false
+  let endSet = false
+  const range = document.createRange()
+  let node: Node | null = walker.nextNode()
+  while (node && !(startSet && endSet)) {
+    const length = (node as Text).data.length
+    if (!startSet && anchor.start >= offset && anchor.start <= offset + length) {
+      range.setStart(node, anchor.start - offset)
+      startSet = true
+    }
+    if (!endSet && anchor.end >= offset && anchor.end <= offset + length) {
+      range.setEnd(node, anchor.end - offset)
+      endSet = true
+    }
+    offset += length
+    node = walker.nextNode()
+  }
+  if (!startSet || !endSet) return null
+  return range
 }
 
 export interface OutlineItem {
@@ -141,12 +210,34 @@ export async function searchDocument(pdf: PDFDocumentProxy, query: string): Prom
   return results
 }
 
+/** One highlight's rendered overlay rect, positioned relative to the text
+ * layer container (`pageLayer`'s coordinate space). */
+interface OverlayRect {
+  id: string
+  color: string
+  flash: boolean
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
 interface ReaderProps {
   /** Paper slug (data/papers/<slug>/). Undefined = no paper open (empty state). */
   slug?: string
+  /** [P2-02] Highlight tool state, lifted to App so ReaderToolbar (a sibling)
+   * can drive it. `undefined`/inactive = plain text selection, no capture. */
+  highlightTool?: { active: boolean; color: HighlightColor }
+  /** [P2-02] Jump seam: set by the Annotations tab (via App) to drive the
+   * reader to a highlight's page and briefly flash it. `nonce` makes
+   * re-jumping to the same target (clicked twice in a row) re-trigger the
+   * effect even though `page`/`highlightId` didn't change. */
+  jumpTarget?: { page: number; highlightId: string; nonce: number } | null
 }
 
-export function Reader({ slug }: ReaderProps): JSX.Element {
+const FLASH_DURATION_MS = 1500
+
+export function Reader({ slug, highlightTool, jumpTarget }: ReaderProps): JSX.Element {
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [numPages, setNumPages] = useState(0)
   const [pageNumber, setPageNumber] = useState(1)
@@ -159,6 +250,10 @@ export function Reader({ slug }: ReaderProps): JSX.Element {
   const [searchResults, setSearchResults] = useState<SearchMatch[]>([])
   const [searchIndex, setSearchIndex] = useState(0)
   const [searching, setSearching] = useState(false)
+  const [highlights, setHighlights] = useState<HighlightRecord[]>([])
+  const [textLayerVersion, setTextLayerVersion] = useState(0)
+  const [overlays, setOverlays] = useState<OverlayRect[]>([])
+  const [flashId, setFlashId] = useState<string | null>(null)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const textLayerRef = useRef<HTMLDivElement>(null)
@@ -175,6 +270,7 @@ export function Reader({ slug }: ReaderProps): JSX.Element {
     setSearchResults([])
     setSearchIndex(0)
     setError(null)
+    setHighlights([])
 
     if (!slug) return
 
@@ -202,10 +298,32 @@ export function Reader({ slug }: ReaderProps): JSX.Element {
       }
     })()
 
+    void window.vellum
+      .highlightsList(slug)
+      .then((records) => {
+        if (!cancelled) setHighlights(records)
+      })
+      .catch(() => {
+        if (!cancelled) setHighlights([])
+      })
+
     return () => {
       cancelled = true
     }
   }, [slug])
+
+  // Jump seam: drive the reader to a highlight's page and flash it briefly.
+  // Fires on every `jumpTarget` change (the caller bumps `nonce` so clicking
+  // the same annotation twice re-triggers the flash even though page/id
+  // didn't change).
+  useEffect(() => {
+    if (!jumpTarget) return
+    setPageNumber(clampPage(jumpTarget.page, numPages))
+    setFlashId(jumpTarget.highlightId)
+    const timer = setTimeout(() => setFlashId(null), FLASH_DURATION_MS)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- numPages intentionally excluded: re-clamping on every doc load isn't the intent, only on an actual jump request.
+  }, [jumpTarget])
 
   // Render the current page (canvas + selectable text layer) on page/zoom change.
   useEffect(() => {
@@ -243,6 +361,11 @@ export function Reader({ slug }: ReaderProps): JSX.Element {
           viewport,
         })
         await textLayer.render()
+        if (cancelled) return
+        // Bumps the overlay-recompute effect below — the text layer's DOM
+        // (needed to re-locate highlight anchors) only exists after this
+        // await resolves.
+        setTextLayerVersion((version) => version + 1)
       }
     })()
 
@@ -251,12 +374,80 @@ export function Reader({ slug }: ReaderProps): JSX.Element {
     }
   }, [doc, pageNumber, scale])
 
+  // Recompute highlight overlay rects whenever the highlight list, current
+  // page, or the rendered text layer itself changes. Anchors that no longer
+  // resolve (stale page content) are silently skipped — see `rangeFromAnchor`.
+  useEffect(() => {
+    const container = textLayerRef.current
+    if (!container) {
+      setOverlays([])
+      return
+    }
+
+    const next: OverlayRect[] = []
+    const containerRect = container.getBoundingClientRect()
+    for (const highlight of highlights) {
+      if (highlight.page !== pageNumber) continue
+      let anchor: HighlightAnchor
+      try {
+        anchor = JSON.parse(highlight.anchor) as HighlightAnchor
+      } catch {
+        continue
+      }
+      const range = rangeFromAnchor(container, anchor)
+      if (!range) continue
+      for (const rect of Array.from(range.getClientRects())) {
+        next.push({
+          id: highlight.id,
+          color: highlight.color,
+          flash: highlight.id === flashId,
+          left: rect.left - containerRect.left,
+          top: rect.top - containerRect.top,
+          width: rect.width,
+          height: rect.height,
+        })
+      }
+    }
+    setOverlays(next)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- textLayerVersion is the "has the DOM actually re-rendered" signal; highlights/pageNumber/flashId are the real deps.
+  }, [highlights, pageNumber, textLayerVersion, flashId])
+
   function goToPage(next: number): void {
     setPageNumber(clampPage(next, numPages))
   }
 
   function zoomBy(delta: number): void {
     setScale((current) => clampScale(current + delta))
+  }
+
+  // [P2-02] Highlight capture: when the highlight tool is active, a mouseup
+  // inside the text layer with a non-collapsed selection creates a
+  // highlight from that selection (page, quote, anchor) and clears the
+  // native selection so it doesn't linger visually once the overlay paints.
+  function handleTextLayerMouseUp(): void {
+    if (!highlightTool?.active || !slug) return
+    const selection = window.getSelection()
+    if (!selection || selection.isCollapsed || selection.rangeCount === 0) return
+
+    const container = textLayerRef.current
+    if (!container) return
+    const range = selection.getRangeAt(0)
+    if (!container.contains(range.commonAncestorContainer)) return
+
+    const quote = selection.toString().trim()
+    if (!quote) return
+    const anchor = anchorFromRange(container, range)
+    if (!anchor) return
+
+    const page = pageNumber
+    const color = highlightTool.color
+    void window.vellum
+      .highlightsCreate({ slug, page, color, quote, anchor: JSON.stringify(anchor) })
+      .then((record) => {
+        setHighlights((current) => [...current, record])
+        selection.removeAllRanges()
+      })
+      .catch(() => undefined)
   }
 
   async function runSearch(query: string): Promise<void> {
@@ -385,7 +576,27 @@ export function Reader({ slug }: ReaderProps): JSX.Element {
           {loading ? <p className={styles.loading}>Loading…</p> : null}
           <div className={styles.pageLayer}>
             <canvas ref={canvasRef} className={styles.canvas} />
-            <div ref={textLayerRef} className={styles.textLayer} />
+            <div
+              ref={textLayerRef}
+              className={styles.textLayer}
+              data-highlight-mode={highlightTool?.active ? 'active' : undefined}
+              onMouseUp={handleTextLayerMouseUp}
+            />
+            <div className={styles.highlightOverlay} aria-hidden="true">
+              {overlays.map((overlay, index) => (
+                <div
+                  key={`${overlay.id}-${index}`}
+                  className={overlay.flash ? `${styles.highlightRect} ${styles.highlightRectFlash}` : styles.highlightRect}
+                  style={{
+                    left: overlay.left,
+                    top: overlay.top,
+                    width: overlay.width,
+                    height: overlay.height,
+                    background: overlay.color,
+                  }}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>

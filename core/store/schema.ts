@@ -74,3 +74,25 @@ CREATE TABLE IF NOT EXISTS notes (
   updated_at  TEXT NOT NULL
 );
 `
+
+// [P2-02] Highlight tool + Annotations tab: multiple highlights per paper, so
+// (unlike notes) this table uses a synthetic caller-supplied `id` rather than
+// `paper_slug` as the primary key. `anchor` is an opaque JSON string produced
+// by the renderer's text-layer selection logic (offsets etc.) — this module
+// stores it verbatim and never parses it, same "state vs. content" boundary
+// as everywhere else in this file. `ON DELETE CASCADE` on the papers FK means
+// purging a paper drops its highlights automatically (coordinate the on-disk
+// side, if any, with the file layer — this table has none, highlights are
+// pure DB state referencing paper.pdf pages).
+export const SCHEMA_V4_HIGHLIGHTS = `
+CREATE TABLE IF NOT EXISTS highlights (
+  id          TEXT PRIMARY KEY,
+  paper_slug  TEXT NOT NULL REFERENCES papers(slug) ON DELETE CASCADE,
+  page        INTEGER NOT NULL,
+  color       TEXT NOT NULL,
+  quote       TEXT NOT NULL,
+  anchor      TEXT NOT NULL,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_highlights_paper ON highlights(paper_slug);
+`

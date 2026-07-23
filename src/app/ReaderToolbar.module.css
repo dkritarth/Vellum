@@ -33,3 +33,16 @@
   background: var(--vellum-surface-hover, #222222);
   color: var(--vellum-text, #eaeaea);
 }
+
+.colorSwatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.colorSwatchActive {
+  border-color: var(--vellum-text, #eaeaea);
+}

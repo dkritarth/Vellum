@@ -17,6 +17,8 @@ import { getPaper, listPapers } from '../core/library/repo.js'
 import type { ListPapersOptions, PaperRecord, PaperSortColumn } from '../core/library/repo.js'
 import { deleteNote, getNote, upsertNote } from '../core/notes/repo.js'
 import type { NoteRecord } from '../core/notes/repo.js'
+import { createHighlight, deleteHighlight, listHighlights } from '../core/highlights/repo.js'
+import type { HighlightRecord } from '../core/highlights/repo.js'
 import { openDb } from '../core/store/db.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -163,6 +165,65 @@ ipcMain.handle('vellum:notes-save', (_event, params: unknown): NoteRecord => {
 // has no note yet.
 ipcMain.handle('vellum:notes-delete', (_event, slug: unknown): void => {
   deleteNote(getDb(), requireSlug(slug, 'vellum:notes-delete'))
+})
+
+// [P2-02] Highlight tool + Annotations tab. ---------------------------------
+//
+// `id`/`createdAt` are stamped here (not by the renderer) — same convention
+// as `vellum:ask-start`'s requestId — so storage stays deterministic and
+// testable (core/highlights/repo.ts takes both as caller-supplied input).
+// `anchor`/`quote`/`color` are opaque strings from the renderer's text-layer
+// selection logic; validated only for type/shape, never parsed here.
+function parseHighlightsCreateParams(value: unknown): {
+  slug: string
+  page: number
+  color: string
+  quote: string
+  anchor: string
+} {
+  if (typeof value !== 'object' || value === null) {
+    throw new Error('vellum:highlights-create: params must be an object')
+  }
+  const candidate = value as Record<string, unknown>
+  const page = candidate['page']
+  if (typeof page !== 'number' || !Number.isInteger(page) || page < 1) {
+    throw new Error('vellum:highlights-create: page must be a positive integer')
+  }
+  const color = candidate['color']
+  const quote = candidate['quote']
+  const anchor = candidate['anchor']
+  if (typeof color !== 'string' || typeof quote !== 'string' || typeof anchor !== 'string') {
+    throw new Error('vellum:highlights-create: color, quote, and anchor must be strings')
+  }
+  return { slug: requireSlug(candidate['slug'], 'vellum:highlights-create'), page, color, quote, anchor }
+}
+
+ipcMain.handle('vellum:highlights-create', (_event, params: unknown): HighlightRecord => {
+  const { slug, page, color, quote, anchor } = parseHighlightsCreateParams(params)
+  return createHighlight(getDb(), {
+    id: randomUUID(),
+    paperSlug: slug,
+    page,
+    color,
+    quote,
+    anchor,
+    createdAt: new Date().toISOString(),
+  })
+})
+
+ipcMain.handle('vellum:highlights-list', (_event, slug: unknown): HighlightRecord[] => {
+  return listHighlights(getDb(), requireSlug(slug, 'vellum:highlights-list'))
+})
+
+function requireNonEmptyId(value: unknown, channel: string): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error(`${channel}: id must be a non-empty string`)
+  }
+  return value
+}
+
+ipcMain.handle('vellum:highlights-delete', (_event, id: unknown): void => {
+  deleteHighlight(getDb(), requireNonEmptyId(id, 'vellum:highlights-delete'))
 })
 
 // [P1-10] Ask tab — grounded chat over ACP. -------------------------------

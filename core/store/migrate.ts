@@ -12,7 +12,7 @@
 
 import type { Database } from 'better-sqlite3'
 
-import { SCHEMA_V1 } from './schema.js'
+import { SCHEMA_V1, SCHEMA_V3_NOTES } from './schema.js'
 
 export interface Migration {
   version: number
@@ -23,6 +23,7 @@ export interface Migration {
 export const MIGRATIONS: Migration[] = [
   { version: 1, sql: SCHEMA_V1 },
   { version: 2, sql: 'ALTER TABLE papers ADD COLUMN summary TEXT;' },
+  { version: 3, sql: SCHEMA_V3_NOTES }, // [P2-01] notes table
 ]
 
 /**

@@ -3,6 +3,7 @@ import type { IpcRendererEvent } from 'electron'
 import type { AskOpenResult, AskStartParams, AskStreamEvent } from '../core/chat/manager.js'
 import type { IngestResult } from '../core/ingest/index.js'
 import type { ListPapersOptions, PaperRecord } from '../core/library/repo.js'
+import type { NoteRecord } from '../core/notes/repo.js'
 import type { AcpBackend } from '../core/acp/client.js'
 
 export interface AskUpdatePayload {
@@ -31,6 +32,15 @@ const api = {
   listPapers: (options?: ListPapersOptions): Promise<PaperRecord[]> =>
     ipcRenderer.invoke('vellum:list-papers', options ?? {}),
   getPaper: (slug: string): Promise<PaperRecord | null> => ipcRenderer.invoke('vellum:get-paper', slug),
+  // [P2-01] Notes tab — one freeform markdown note per paper. `notesGet`
+  // resolves null when the paper has no note yet (empty-editor state).
+  // `notesSave` is autosave's persistence half — upsert-by-paper-slug, so the
+  // renderer never juggles a note id.
+  notesGet: (slug: string): Promise<NoteRecord | null> => ipcRenderer.invoke('vellum:notes-get', slug),
+  notesSave: (params: { slug: string; body: string }): Promise<NoteRecord> =>
+    ipcRenderer.invoke('vellum:notes-save', params),
+  // Delete half of Notes CRUD — "Clear note" action.
+  notesDelete: (slug: string): Promise<void> => ipcRenderer.invoke('vellum:notes-delete', slug),
   // [P1-10] Ask tab — grounded chat over ACP. -----------------------------
   // Open (or reload) the most recent chat session + history for a paper.
   askOpen: (slug: string): Promise<AskOpenResult> => ipcRenderer.invoke('vellum:ask-open', slug),

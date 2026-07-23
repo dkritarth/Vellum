@@ -163,3 +163,28 @@
   overflow: hidden;
   line-height: 1;
 }
+
+.textLayer[data-highlight-mode='active'] {
+  cursor: text;
+}
+
+/* [P2-02] Highlight overlays — one .highlightRect per selection-derived
+   client rect, absolutely positioned atop the (invisible) text layer spans
+   they cover. `pointer-events: none` on the container so overlays never
+   intercept new selections/clicks meant for the text layer beneath them. */
+.highlightOverlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.highlightRect {
+  position: absolute;
+  opacity: 0.35;
+  mix-blend-mode: multiply;
+}
+
+.highlightRectFlash {
+  opacity: 0.65;
+  outline: 2px solid var(--vellum-text, #eaeaea);
+}

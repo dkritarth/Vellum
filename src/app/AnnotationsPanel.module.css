@@ -1,0 +1,77 @@
+.annotationsPanel {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--vellum-border, #2a2a2a);
+}
+
+.rowMain {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--vellum-text, #eaeaea);
+  text-align: left;
+  padding: 10px 8px;
+  cursor: pointer;
+}
+
+.rowMain:hover {
+  background: var(--vellum-surface-hover, #222222);
+}
+
+.swatch {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.quote {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.page {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--vellum-text-dim, #8a8a8a);
+}
+
+.deleteButton {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--vellum-text-dim, #8a8a8a);
+  font-size: 16px;
+  line-height: 1;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.deleteButton:hover {
+  color: var(--vellum-text, #eaeaea);
+}
+
+.placeholder {
+  padding: 24px 16px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--vellum-text-dim, #8a8a8a);
+  text-align: center;
+}

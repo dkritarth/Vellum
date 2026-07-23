@@ -35,6 +35,11 @@ beforeEach(() => {
       // state without asserting on it.
       askOpen: vi.fn(() => new Promise(() => {})),
       onAskUpdate: vi.fn(() => () => {}),
+      // [P2-02] Reader/AnnotationsPanel both load a paper's highlights once
+      // opened — this test only cares about tab/pane shell behavior.
+      highlightsList: vi.fn().mockResolvedValue([]),
+      highlightsCreate: vi.fn(),
+      highlightsDelete: vi.fn().mockResolvedValue(undefined),
     },
   })
 })

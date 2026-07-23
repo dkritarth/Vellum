@@ -27,6 +27,7 @@ describe('runMigrations', () => {
         'chat_sessions',
         'chat_messages',
         'notes',
+        'highlights',
       ]),
     )
   })
@@ -36,7 +37,19 @@ describe('runMigrations', () => {
     runMigrations(db)
 
     const version = db.pragma('user_version', { simple: true })
-    expect(version).toBe(3)
+    expect(version).toBe(4)
+  })
+
+  it('creates the highlights table index', () => {
+    db = new Database(':memory:')
+    runMigrations(db)
+
+    const indexes = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'highlights'")
+      .all()
+      .map((row) => (row as { name: string }).name)
+
+    expect(indexes).toContain('idx_highlights_paper')
   })
 
   it('re-running is a no-op: applying twice does not error or reset data', () => {
@@ -51,7 +64,7 @@ describe('runMigrations', () => {
     runMigrations(db)
 
     const version = db.pragma('user_version', { simple: true })
-    expect(version).toBe(3)
+    expect(version).toBe(4)
 
     const row = db.prepare('SELECT * FROM papers WHERE slug = ?').get('a')
     expect(row).toBeTruthy()

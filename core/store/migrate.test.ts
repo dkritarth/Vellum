@@ -20,7 +20,14 @@ describe('runMigrations', () => {
       .map((row) => (row as { name: string }).name)
 
     expect(tables).toEqual(
-      expect.arrayContaining(['papers', 'collections', 'paper_collections', 'chat_sessions', 'chat_messages']),
+      expect.arrayContaining([
+        'papers',
+        'collections',
+        'paper_collections',
+        'chat_sessions',
+        'chat_messages',
+        'notes',
+      ]),
     )
   })
 
@@ -29,7 +36,7 @@ describe('runMigrations', () => {
     runMigrations(db)
 
     const version = db.pragma('user_version', { simple: true })
-    expect(version).toBe(2)
+    expect(version).toBe(3)
   })
 
   it('re-running is a no-op: applying twice does not error or reset data', () => {
@@ -44,7 +51,7 @@ describe('runMigrations', () => {
     runMigrations(db)
 
     const version = db.pragma('user_version', { simple: true })
-    expect(version).toBe(2)
+    expect(version).toBe(3)
 
     const row = db.prepare('SELECT * FROM papers WHERE slug = ?').get('a')
     expect(row).toBeTruthy()

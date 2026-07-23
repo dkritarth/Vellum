@@ -17,6 +17,12 @@ export interface PaperRecord {
   slug: string
   title: string
   authors: string[]
+  /** [P2-04] ORCIDs positionally aligned to `authors` — entry `i` is the bare
+   * ORCID id (e.g. `0000-0002-1825-0097`) for `authors[i]`, or `null` when
+   * that specific author's ORCID is unknown. `undefined` when no ORCID data
+   * is known for this paper at all (column is NULL — predates this feature
+   * or was never supplied), as distinct from an array of all-null entries. */
+  authorOrcids?: (string | null)[]
   year?: number
   venue?: string
   doi?: string
@@ -34,6 +40,7 @@ interface PaperRow {
   slug: string
   title: string
   authors: string | null
+  author_orcids: string | null
   year: number | null
   venue: string | null
   doi: string | null
@@ -51,6 +58,9 @@ function toRecord(row: PaperRow): PaperRecord {
     slug: row.slug,
     title: row.title,
     authors: row.authors ? (JSON.parse(row.authors) as string[]) : [],
+    authorOrcids: row.author_orcids
+      ? (JSON.parse(row.author_orcids) as (string | null)[])
+      : undefined,
     year: row.year ?? undefined,
     venue: row.venue ?? undefined,
     doi: row.doi ?? undefined,
@@ -71,25 +81,27 @@ function toRecord(row: PaperRow): PaperRecord {
  */
 export function upsertPaper(db: Database, paper: PaperRecord): void {
   db.prepare(
-    `INSERT INTO papers (slug, title, authors, year, venue, doi, arxiv_id, abstract, summary, md_path, pdf_path, sections, added_at)
-     VALUES (@slug, @title, @authors, @year, @venue, @doi, @arxivId, @abstract, @summary, @mdPath, @pdfPath, @sections, @addedAt)
+    `INSERT INTO papers (slug, title, authors, author_orcids, year, venue, doi, arxiv_id, abstract, summary, md_path, pdf_path, sections, added_at)
+     VALUES (@slug, @title, @authors, @authorOrcids, @year, @venue, @doi, @arxivId, @abstract, @summary, @mdPath, @pdfPath, @sections, @addedAt)
      ON CONFLICT(slug) DO UPDATE SET
-       title     = excluded.title,
-       authors   = excluded.authors,
-       year      = excluded.year,
-       venue     = excluded.venue,
-       doi       = excluded.doi,
-       arxiv_id  = excluded.arxiv_id,
-       abstract  = excluded.abstract,
-       summary   = excluded.summary,
-       md_path   = excluded.md_path,
-       pdf_path  = excluded.pdf_path,
-       sections  = excluded.sections,
-       added_at  = excluded.added_at`,
+       title         = excluded.title,
+       authors       = excluded.authors,
+       author_orcids = excluded.author_orcids,
+       year          = excluded.year,
+       venue         = excluded.venue,
+       doi           = excluded.doi,
+       arxiv_id      = excluded.arxiv_id,
+       abstract      = excluded.abstract,
+       summary       = excluded.summary,
+       md_path       = excluded.md_path,
+       pdf_path      = excluded.pdf_path,
+       sections      = excluded.sections,
+       added_at      = excluded.added_at`,
   ).run({
     slug: paper.slug,
     title: paper.title,
     authors: JSON.stringify(paper.authors ?? []),
+    authorOrcids: paper.authorOrcids !== undefined ? JSON.stringify(paper.authorOrcids) : null,
     year: paper.year ?? null,
     venue: paper.venue ?? null,
     doi: paper.doi ?? null,

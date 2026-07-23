@@ -37,7 +37,19 @@ describe('runMigrations', () => {
     runMigrations(db)
 
     const version = db.pragma('user_version', { simple: true })
-    expect(version).toBe(4)
+    expect(version).toBe(5)
+  })
+
+  it('adds the author_orcids column to papers [P2-04]', () => {
+    db = new Database(':memory:')
+    runMigrations(db)
+
+    const columns = db
+      .prepare("PRAGMA table_info(papers)")
+      .all()
+      .map((row) => (row as { name: string }).name)
+
+    expect(columns).toContain('author_orcids')
   })
 
   it('creates the highlights table index', () => {
@@ -64,7 +76,7 @@ describe('runMigrations', () => {
     runMigrations(db)
 
     const version = db.pragma('user_version', { simple: true })
-    expect(version).toBe(4)
+    expect(version).toBe(5)
 
     const row = db.prepare('SELECT * FROM papers WHERE slug = ?').get('a')
     expect(row).toBeTruthy()

@@ -31,6 +31,19 @@ const CROSSREF_FIXTURE = {
   },
 }
 
+const CROSSREF_FIXTURE_WITH_ORCIDS = {
+  message: {
+    title: ['ORCID-Bearing Paper'],
+    author: [
+      { given: 'Ada', family: 'Lovelace', ORCID: 'http://orcid.org/0000-0002-1825-0097' },
+      { given: 'Alan', family: 'Turing' },
+      { given: 'Grace', family: 'Hopper', ORCID: 'https://orcid.org/0000-0001-5109-3700/' },
+    ],
+    published: { 'date-parts': [[2023, 1, 1]] },
+    'container-title': ['Journal of Reproducible Authorship'],
+  },
+}
+
 describe('fetchSource', () => {
   let fetchMock: ReturnType<typeof vi.fn>
 
@@ -67,6 +80,7 @@ describe('fetchSource', () => {
       venue: 'NeurIPS 2024',
       abstract: 'This paper revisits attention mechanisms.',
     })
+    expect(result.metadata?.authorOrcids).toBeUndefined()
 
     const calledUrls = fetchMock.mock.calls.map((c) => String(c[0]))
     expect(calledUrls.some((u) => u.includes('id_list=2401.12345'))).toBe(true)
@@ -103,11 +117,43 @@ describe('fetchSource', () => {
       venue: 'Journal of Made-Up Science',
       abstract: 'A survey of things.',
     })
+    expect(result.metadata?.authorOrcids).toBeUndefined()
 
     const calledUrls = fetchMock.mock.calls.map((c) => String(c[0]))
     expect(
       calledUrls.some((u) => u.includes('api.crossref.org/works/10.1038%2Fs41586-021-03819-2')),
     ).toBe(true)
+  })
+
+  it('extracts and bare-normalizes ORCIDs from Crossref, positionally aligned with nulls for authors with none', async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url.includes('api.crossref.org/works/')) {
+        return Promise.resolve(
+          new Response(JSON.stringify(CROSSREF_FIXTURE_WITH_ORCIDS), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+        )
+      }
+      if (url.startsWith('https://doi.org/')) {
+        return Promise.resolve(new Response(new Uint8Array([1]), { status: 200 }))
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+
+    const input: ClassifiedInput = {
+      kind: 'doi',
+      slug: 'doi-orcid-test',
+      value: '10.1/orcid-test',
+    }
+    const result = await fetchSource(input)
+
+    expect(result.metadata?.authors).toEqual(['Ada Lovelace', 'Alan Turing', 'Grace Hopper'])
+    expect(result.metadata?.authorOrcids).toEqual([
+      '0000-0002-1825-0097',
+      null,
+      '0000-0001-5109-3700',
+    ])
   })
 
   it('fetches raw PDF bytes for a direct pdf_url with no metadata', async () => {

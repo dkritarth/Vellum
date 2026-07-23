@@ -18,11 +18,12 @@
 // No paper/slug is wired up yet (library + open-in-tab land in later P1
 // cards), so `slug` is optional and undefined by default — the empty state
 // below is what App.tsx shows today.
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { GlobalWorkerOptions, TextLayer, getDocument, type PDFDocumentProxy } from 'pdfjs-dist'
 import workerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import type { HighlightColor } from './ReaderToolbar'
 import type { HighlightRecord } from '../../core/highlights/repo'
+import { CitationTooltip } from './CitationTooltip'
 import styles from './Reader.module.css'
 
 GlobalWorkerOptions.workerSrc = workerSrc
@@ -210,6 +211,188 @@ export async function searchDocument(pdf: PDFDocumentProxy, query: string): Prom
   return results
 }
 
+// ---------------------------------------------------------------------------
+// [P2-03] Inline citation click-through.
+//
+// References are not structured data anywhere in a PDF — the only signal is
+// the raw per-page text pdf.js's text layer already extracts. Detection is
+// therefore two passes over that text, both pure/DOM-free (unit-testable
+// without rendering anything):
+//
+//   1. `buildReferenceIndex` scans a loaded document's per-page text once
+//      (on doc load, memoized in Reader's `referenceIndex` state — never
+//      rescanned on page/zoom changes) for a "References"/"Bibliography"
+//      heading, then parses `[n] ...` entries on/after that page into a
+//      number → { page, text } map.
+//   2. `injectCitationMarkers` runs after each page's text layer renders and
+//      wraps `[n]`/`[n, m]`/`[n-m]`-shaped substrings whose number(s) resolve
+//      in that index in a clickable `<button>` — everything else (including
+//      unresolved markers, when no references section was found at all)
+//      stays plain text, so a paper with no detectable bibliography is
+//      simply inert rather than broken.
+// ---------------------------------------------------------------------------
+
+/** One parsed reference-list entry: the number `[n]` was defined under, the
+ * (1-based) page it was found on, and its trailing citation text (used for
+ * the hover tooltip). */
+export interface ReferenceEntry {
+  number: number
+  page: number
+  text: string
+}
+
+/** Reference number → its entry. Empty when no references/bibliography
+ * section was found (or the document has none) — callers treat an empty
+ * index as "feature inert", not an error. */
+export type ReferenceIndex = Map<number, ReferenceEntry>
+
+/** Matches an inline citation marker's bracket contents: a single number, a
+ * comma-separated list (`1, 2`), a dash range (`3-5`), or any mix of those
+ * (`1, 3-5, 7`). Capture group 1 is the raw contents between the brackets. */
+const INLINE_CITATION_REGEX = /\[(\d+(?:\s*[-,]\s*\d+)*)\]/g
+
+/** A page-local text heading that marks the start of the reference list.
+ * Checked against a single text item's trimmed content (headings are
+ * typically their own text-layer item), not a whole page's joined text. */
+const REFERENCES_HEADING_REGEX = /^(references|bibliography)$/i
+
+/** Largest `[n-m]` range span (inclusive) `expandCitationNumbers` will
+ * expand. A garbled PDF's text layer can produce nonsense like
+ * `[1-999999999]`; without a cap that would synchronously allocate a
+ * near-billion-element array inside a render-effect and hang the UI.
+ * Reference lists are never remotely this large, so any range wider than
+ * this is treated as garbage and dropped entirely (not clamped — clamping
+ * would silently attach the marker to a wrong/arbitrary reference). */
+const MAX_CITATION_RANGE_SPAN = 100
+
+/**
+ * Expand a citation marker's raw bracket contents (e.g. `"3-5"`, `"1, 2"`,
+ * `"1, 3-5, 7"`) into the individual reference numbers it covers. Malformed
+ * fragments (neither a bare number nor a `n-m` range) are silently dropped
+ * rather than throwing, as is any range wider than `MAX_CITATION_RANGE_SPAN`
+ * (garbled-PDF guard — see that constant's doc comment).
+ */
+export function expandCitationNumbers(raw: string): number[] {
+  const numbers: number[] = []
+  for (const part of raw.split(',')) {
+    const trimmed = part.trim()
+    const range = trimmed.match(/^(\d+)\s*-\s*(\d+)$/)
+    if (range) {
+      const start = Number(range[1])
+      const end = Number(range[2])
+      if (end - start > MAX_CITATION_RANGE_SPAN) continue
+      for (let n = start; n <= end; n += 1) numbers.push(n)
+    } else if (/^\d+$/.test(trimmed)) {
+      numbers.push(Number(trimmed))
+    }
+  }
+  return numbers
+}
+
+/**
+ * Build a reference index from a document's per-page text, given as one
+ * string array per page (the order `page.getTextContent()`'s `items`
+ * naturally come in — Reader passes each item's `.str`). Finds the first
+ * page whose text contains a standalone "References"/"Bibliography"
+ * heading, then parses `[n] ...` entries from that page onward (a heading
+ * and its list commonly share a page). The first occurrence of a given
+ * number wins if a reference is (mis-)detected more than once. Returns an
+ * empty map — not an error — when no heading is found at all.
+ */
+export function buildReferenceIndex(pages: string[][]): ReferenceIndex {
+  const index: ReferenceIndex = new Map()
+
+  let startPage = -1
+  outer: for (let i = 0; i < pages.length; i += 1) {
+    for (const item of pages[i]) {
+      for (const line of item.split(/\r?\n/)) {
+        if (REFERENCES_HEADING_REGEX.test(line.trim())) {
+          startPage = i
+          break outer
+        }
+      }
+    }
+  }
+  if (startPage === -1) return index
+
+  const entryStartRegex = /\[(\d+)\]\s*/g
+  for (let i = startPage; i < pages.length; i += 1) {
+    const pageText = pages[i].join(' ')
+    entryStartRegex.lastIndex = 0
+    const starts: Array<{ number: number; markerStart: number; contentStart: number }> = []
+    let match: RegExpExecArray | null
+    while ((match = entryStartRegex.exec(pageText))) {
+      starts.push({ number: Number(match[1]), markerStart: match.index, contentStart: entryStartRegex.lastIndex })
+    }
+    for (let s = 0; s < starts.length; s += 1) {
+      const current = starts[s]
+      const next = starts[s + 1]
+      const text = pageText.slice(current.contentStart, next ? next.markerStart : undefined).trim()
+      if (!index.has(current.number)) {
+        index.set(current.number, { number: current.number, page: i + 1, text })
+      }
+    }
+  }
+
+  return index
+}
+
+/**
+ * Walk `container`'s text nodes (as rendered by pdf.js's `TextLayer`, one
+ * `<span>` per text item) and replace any `[n]`/`[n, m]`/`[n-m]` marker whose
+ * number(s) resolve in `referenceIndex` with a `<button data-citation-number
+ * ="n">` carrying the same visible text — a plain-DOM-mutation seam, tested
+ * without rendering pdf.js. Markers whose number(s) don't resolve (including
+ * every marker when `referenceIndex` is empty — no references section
+ * found) are left untouched as plain text. Total text content is preserved
+ * exactly, so callers that re-derive character offsets over the container
+ * (e.g. highlight anchors) keep working unaffected.
+ */
+export function injectCitationMarkers(container: HTMLElement, referenceIndex: ReferenceIndex): void {
+  if (referenceIndex.size === 0) return
+
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
+  const textNodes: Text[] = []
+  let node: Node | null = walker.nextNode()
+  while (node) {
+    textNodes.push(node as Text)
+    node = walker.nextNode()
+  }
+
+  for (const textNode of textNodes) {
+    const data = textNode.data
+    INLINE_CITATION_REGEX.lastIndex = 0
+    const matches: Array<{ index: number; length: number; primary: number }> = []
+    let match: RegExpExecArray | null
+    while ((match = INLINE_CITATION_REGEX.exec(data))) {
+      const numbers = expandCitationNumbers(match[1])
+      const primary = numbers.find((n) => referenceIndex.has(n))
+      if (primary !== undefined) matches.push({ index: match.index, length: match[0].length, primary })
+    }
+    if (matches.length === 0) continue
+
+    const parent = textNode.parentNode
+    if (!parent) continue
+
+    const fragment = document.createDocumentFragment()
+    let cursor = 0
+    for (const m of matches) {
+      if (m.index > cursor) fragment.appendChild(document.createTextNode(data.slice(cursor, m.index)))
+      const raw = data.slice(m.index, m.index + m.length)
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = styles.citationMarker
+      button.textContent = raw
+      button.setAttribute('data-citation-number', String(m.primary))
+      button.setAttribute('aria-label', `Jump to reference ${m.primary}`)
+      fragment.appendChild(button)
+      cursor = m.index + m.length
+    }
+    if (cursor < data.length) fragment.appendChild(document.createTextNode(data.slice(cursor)))
+    parent.replaceChild(fragment, textNode)
+  }
+}
+
 /** One highlight's rendered overlay rect, positioned relative to the text
  * layer container (`pageLayer`'s coordinate space). */
 interface OverlayRect {
@@ -254,6 +437,12 @@ export function Reader({ slug, highlightTool, jumpTarget }: ReaderProps): JSX.El
   const [textLayerVersion, setTextLayerVersion] = useState(0)
   const [overlays, setOverlays] = useState<OverlayRect[]>([])
   const [flashId, setFlashId] = useState<string | null>(null)
+  // [P2-03] Built once per loaded doc (see the doc-load effect) from a
+  // single pass over every page's text — never rescanned on page/zoom
+  // changes. Empty when no references section was found (feature inert).
+  const [referenceIndex, setReferenceIndex] = useState<ReferenceIndex>(new Map())
+  const [citationFlash, setCitationFlash] = useState<number | null>(null)
+  const [hoveredCitation, setHoveredCitation] = useState<{ text: string; left: number; top: number } | null>(null)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const textLayerRef = useRef<HTMLDivElement>(null)
@@ -271,6 +460,9 @@ export function Reader({ slug, highlightTool, jumpTarget }: ReaderProps): JSX.El
     setSearchIndex(0)
     setError(null)
     setHighlights([])
+    setReferenceIndex(new Map())
+    setCitationFlash(null)
+    setHoveredCitation(null)
 
     if (!slug) return
 
@@ -291,6 +483,19 @@ export function Reader({ slug, highlightTool, jumpTarget }: ReaderProps): JSX.El
         const rawOutline = (await pdf.getOutline()) as RawOutlineNode[] | null
         if (cancelled) return
         setOutline(rawOutline ? await resolveOutline(pdf, rawOutline) : [])
+
+        // [P2-03] One pass over every page's text to build the reference
+        // index — done once per doc load (not on every page/zoom change).
+        const pagesText: string[][] = []
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+          const page = await pdf.getPage(pageNumber)
+          if (cancelled) return
+          const textContent = await page.getTextContent()
+          if (cancelled) return
+          pagesText.push(textContent.items.map((item) => ('str' in item ? item.str : '')))
+        }
+        if (cancelled) return
+        setReferenceIndex(buildReferenceIndex(pagesText))
       } catch {
         if (!cancelled) setError('Could not open this PDF.')
       } finally {
@@ -374,6 +579,32 @@ export function Reader({ slug, highlightTool, jumpTarget }: ReaderProps): JSX.El
     }
   }, [doc, pageNumber, scale])
 
+  // [P2-03] Wrap resolved `[n]` markers in the just-rendered text layer as
+  // clickable buttons. Kept separate from the page-render effect above
+  // (rather than folded in) so building/updating the reference index never
+  // forces a canvas re-render — this only re-runs the DOM-mutation pass over
+  // the already-rendered text layer, keyed off the same `textLayerVersion`
+  // "DOM actually updated" signal the overlay-recompute effect below uses.
+  useEffect(() => {
+    const container = textLayerRef.current
+    if (!container) return
+    injectCitationMarkers(container, referenceIndex)
+  }, [referenceIndex, pageNumber, textLayerVersion])
+
+  // [P2-03] Briefly flash the reference-list entry a citation marker was
+  // clicked through to, on the page it's rendered on — mirrors the
+  // highlight jump/flash pattern above (a class toggled for
+  // `FLASH_DURATION_MS`), but keyed off `citationFlash` rather than a prop.
+  useEffect(() => {
+    if (citationFlash === null) return
+    const container = textLayerRef.current
+    if (!container) return
+    const marker = container.querySelector(`[data-citation-number="${citationFlash}"]`)
+    if (!marker) return
+    marker.classList.add(styles.citationMarkerFlash)
+    return () => marker.classList.remove(styles.citationMarkerFlash)
+  }, [citationFlash, pageNumber, textLayerVersion])
+
   // Recompute highlight overlay rects whenever the highlight list, current
   // page, or the rendered text layer itself changes. Anchors that no longer
   // resolve (stale page content) are silently skipped — see `rangeFromAnchor`.
@@ -448,6 +679,47 @@ export function Reader({ slug, highlightTool, jumpTarget }: ReaderProps): JSX.El
         selection.removeAllRanges()
       })
       .catch(() => undefined)
+  }
+
+  // [P2-03] Event delegation on the text layer (rather than imperative
+  // listeners attached per-marker in `injectCitationMarkers`) — React's
+  // synthetic click bubbles up from any `<button data-citation-number>` the
+  // injection pass created, so it's found via `closest`.
+  function handleCitationClick(event: MouseEvent<HTMLDivElement>): void {
+    const target = (event.target as HTMLElement).closest('[data-citation-number]')
+    if (!target) return
+    const number = Number(target.getAttribute('data-citation-number'))
+    const entry = referenceIndex.get(number)
+    if (!entry) return
+    goToPage(entry.page)
+    setCitationFlash(number)
+    window.setTimeout(() => setCitationFlash(null), FLASH_DURATION_MS)
+  }
+
+  // [P2-03] Same delegation approach for the hover tooltip: position it
+  // relative to the text layer container (same coordinate space
+  // `OverlayRect`s use) from the hovered marker's own client rect.
+  function handleCitationMouseOver(event: MouseEvent<HTMLDivElement>): void {
+    const target = (event.target as HTMLElement).closest('[data-citation-number]')
+    if (!target) return
+    const number = Number(target.getAttribute('data-citation-number'))
+    const entry = referenceIndex.get(number)
+    if (!entry) return
+    const container = textLayerRef.current
+    if (!container) return
+    const targetRect = target.getBoundingClientRect()
+    const containerRect = container.getBoundingClientRect()
+    setHoveredCitation({
+      text: entry.text,
+      left: targetRect.left - containerRect.left,
+      top: targetRect.bottom - containerRect.top,
+    })
+  }
+
+  function handleCitationMouseOut(event: MouseEvent<HTMLDivElement>): void {
+    const related = event.relatedTarget as HTMLElement | null
+    if (related && related.closest('[data-citation-number]')) return
+    setHoveredCitation(null)
   }
 
   async function runSearch(query: string): Promise<void> {
@@ -581,6 +853,9 @@ export function Reader({ slug, highlightTool, jumpTarget }: ReaderProps): JSX.El
               className={styles.textLayer}
               data-highlight-mode={highlightTool?.active ? 'active' : undefined}
               onMouseUp={handleTextLayerMouseUp}
+              onClick={handleCitationClick}
+              onMouseOver={handleCitationMouseOver}
+              onMouseOut={handleCitationMouseOut}
             />
             <div className={styles.highlightOverlay} aria-hidden="true">
               {overlays.map((overlay, index) => (
@@ -597,6 +872,9 @@ export function Reader({ slug, highlightTool, jumpTarget }: ReaderProps): JSX.El
                 />
               ))}
             </div>
+            {hoveredCitation ? (
+              <CitationTooltip text={hoveredCitation.text} left={hoveredCitation.left} top={hoveredCitation.top} />
+            ) : null}
           </div>
         </div>
       </div>

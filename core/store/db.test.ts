@@ -60,7 +60,7 @@ describe('openDb', () => {
       const row = db2.prepare('SELECT * FROM papers WHERE slug = ?').get('p1')
       expect(row).toBeTruthy()
       const version = db2.pragma('user_version', { simple: true })
-      expect(version).toBe(2)
+      expect(version).toBe(3)
     } finally {
       db2.close()
     }

@@ -3,21 +3,22 @@
 //   - Ask: [P1-10] grounded chat (AskPanel) once a paper is open (bound to
 //     its slug); the [P1-07] empty-state placeholder + stubbed AskInput bar
 //     still cover the no-paper-open case.
+//   - Notes: [P2-01] per-paper markdown note (NotesPanel), bound to slug.
 //   - Details renders an empty-state placeholder (real logic: [P1-12]).
-//   - Notes, Annotations are Phase-2 and render a visible "coming soon" stub
-//     linking their wiki card — never a dead/invisible button.
+//   - Annotations is Phase-2 and renders a visible "coming soon" stub linking
+//     its wiki card — never a dead/invisible button.
 import { useState } from 'react'
 import { AskInput } from './AskInput'
 import { AskPanel } from './AskPanel'
 import { ComingSoon } from './ComingSoon'
 import { DetailsPanel } from './DetailsPanel'
+import { NotesPanel } from './NotesPanel'
 import styles from './RightPanel.module.css'
 
 const RIGHT_PANEL_TABS = ['Ask', 'Notes', 'Details', 'Annotations'] as const
 export type RightPanelTab = (typeof RIGHT_PANEL_TABS)[number]
 
 const DEFERRED_TABS: Partial<Record<RightPanelTab, { note: string }>> = {
-  Notes: { note: 'Per-paper notes — wiki card [P2-01]' },
   Annotations: { note: 'Highlights + annotations — wiki card [P2-02]' },
 }
 
@@ -61,9 +62,9 @@ function renderTabContent(tab: RightPanelTab, slug: string | undefined): JSX.Ele
     return <ComingSoon label={tab} note={deferred.note} />
   }
 
-  // Only Ask/Details reach here — Notes/Annotations are handled above via
+  // Only Ask/Notes/Details reach here — Annotations is handled above via
   // DEFERRED_TABS.
-  switch (tab as 'Ask' | 'Details') {
+  switch (tab as 'Ask' | 'Notes' | 'Details') {
     case 'Ask':
       if (slug) return <AskPanel slug={slug} />
       return (
@@ -72,6 +73,8 @@ function renderTabContent(tab: RightPanelTab, slug: string | undefined): JSX.Ele
           <AskInput />
         </div>
       )
+    case 'Notes':
+      return <NotesPanel slug={slug} />
     case 'Details':
       return <DetailsPanel slug={slug} />
   }

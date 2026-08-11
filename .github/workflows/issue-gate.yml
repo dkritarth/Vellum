@@ -60,6 +60,9 @@ jobs:
               core.setFailed(`PR body missing required sections: ${missing.join(', ')}`);
             }
 
-            if (/\b(?:TODO|TBD|not tested|not run)\b/i.test(body) && !context.payload.pull_request.draft) {
-              core.setFailed('Ready PR still contains TODO/TBD/not-tested evidence. Keep draft or complete verification.');
+            // Reject placeholders, but allow explicit disclosure that an
+            // inapplicable path was not run. Hiding limitations is worse than
+            // stating them in the required evidence sections.
+            if (/\b(?:TODO|TBD)\b/i.test(body) && !context.payload.pull_request.draft) {
+              core.setFailed('Ready PR still contains TODO/TBD placeholders. Keep draft or complete evidence.');
             }

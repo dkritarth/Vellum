@@ -1,7 +1,24 @@
 # Vellum — Plan
 
-Local-first AI paper workspace (anara.com-style) that runs on **your own**
-Claude/Codex plan via **ACP** — no extra API subscription, no raw API key.
+Local-first AI paper workspace inspired by anara.com. Built for Kritarth's
+incoming Computer Science Ph.D. workflow: review papers, understand difficult
+passages, preserve notes and annotations, and perform deep paper-grounded analysis.
+It runs on **your own** Claude/Codex plan via **ACP** — no extra AI subscription,
+no raw API key.
+
+## Product goal
+
+Vellum replaces the parts of a paid paper-analysis tool Kritarth needs every day,
+without becoming a generic Anara clone. Core journey:
+
+1. Add a real paper from arXiv, DOI, URL, or local PDF.
+2. Read and navigate PDF inside desktop app.
+3. Select text and choose **Add to chat** or **Explain**.
+4. Ask follow-up questions grounded in paper, with section/passage references.
+5. Save summaries, chats, notes, and annotations for later research.
+
+Current priority: make this journey reliable through Kritarth's signed-in Codex
+subscription and `codex-acp`. Claude remains supported through same unified seam.
 
 ## Premise (read the boundary carefully)
 
@@ -32,9 +49,11 @@ heavy use can still exhaust the plan credit.
 
 ## Phases
 
-### Phase 1 — MVP vertical loop (functional)
+### Phase 1 — implemented baseline, now stabilization target
 
-Prove ingest → read → chat on your own plan, end to end.
+Code for ingest → read → chat exists. “Merged” does not prove product reliability.
+Re-test full loop in running Electron app with real papers. Claude has live smoke
+evidence; Codex remains unverified until current signed-in adapter succeeds.
 
 - Ingest: arXiv / DOI / PDF URL / local PDF → markdown + metadata via ACP agent
 - Library grid → open paper in a **tab**
@@ -43,9 +62,10 @@ Prove ingest → read → chat on your own plan, end to end.
 - **Model selector** = real Claude/Codex ACP switch (the premise proof)
 - Auto **Summary** on ingest; **Quick actions** (canned prompts); **Details** tab
 
-### Phase 2 — shell stubs → real logic (the wiki backlog)
+### Phase 2 — research workflow
 
-Highlight tool + **Annotations** tab · **Notes** tab (SQLite) · inline citation
+PDF selection → **Add to chat / Explain** · highlight tool + **Annotations** tab ·
+**Notes** tab (SQLite) · inline citation
 click-through · ORCID badges · folder tree/collections · **Chats** library view ·
 suggested-questions generation · Trash · Usage · multi-workspace switcher ·
 `/` skills + `@` context in the input.
@@ -57,9 +77,11 @@ large-corpus retrieval (only if a real wall is hit).
 
 ## Where work lives
 
-The **GitHub wiki** is the task backlog. Each phase is a set of task cards with
-scope, files, and acceptance criteria. Agents pick up a card, implement it
-test-first, and open a PR against `master` linking the card. See `AGENTS.md`.
+This file records product direction and locked architecture decisions. It is not a
+task backlog. **GitHub Issues are sole executable source of truth.** Issues carry
+phases, dependency locks, scope, acceptance criteria, and live-verification evidence.
+Agents work only issues labeled `status:ready`; milestone gates unlock later phases.
+See `AGENTS.md` for execution contract.
 
 ## Prior art
 

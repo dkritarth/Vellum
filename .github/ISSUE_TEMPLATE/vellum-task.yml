@@ -1,0 +1,96 @@
+name: Vellum implementation task
+description: Create one independently verifiable Vellum task or bug.
+title: "[AREA-NN] "
+labels:
+  - status:blocked
+body:
+  - type: markdown
+    attributes:
+      value: |
+        GitHub Issues are Vellum's sole executable backlog. New issues default to blocked. Maintainer adds `status:ready` only when every dependency and prior phase gate is closed.
+  - type: textarea
+    id: outcome
+    attributes:
+      label: User outcome
+      description: Describe observable value for Kritarth's paper-reading workflow.
+      placeholder: After this closes, user can...
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and gate
+      description: List exact blocking issue numbers. Write None only when maintainer intentionally makes this first ready task.
+      placeholder: Blocked by #123 and gate #120. Do not start until both close.
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current behavior and evidence
+      description: Include reproduction, expected/actual result, screenshots, logs, or current code seam. Never include credentials.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: In scope
+      description: Define one vertical slice and likely files/seams.
+    validations:
+      required: true
+  - type: textarea
+    id: non_goals
+    attributes:
+      label: Explicit non-goals
+      description: State what this issue must not absorb.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Use concrete checkboxes for user-visible behavior, errors, persistence, accessibility, and safety.
+      placeholder: |
+        - [ ] Observable behavior...
+        - [ ] Failure behavior...
+        - [ ] Persistence/restart behavior...
+    validations:
+      required: true
+  - type: textarea
+    id: automated
+    attributes:
+      label: Automated verification
+      description: Name failing test first, focused tests, full suite, typecheck, build, and diff check.
+      placeholder: |
+        - [ ] Regression test fails before fix and passes after
+        - [ ] npm test
+        - [ ] npm run typecheck
+        - [ ] npm run build
+        - [ ] git diff --check
+    validations:
+      required: true
+  - type: textarea
+    id: live
+    attributes:
+      label: Live Electron verification
+      description: Exact clicks/typing, data setup, expected visible state, console inspection, screenshots, real-paper/ACP checks, and restart steps.
+    validations:
+      required: true
+  - type: textarea
+    id: pr_evidence
+    attributes:
+      label: Required PR evidence
+      description: State what reviewer must see and repeat independently. PR must use Closes #N.
+    validations:
+      required: true
+  - type: checkboxes
+    id: guardrails
+    attributes:
+      label: Guardrail acknowledgement
+      options:
+        - label: First-party ACP only; no raw API keys or OAuth bridge.
+          required: true
+        - label: Pure Node/TypeScript; no Python or custom RAG.
+          required: true
+        - label: I will not start this issue while it has `status:blocked`.
+          required: true

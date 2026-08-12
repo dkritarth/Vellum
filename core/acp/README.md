@@ -12,6 +12,13 @@ for the implementation ([P1-01] — done).
 
 Adding a backend later = spawn a different ACP server. No new client code.
 
+Install the maintained Codex adapter as
+`@agentclientprotocol/codex-acp`. The older
+`@zed-industries/codex-acp` package is deprecated and embeds an older Codex
+runtime even when a newer standalone `codex` CLI is on `PATH`. Record the
+adapter package and version during live verification; executable name alone
+does not distinguish them.
+
 ## Dependency
 
 `@agentclientprotocol/sdk` (npm, verified on the registry 2026-07-21). This is
@@ -64,6 +71,13 @@ child adapter process is killed and the caller gets a thrown error
 hanging forever — this is what protects against a stalled adapter (e.g. an
 errored codex-acp turn, or any other hang mid-session).
 
+On POSIX, adapters start in their own process group. Session disposal and
+handshake/turn failures terminate the complete adapter process tree, wait up
+to one second, then escalate to `SIGKILL` if required. This matters for npm
+launcher scripts that spawn a native adapter child: killing only the launcher
+can otherwise orphan the native process. Windows terminates the direct child,
+waits with the same bound, and escalates before reporting cleanup failure.
+
 The handshake default is deliberately generous, not tight: measured against
 a real cold-start `claude-code-acp` (`CLAUDECODE` stripped), `initialize`
 returns in ~226ms but `session/new` alone legitimately takes ~16.2s — it
@@ -82,6 +96,18 @@ npm run smoke:acp -- codex    # just codex-acp
 Requires the adapter CLI(s) actually installed and signed in to your
 Claude Pro/Max or ChatGPT plan. This is **not** part of `npm test` / CI — it's
 a separate, honest check of the real sanctioned-plan path. See `smoke.ts`.
+
+Smoke output is sanitized and compact: UTC start/end times, streamed text,
+update kinds, and terminal stop reason. Adapter diagnostics remain on stderr.
+
+If a service rollout selects a model newer than the installed adapter runtime,
+set `VELLUM_CODEX_MODEL` to a model supported by that runtime while upgrading
+the adapter. The value goes directly to the first-party adapter as
+`-c model=<value>` without a shell or alternate authentication path:
+
+```bash
+VELLUM_CODEX_MODEL=gpt-5.5 npm run smoke:acp -- codex
+```
 
 Runs fine from inside a Claude Code terminal/agent now (the `CLAUDECODE`
 stripping above handles it automatically) and no longer hangs forever on a

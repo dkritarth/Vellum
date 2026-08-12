@@ -40,6 +40,7 @@ const PROMPT = 'Reply with exactly the word "pong" and nothing else.'
 
 async function smoke(backend: AcpBackend): Promise<void> {
   console.log(`\n=== ${backend} (${backend === 'claude' ? 'claude-code-acp' : 'codex-acp'}) ===`)
+  console.log(`startedAt=${new Date().toISOString()}`)
   const client = new StdioAcpClient()
   let session
   try {
@@ -49,22 +50,34 @@ async function smoke(backend: AcpBackend): Promise<void> {
     console.log(
       `  -> install/sign in the adapter, confirm it's on PATH, then re-run: npm run smoke:acp -- ${backend}`,
     )
+    process.exitCode = 1
     return
   }
 
   try {
     let sawDone = false
+    const updateKinds: string[] = []
     for await (const update of session.prompt({ text: PROMPT })) {
-      console.log(JSON.stringify(update))
+      updateKinds.push(update.kind)
+      if (update.kind === 'text' && typeof update.data === 'object' && update.data !== null) {
+        const text = 'text' in update.data ? update.data.text : undefined
+        if (typeof text === 'string') console.log(`text=${JSON.stringify(text)}`)
+      }
+      if (update.kind === 'done') console.log(`done=${JSON.stringify(update.data)}`)
       if (update.kind === 'done') sawDone = true
       if (update.kind === 'error') {
+        console.log(`error=${JSON.stringify(update.data)}`)
         console.log(`UNVERIFIED — adapter reported an error mid-turn.`)
+        process.exitCode = 1
         return
       }
     }
+    console.log(`updateKinds=${updateKinds.join(',')}`)
     console.log(sawDone ? 'VERIFIED — stream ended in a done update.' : 'UNVERIFIED — stream ended without done.')
+    if (!sawDone) process.exitCode = 1
   } finally {
     await session.dispose()
+    console.log(`endedAt=${new Date().toISOString()}`)
   }
 }
 

@@ -42,9 +42,20 @@ type AdapterChildProcess = ChildProcessByStdio<Writable, Readable, null>
 
 /** First-party adapter subprocess per backend. Do not add others here without
  * a card — this is the whole point of the "no OAuth bridge" guardrail. */
-const ADAPTERS: Record<AcpBackend, { command: string; args: string[] }> = {
-  claude: { command: 'claude-code-acp', args: [] },
-  codex: { command: 'codex-acp', args: [] },
+const ADAPTERS: Record<AcpBackend, { command: string }> = {
+  claude: { command: 'claude-code-acp' },
+  codex: { command: 'codex-acp' },
+}
+
+/** Optional compatibility override for Codex service/CLI rollout skew. The
+ * adapter owns config parsing; JSON string encoding is valid TOML and keeps
+ * the model value in one argv entry without invoking a shell. */
+export function buildAdapterArgs(
+  backend: AcpBackend,
+  sourceEnv: NodeJS.ProcessEnv = process.env,
+): string[] {
+  const model = sourceEnv.VELLUM_CODEX_MODEL?.trim()
+  return backend === 'codex' && model ? ['-c', `model=${JSON.stringify(model)}`] : []
 }
 
 /** Spawns the adapter subprocess for a backend. Overridable for tests so unit
@@ -72,11 +83,77 @@ export function buildAdapterEnv(sourceEnv: NodeJS.ProcessEnv = process.env): Nod
 }
 
 const defaultSpawnAdapter: SpawnAdapter = (backend) => {
-  const { command, args } = ADAPTERS[backend]
-  return spawn(command, args, {
+  const { command } = ADAPTERS[backend]
+  return spawn(command, buildAdapterArgs(backend), {
     stdio: ['pipe', 'pipe', 'inherit'],
     env: buildAdapterEnv(),
+    detached: process.platform !== 'win32',
   }) as AdapterChildProcess
+}
+
+const PROCESS_EXIT_GRACE_MS = 1_000
+
+function processGroupExists(pid: number): boolean {
+  try {
+    process.kill(-pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function waitForProcessGroupExit(pid: number, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (processGroupExists(pid) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+  return !processGroupExists(pid)
+}
+
+async function waitForChildExit(child: AdapterChildProcess, timeoutMs: number): Promise<boolean> {
+  if (child.exitCode !== null || child.signalCode !== null) return true
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), timeoutMs)
+    const finish = (): void => {
+      clearTimeout(timer)
+      resolve(true)
+    }
+    child.once('exit', finish)
+    child.once('error', finish)
+  })
+}
+
+async function terminateAdapter(child: AdapterChildProcess): Promise<void> {
+  // A spawn failure has no pid and no process tree to terminate. Its tracked
+  // ENOENT/permission diagnostic must remain the error returned to callers.
+  if (child.pid === undefined) return
+
+  if (process.platform === 'win32') {
+    if (child.exitCode !== null || child.signalCode !== null) return
+    child.kill()
+    if (await waitForChildExit(child, PROCESS_EXIT_GRACE_MS)) return
+    child.kill('SIGKILL')
+    if (await waitForChildExit(child, PROCESS_EXIT_GRACE_MS)) return
+    throw new Error('ACP adapter process did not exit after forced termination')
+  }
+
+  const pid = child.pid
+  if (!processGroupExists(pid)) return
+  try {
+    process.kill(-pid, 'SIGTERM')
+  } catch {
+    child.kill()
+  }
+  if (await waitForProcessGroupExit(pid, PROCESS_EXIT_GRACE_MS)) return
+
+  try {
+    process.kill(-pid, 'SIGKILL')
+  } catch {
+    child.kill('SIGKILL')
+  }
+  if (!(await waitForProcessGroupExit(pid, PROCESS_EXIT_GRACE_MS))) {
+    throw new Error(`ACP adapter process group ${pid} did not exit after forced termination`)
+  }
 }
 
 /** Maps a raw ACP `SessionUpdate` onto Vellum's `AcpUpdate` contract.
@@ -223,6 +300,7 @@ class StdioAcpSession implements AcpSession {
   // session, mirroring the ACP protocol (a session has one active turn).
   private queue: UpdateQueue | undefined
   private disposed = false
+  private disposePromise: Promise<void> | undefined
   // Set only while a prompt() call is in flight; cleared by dispose() too so
   // an external dispose mid-turn doesn't leave a dangling timer.
   private turnTimeout: { cancel(): void } | undefined
@@ -280,8 +358,7 @@ class StdioAcpSession implements AcpSession {
       settled = true
       queue.push({ kind: 'error', data: { message: err.message } })
       queue.close()
-      this.disposed = true
-      this.child.kill()
+      void this.dispose().catch(() => undefined)
     })
 
     try {
@@ -293,13 +370,14 @@ class StdioAcpSession implements AcpSession {
   }
 
   async dispose(): Promise<void> {
-    if (this.disposed) return
+    if (this.disposePromise) return this.disposePromise
     this.disposed = true
     this.turnTimeout?.cancel()
     this.turnTimeout = undefined
     this.queue?.close()
     this.queue = undefined
-    this.child.kill()
+    this.disposePromise = terminateAdapter(this.child)
+    return this.disposePromise
   }
 }
 
@@ -372,7 +450,7 @@ export class StdioAcpClient implements AcpClient {
       return session
     } catch (err) {
       handshake.cancel()
-      child.kill()
+      await terminateAdapter(child)
       // Whether the transport's generic "connection closed" error or the
       // child's own exit/spawn diagnostic wins the race above is a timing
       // accident. `failure` settles once the child actually exits/errors

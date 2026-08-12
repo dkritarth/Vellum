@@ -13,7 +13,13 @@ import type { Readable, Writable } from 'node:stream'
 import { describe, expect, it } from 'vitest'
 
 import type { AcpBackend, AcpUpdate } from './client.js'
-import { StdioAcpClient, buildAdapterEnv, mapSessionUpdate, type SpawnAdapter } from './stdio-client.js'
+import {
+  StdioAcpClient,
+  buildAdapterArgs,
+  buildAdapterEnv,
+  mapSessionUpdate,
+  type SpawnAdapter,
+} from './stdio-client.js'
 
 type AdapterChildProcess = ChildProcessByStdio<Writable, Readable, null>
 
@@ -22,12 +28,19 @@ type AdapterChildProcess = ChildProcessByStdio<Writable, Readable, null>
 // Behavior is selected via argv so one script covers every test scenario.
 const FAKE_AGENT_SCRIPT = String.raw`
 const readline = require('node:readline')
+const { spawn } = require('node:child_process')
 // argv[0] is the node binary; with \`node -e <script> <extra>\`, the first
 // extra arg lands at argv[1] (there is no "eval" placeholder entry).
 const mode = process.argv[1]
 
 if (mode === 'exit-immediately') {
   process.exit(7)
+}
+
+if (mode === 'term-resistant-descendant') {
+  spawn(process.execPath, ['-e', 'process.on("SIGTERM", () => {}); setInterval(() => {}, 1000)'], {
+    stdio: 'ignore',
+  })
 }
 
 const rl = readline.createInterface({ input: process.stdin, terminal: false })
@@ -70,6 +83,7 @@ function spawnFakeAgent(mode: string): SpawnAdapter {
   return (_backend: AcpBackend): AdapterChildProcess =>
     spawn(process.execPath, ['-e', FAKE_AGENT_SCRIPT, mode], {
       stdio: ['pipe', 'pipe', 'inherit'],
+      detached: process.platform !== 'win32',
     }) as AdapterChildProcess
 }
 
@@ -163,6 +177,38 @@ describe('StdioAcpClient', () => {
     expect(updates).toEqual([{ kind: 'error', data: { message: 'session disposed' } }])
   })
 
+  it('dispose() does not resolve until the adapter subprocess exits', async () => {
+    let child: AdapterChildProcess | undefined
+    const captureChild: SpawnAdapter = (backend) => {
+      child = spawnFakeAgent('happy')(backend)
+      return child
+    }
+    const client = new StdioAcpClient(captureChild)
+    const session = await client.newSession('codex')
+
+    await session.dispose()
+
+    expect(child?.exitCode !== null || child?.signalCode !== null).toBe(true)
+  })
+
+  it.runIf(process.platform !== 'win32')(
+    'dispose() removes a TERM-resistant adapter descendant and remains idempotent',
+    async () => {
+      let child: AdapterChildProcess | undefined
+      const captureChild: SpawnAdapter = (backend) => {
+        child = spawnFakeAgent('term-resistant-descendant')(backend)
+        return child
+      }
+      const client = new StdioAcpClient(captureChild)
+      const session = await client.newSession('codex')
+      const groupId = child!.pid!
+
+      await Promise.all([session.dispose(), session.dispose()])
+
+      expect(() => process.kill(-groupId, 0)).toThrow()
+    },
+  )
+
   it('fails a stalled prompt() via the turn timeout instead of hanging forever', async () => {
     const client = new StdioAcpClient(spawnFakeAgent('stall'), { turnMs: 50 })
     const session = await client.newSession('claude')
@@ -176,8 +222,14 @@ describe('StdioAcpClient', () => {
   })
 
   it('fails newSession() via the handshake timeout when the adapter never answers initialize', async () => {
-    const client = new StdioAcpClient(spawnFakeAgent('stall-handshake'), { handshakeMs: 50 })
+    let child: AdapterChildProcess | undefined
+    const captureChild: SpawnAdapter = (backend) => {
+      child = spawnFakeAgent('stall-handshake')(backend)
+      return child
+    }
+    const client = new StdioAcpClient(captureChild, { handshakeMs: 50 })
     await expect(client.newSession('claude')).rejects.toThrow('ACP handshake timed out after 50ms')
+    expect(child?.exitCode !== null || child?.signalCode !== null).toBe(true)
   })
 })
 
@@ -198,5 +250,19 @@ describe('buildAdapterEnv', () => {
   it('leaves the env untouched when CLAUDECODE / CLAUDE_CODE_SSE_PORT are absent', () => {
     const sourceEnv = { PATH: '/usr/bin' }
     expect(buildAdapterEnv(sourceEnv)).toEqual({ PATH: '/usr/bin' })
+  })
+})
+
+describe('buildAdapterArgs', () => {
+  it('passes an explicit Codex model override through the first-party adapter config interface', () => {
+    expect(buildAdapterArgs('codex', { VELLUM_CODEX_MODEL: 'gpt-5.5' })).toEqual([
+      '-c',
+      'model="gpt-5.5"',
+    ])
+  })
+
+  it('uses normal adapter configuration when no Codex model override is set', () => {
+    expect(buildAdapterArgs('codex', {})).toEqual([])
+    expect(buildAdapterArgs('claude', { VELLUM_CODEX_MODEL: 'gpt-5.5' })).toEqual([])
   })
 })

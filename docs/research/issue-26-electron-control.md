@@ -35,8 +35,14 @@ ELECTRON_ENABLE_LOGGING=1 ELECTRON_LOG_FILE="$PWD/.audit/artifacts/electron.log"
   --user-data-dir="$PWD/.audit/user-data" \
   >.audit/artifacts/electron-stdout.log 2>.audit/artifacts/electron-stderr.log &
 ELECTRON_PID=$!
-until curl --silent --fail "http://127.0.0.1:$PORT/json/version" >/dev/null; do sleep 0.1; done
-lsof -nP -iTCP:"$PORT" -sTCP:LISTEN | grep -F "$ELECTRON_PID"
+for attempt in {1..100}; do
+  kill -0 "$ELECTRON_PID" 2>/dev/null || break
+  curl --silent --fail "http://127.0.0.1:$PORT/json/version" >/dev/null && break
+  sleep 0.1
+done
+kill -0 "$ELECTRON_PID"
+curl --silent --fail "http://127.0.0.1:$PORT/json/version" >/dev/null
+lsof -t -iTCP:"$PORT" -sTCP:LISTEN | grep -Fx "$ELECTRON_PID"
 ```
 
 Use a free high port selected for this run, verify that the CDP endpoint belongs
@@ -48,17 +54,28 @@ The same documentation shows that command-line switches are Chromium controls,
 not application arguments. `--inspect` is a different V8 inspector for the main
 process, as documented in [Electron's main-process debugging guide](https://www.electronjs.org/docs/latest/tutorial/debugging-main-process).
 
-After the run, close the app through the harness, await its process exit, and
-verify both the loopback endpoint and every process whose command references the
-detached worktree are gone. If graceful close fails, signal only the recorded
-PID, wait for it, and repeat both checks. Do not remove the worktree while either
-check still finds a live process:
+Before closing, record the launcher's current descendant PIDs from the process
+tree. Close the app through the harness, wait boundedly for the launcher and
+every recorded descendant to exit, and verify the loopback endpoint is closed.
+If graceful close fails, stop the cleanup and inspect the recorded numeric PIDs;
+do not guess at a broader kill target or remove the worktree:
 
 ```sh
-kill "$ELECTRON_PID" 2>/dev/null || true
-wait "$ELECTRON_PID" 2>/dev/null || true
+AUDIT_DESCENDANT_PIDS=$(AUDIT_PARENT_PID="$ELECTRON_PID" node -e '
+const {execFileSync}=require("node:child_process");
+const root=Number(process.env.AUDIT_PARENT_PID);
+const rows=execFileSync("ps",["-axo","pid=,ppid="]).toString().trim().split("\n").map(line=>line.trim().split(/\s+/).map(Number));
+const children=new Map(); for(const [pid,ppid] of rows) children.set(ppid,[...(children.get(ppid)||[]),pid]);
+const found=[]; const visit=pid=>{for(const child of children.get(pid)||[]){found.push(child);visit(child)}}; visit(root);
+process.stdout.write(found.join(" "));
+')
+# Have the Playwright/CDP harness close Electron here.
+for attempt in {1..100}; do kill -0 "$ELECTRON_PID" 2>/dev/null || break; sleep 0.1; done
+! kill -0 "$ELECTRON_PID" 2>/dev/null
+for pid in $AUDIT_DESCENDANT_PIDS; do ! kill -0 "$pid" 2>/dev/null; done
+wait "$ELECTRON_PID"
 ! curl --silent --fail "http://127.0.0.1:$PORT/json/version"
-! ps -axo pid,ppid,command | grep -F "$AUDIT_WT" | grep -v grep
+cd -
 git worktree remove "$AUDIT_WT"
 ```
 

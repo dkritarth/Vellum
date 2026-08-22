@@ -45,12 +45,12 @@ output.
 | Clean isolated start | Pass | Detached worktree began without `data/`; normal checkout stayed untouched. |
 | Production/dev preload bridge | **Fail** | Build emitted `out/preload/preload.mjs`; Electron requested `out/preload/index.js`; status remained `bridge: …`. Filed [#51](https://github.com/dkritarth/Vellum/issues/51). Screenshot: [`issue-26/01-preload-failure.png`](issue-26/01-preload-failure.png). |
 | Empty reader state | Pass after temporary preload bypass | Visible `No paper open` and `Open a paper from Library to start reading`; status `bridge: pong`. Screenshot: [`issue-26/02-empty-state.png`](issue-26/02-empty-state.png). |
-| Create / ingest entry | **Fail** | Semantic click on **Create** produced no visible or accessible-tree change; no input or dialog appeared. Filed [#53](https://github.com/dkritarth/Vellum/issues/53). |
+| Create / ingest entry | **Fail** | Semantic click on **Create** produced no visible or accessible-tree change; controller recorded `didCreate: true` and `createChanged: false`. Filed [#53](https://github.com/dkritarth/Vellum/issues/53). |
 | Input classification | **Fail — blocked** | No user-facing ingest input exists. Direct IPC was not substituted for the required user journey; #53. |
 | Real arXiv ingest | **Fail — blocked** | #53 prevents initiation; #52 prevents first DB-backed operation. |
 | Re-ingest / idempotency | **Fail — blocked** | No first ingest completed because of #52 and #53. |
 | Library empty state | **Fail** | Unmodified app emptied the renderer and logged `window.vellum`/`listPapers` TypeError (#51). With preload temporarily bypassed, it showed `Could not load your library.` and main threw the native-binding error (#52). |
-| Library loading state | **Fail — not verified** | Transition was too brief to capture before #52; no loading-state claim made. |
+| Library loading state | **Fail — evidence unavailable** | Audit could not verify this state before #52. This is an audit-coverage failure, not evidence that the loading UI itself malfunctions. |
 | Library search and sort | **Fail — blocked** | #52 prevents a successful Library query. |
 | Open paper tab | **Fail — blocked** | #52 and #53 prevent creation of a paper record. |
 | PDF render and page navigation | **Fail — blocked** | #52 and #53 prevent ingest/open. |
@@ -68,6 +68,7 @@ output.
 | Keyboard/accessibility labels | Partial pass | Empty-state accessibility tree exposed named navigation buttons, `Paper view`, right-panel tabs, `Highlight`, `Skills`, `Context`, and disabled `Ask a question`. Focus reached clicked `Library`. Full reader/chat order was blocked. |
 
 Machine-readable action/result transcript: [`issue-26/interaction-journal.json`](issue-26/interaction-journal.json).
+Controller console transcript: [`issue-26/controller-console.txt`](issue-26/controller-console.txt).
 
 ## Exact console failures
 

@@ -1,7 +1,9 @@
 # Electron core-journey audit — 2026-08-22
 
-Issue: [#26](https://github.com/dkritarth/Vellum/issues/26)  
-Commit under test: `a21d596e3fca6de7edef1e63576a8beb00183e5e`  
+Issue: [#26](https://github.com/dkritarth/Vellum/issues/26)
+
+Commit under test: `a21d596e3fca6de7edef1e63576a8beb00183e5e`
+
 Result: **failed at boot and entry-to-ingest boundaries; downstream journey blocked**
 
 ## Test isolation and control

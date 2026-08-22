@@ -98,6 +98,19 @@ Each issue includes severity, expected/actual behavior, exact reproduction,
 suspected ownership, evidence, and explicit non-goals. All remain blocked; this
 audit made no product fix.
 
+## Automated verification
+
+- `npm run typecheck`: passed.
+- `npm run build`: passed. Build output itself reproduces #51 by emitting
+  `out/preload/preload.mjs` while unmodified main expects `index.js`.
+- Focused `npx vitest run core/acp/stdio-client.test.ts`: 18/18 passed.
+- Final `npm test`: 147/147 passed across 24 files. Initial full run was
+  146/147 because `dispose() does not resolve until the adapter subprocess
+  exits` failed once; focused and final full reruns passed. Existing jsdom
+  canvas-not-implemented stderr remained non-failing test noise and is not PDF
+  rendering proof.
+- `git diff --check master...HEAD`: passed.
+
 ## Limitations
 
 - Native macOS dialogs were not exercised because Accessibility permission was

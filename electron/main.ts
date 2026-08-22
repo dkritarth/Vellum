@@ -15,6 +15,8 @@ import { ingest } from '../core/ingest/index.js'
 import type { IngestResult } from '../core/ingest/index.js'
 import { getPaper, listPapers } from '../core/library/repo.js'
 import type { ListPapersOptions, PaperRecord, PaperSortColumn } from '../core/library/repo.js'
+import { deleteNote, getNote, upsertNote } from '../core/notes/repo.js'
+import type { NoteRecord } from '../core/notes/repo.js'
 import { openDb } from '../core/store/db.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -128,6 +130,39 @@ ipcMain.handle('vellum:list-papers', (_event, options: unknown): PaperRecord[] =
 
 ipcMain.handle('vellum:get-paper', (_event, slug: unknown): PaperRecord | null => {
   return getPaper(getDb(), requireSlug(slug, 'vellum:get-paper')) ?? null
+})
+
+// [P2-01] Notes tab — one freeform markdown note per paper. -----------------
+//
+// `getNote` returns undefined for "no note yet"; normalized to null over IPC
+// (matching `vellum:get-paper`'s convention) since `undefined` doesn't
+// survive structured clone.
+ipcMain.handle('vellum:notes-get', (_event, slug: unknown): NoteRecord | null => {
+  return getNote(getDb(), requireSlug(slug, 'vellum:notes-get')) ?? null
+})
+
+function parseNotesSaveParams(value: unknown): { slug: string; body: string } {
+  if (typeof value !== 'object' || value === null) {
+    throw new Error('vellum:notes-save: params must be an object')
+  }
+  const candidate = value as Record<string, unknown>
+  const body = candidate['body']
+  if (typeof body !== 'string') {
+    throw new Error('vellum:notes-save: body must be a string')
+  }
+  return { slug: requireSlug(candidate['slug'], 'vellum:notes-save'), body }
+}
+
+// Autosave's persistence half — a plain upsert-by-paper-slug (core/notes/repo.ts).
+ipcMain.handle('vellum:notes-save', (_event, params: unknown): NoteRecord => {
+  const { slug, body } = parseNotesSaveParams(params)
+  return upsertNote(getDb(), slug, body)
+})
+
+// Delete half of Notes CRUD — "Clear note" in the tab. No-op if the paper
+// has no note yet.
+ipcMain.handle('vellum:notes-delete', (_event, slug: unknown): void => {
+  deleteNote(getDb(), requireSlug(slug, 'vellum:notes-delete'))
 })
 
 // [P1-10] Ask tab — grounded chat over ACP. -------------------------------

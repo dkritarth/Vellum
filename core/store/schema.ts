@@ -52,5 +52,25 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   created_at  TEXT NOT NULL
 );
 
--- Phase-2 backlog tables (notes, highlights) added when those cards land.
+-- Phase-2 backlog tables (highlights, etc.) added when those cards land.
+-- notes landed in migration 3, see SCHEMA_V3_NOTES below.
+`
+
+// [P2-01] Notes tab: one freeform note per paper, right-panel markdown editor.
+//
+// paper_slug is the PRIMARY KEY (not a separate autoincrement id +
+// UNIQUE constraint) — this is a deliberate 1:1 modeling choice, not a
+// simplification. The Notes tab has exactly one note per paper, so the
+// natural key IS the uniqueness constraint, and it makes autosave a plain
+// upsert-by-paper-slug (`INSERT ... ON CONFLICT(paper_slug) DO UPDATE`,
+// same shape as `upsertPaper`) with no id indirection for callers to carry
+// around. `ON DELETE CASCADE` removes a paper's note automatically when the
+// paper itself is deleted — no orphaned rows, no separate cleanup step for
+// the trash/purge flow.
+export const SCHEMA_V3_NOTES = `
+CREATE TABLE IF NOT EXISTS notes (
+  paper_slug  TEXT PRIMARY KEY REFERENCES papers(slug) ON DELETE CASCADE,
+  body        TEXT NOT NULL DEFAULT '',
+  updated_at  TEXT NOT NULL
+);
 `

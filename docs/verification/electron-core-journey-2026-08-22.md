@@ -46,26 +46,28 @@ output.
 | Production/dev preload bridge | **Fail** | Build emitted `out/preload/preload.mjs`; Electron requested `out/preload/index.js`; status remained `bridge: …`. Filed [#51](https://github.com/dkritarth/Vellum/issues/51). Screenshot: [`issue-26/01-preload-failure.png`](issue-26/01-preload-failure.png). |
 | Empty reader state | Pass after temporary preload bypass | Visible `No paper open` and `Open a paper from Library to start reading`; status `bridge: pong`. Screenshot: [`issue-26/02-empty-state.png`](issue-26/02-empty-state.png). |
 | Create / ingest entry | **Fail** | Semantic click on **Create** produced no visible or accessible-tree change; no input or dialog appeared. Filed [#53](https://github.com/dkritarth/Vellum/issues/53). |
-| Input classification | Blocked | No user-facing ingest input exists. Direct IPC was not substituted for the required user journey. |
-| Real arXiv ingest | Blocked | #53 prevents initiation; #52 prevents first DB-backed operation. |
-| Re-ingest / idempotency | Blocked | No first ingest completed. |
-| Library empty state | **Fail** | With preload temporarily bypassed, clicking **Library** showed `Could not load your library.` Main process threw the native-binding error below. Filed [#52](https://github.com/dkritarth/Vellum/issues/52). |
-| Library loading state | Not verified | Transition was too brief to capture before the DB failure; no claim made. |
-| Library search and sort | Blocked | Library query fails before controls can operate on data. |
-| Open paper tab | Blocked | No paper record exists. |
-| PDF render and page navigation | Blocked | No paper can be ingested/opened. |
-| Zoom, TOC, document search | Blocked | Reader never receives a paper. |
-| Details and generated summary | Blocked | No paper record or markdown exists in isolated state. |
-| Model selector | Blocked | Ask panel has no open paper/session. |
-| Codex factual question and grounding check | Blocked | No paper markdown/session reachable; prior #25 adapter smoke is not substituted for this journey. |
-| Codex interpretive question | Blocked | Same blocker. |
-| New chat | Blocked | No paper chat can open. |
-| Chat persistence across reload | Blocked | No chat can be created. |
+| Input classification | **Fail — blocked** | No user-facing ingest input exists. Direct IPC was not substituted for the required user journey; #53. |
+| Real arXiv ingest | **Fail — blocked** | #53 prevents initiation; #52 prevents first DB-backed operation. |
+| Re-ingest / idempotency | **Fail — blocked** | No first ingest completed because of #52 and #53. |
+| Library empty state | **Fail** | Unmodified app emptied the renderer and logged `window.vellum`/`listPapers` TypeError (#51). With preload temporarily bypassed, it showed `Could not load your library.` and main threw the native-binding error (#52). |
+| Library loading state | **Fail — not verified** | Transition was too brief to capture before #52; no loading-state claim made. |
+| Library search and sort | **Fail — blocked** | #52 prevents a successful Library query. |
+| Open paper tab | **Fail — blocked** | #52 and #53 prevent creation of a paper record. |
+| PDF render and page navigation | **Fail — blocked** | #52 and #53 prevent ingest/open. |
+| Zoom, TOC, document search | **Fail — blocked** | #52 and #53 prevent Reader from receiving a paper. |
+| Details and generated summary | **Fail — blocked** | #52 and #53 prevent paper record/markdown creation. |
+| Model selector | **Fail — blocked** | #52 and #53 prevent opening a paper/session. |
+| Codex factual question and grounding check | **Fail — blocked** | No paper markdown/session is reachable; prior #25 adapter smoke is not substituted for this journey. |
+| Codex interpretive question | **Fail — blocked** | Same #52/#53 blocker. |
+| New chat | **Fail — blocked** | #52/#53 prevent a paper chat from opening. |
+| Chat persistence across reload | **Fail — blocked** | #52/#53 prevent chat creation. |
 | App restart persistence | **Fail / blocked** | Repeated fresh launches reproduced #51. Temporary-bypass launches reproduced #52; no durable paper/chat state could be created to test round trip. |
 | Failure state | Pass | Library rendered `Could not load your library.` after #52. |
 | Renderer console | Pass for captured post-load window | No renderer page errors were observed after the temporary preload bypass; [`issue-26/last-renderer-console.json`](issue-26/last-renderer-console.json). This does not cover preload-time errors. |
 | Main-process console | **Fail** | Exact preload and SQLite errors below. |
 | Keyboard/accessibility labels | Partial pass | Empty-state accessibility tree exposed named navigation buttons, `Paper view`, right-panel tabs, `Highlight`, `Skills`, `Context`, and disabled `Ask a question`. Focus reached clicked `Library`. Full reader/chat order was blocked. |
+
+Machine-readable action/result transcript: [`issue-26/interaction-journal.json`](issue-26/interaction-journal.json).
 
 ## Exact console failures
 
@@ -87,6 +89,7 @@ dynamicRequireTargets or/and ignoreDynamicRequires option of
 
 Generated `out/main/index.js` contained `commonjsRequire(filename)` for the
 native addon and resolved it under `out/build/Release/`, where no addon exists.
+Captured excerpts: [`issue-26/main-console.txt`](issue-26/main-console.txt).
 
 ## Filed failures
 

@@ -28,13 +28,15 @@ cd "$AUDIT_WT"
 npm ci
 npm run build
 mkdir -p .audit/{artifacts,user-data}
-PORT=49152
+PORT=$(node -e "const net=require('node:net');const s=net.createServer();s.listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})")
 ELECTRON_ENABLE_LOGGING=1 ELECTRON_LOG_FILE="$PWD/.audit/artifacts/electron.log" \
   ./node_modules/.bin/electron out/main/index.js \
   --remote-debugging-port="$PORT" \
   --user-data-dir="$PWD/.audit/user-data" \
   >.audit/artifacts/electron-stdout.log 2>.audit/artifacts/electron-stderr.log &
 ELECTRON_PID=$!
+until curl --silent --fail "http://127.0.0.1:$PORT/json/version" >/dev/null; do sleep 0.1; done
+lsof -nP -iTCP:"$PORT" -sTCP:LISTEN | grep -F "$ELECTRON_PID"
 ```
 
 Use a free high port selected for this run, verify that the CDP endpoint belongs
@@ -46,19 +48,26 @@ The same documentation shows that command-line switches are Chromium controls,
 not application arguments. `--inspect` is a different V8 inspector for the main
 process, as documented in [Electron's main-process debugging guide](https://www.electronjs.org/docs/latest/tutorial/debugging-main-process).
 
-After the run, close the app through the harness where possible, then terminate
-only the recorded PID and remove the detached worktree after copying artifacts:
+After the run, close the app through the harness, await its process exit, and
+verify both the loopback endpoint and every process whose command references the
+detached worktree are gone. If graceful close fails, signal only the recorded
+PID, wait for it, and repeat both checks. Do not remove the worktree while either
+check still finds a live process:
 
 ```sh
 kill "$ELECTRON_PID" 2>/dev/null || true
-git worktree remove --force "$AUDIT_WT"
+wait "$ELECTRON_PID" 2>/dev/null || true
+! curl --silent --fail "http://127.0.0.1:$PORT/json/version"
+! ps -axo pid,ppid,command | grep -F "$AUDIT_WT" | grep -v grep
+git worktree remove "$AUDIT_WT"
 ```
 
-The `--force` removal is safe here only after confirming the worktree contains
-no changes that need preserving; copy `.audit/artifacts` out first. Do not use a
-personal profile or the normal repository's `data/` directory. Vellum resolves
-paper files and SQLite relative to its current working directory, so the
-detached worktree also isolates those files from the user's checkout.
+Copy `.audit/artifacts` out before removal. A non-force worktree removal should
+refuse if untracked or modified audit material remains; inspect rather than
+bypassing that refusal. Do not use a personal profile or the normal repository's
+`data/` directory. Vellum resolves paper files and SQLite relative to its current
+working directory, so the detached worktree also isolates those files from the
+user's checkout.
 
 ## Temporary Playwright harness
 

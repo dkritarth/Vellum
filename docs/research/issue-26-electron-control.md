@@ -72,6 +72,12 @@ process.stdout.write(found.join(" "));
 # Have the Playwright/CDP harness close Electron here.
 for attempt in {1..100}; do kill -0 "$ELECTRON_PID" 2>/dev/null || break; sleep 0.1; done
 ! kill -0 "$ELECTRON_PID" 2>/dev/null
+for attempt in {1..100}; do
+  audit_descendants_alive=0
+  for pid in $AUDIT_DESCENDANT_PIDS; do kill -0 "$pid" 2>/dev/null && audit_descendants_alive=1; done
+  [ "$audit_descendants_alive" -eq 0 ] && break
+  sleep 0.1
+done
 for pid in $AUDIT_DESCENDANT_PIDS; do ! kill -0 "$pid" 2>/dev/null; done
 wait "$ELECTRON_PID"
 ! curl --silent --fail "http://127.0.0.1:$PORT/json/version"

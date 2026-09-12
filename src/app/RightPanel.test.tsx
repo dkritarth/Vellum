@@ -34,17 +34,23 @@ describe('RightPanel', () => {
     expect(screen.getByText(/metadata will show here/i)).toBeInTheDocument()
   })
 
-  it('renders a visible "coming soon" stub for deferred tabs (Notes, Annotations)', async () => {
+  it('renders a visible "coming soon" stub for deferred tabs (Annotations)', async () => {
     const user = userEvent.setup()
     render(<RightPanel />)
-
-    await user.click(screen.getByRole('tab', { name: 'Notes' }))
-    expect(screen.getByText(/Notes — coming soon/i)).toBeInTheDocument()
-    expect(screen.getByText(/P2-01/)).toBeInTheDocument()
 
     await user.click(screen.getByRole('tab', { name: 'Annotations' }))
     expect(screen.getByText(/Annotations — coming soon/i)).toBeInTheDocument()
     expect(screen.getByText(/P2-02/)).toBeInTheDocument()
+  })
+
+  it('switches to Notes and shows its no-paper-open placeholder', async () => {
+    const user = userEvent.setup()
+    render(<RightPanel />)
+
+    await user.click(screen.getByRole('tab', { name: 'Notes' }))
+
+    expect(screen.getByRole('tab', { name: 'Notes' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText(/open a paper to add notes/i)).toBeInTheDocument()
   })
 
   it('only ever shows one tab panel at a time', async () => {

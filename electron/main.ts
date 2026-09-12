@@ -3,6 +3,7 @@ import type { IpcMainInvokeEvent } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import type { Database } from 'better-sqlite3'
 
@@ -35,13 +36,19 @@ const SLUG_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/
 //
 // Everything below is the minimal boot skeleton. Feature work attaches here.
 
+function resolvePreloadPath(): string {
+  const mjs = join(__dirname, '../preload/preload.mjs')
+  if (existsSync(mjs)) return mjs
+  return join(__dirname, '../preload/index.js')
+}
+
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
     show: false,
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      preload: resolvePreloadPath(),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
@@ -102,7 +109,7 @@ ipcMain.handle('vellum:ingest', async (_event, input: unknown): Promise<IngestRe
 
 const SORT_COLUMN_VALUES: readonly PaperSortColumn[] = ['addedAt', 'year', 'title']
 
-// [P1-08] Library IPC seam. `options` arrives from the renderer as untyped
+// [P1-08] Library grid data. `options` arrives from the renderer as untyped
 // `unknown` — narrowed field-by-field here rather than trusted via a cast.
 // core/library/repo.ts's listPapers() is independently defensive about a bad
 // `sort` value (falls back to the added_at default), so this narrowing is

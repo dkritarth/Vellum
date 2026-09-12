@@ -29,6 +29,12 @@ beforeEach(() => {
       listPapers: vi.fn().mockResolvedValue([
         { slug: 'arxiv-1706.03762', title: 'Attention Is All You Need', authors: ['Ashish Vaswani'], year: 2017, addedAt: '2026-01-01T00:00:00.000Z' },
       ]),
+      ingest: vi.fn().mockResolvedValue({
+        slug: 'arxiv-1706.03762',
+        title: 'Attention Is All You Need',
+        metadata: { title: 'Attention Is All You Need', authors: ['Ashish Vaswani'] },
+        paths: { pdfPath: 'paper.pdf', mdPath: 'paper.md' },
+      }),
       // Opening a paper mounts RightPanel's AskPanel ([P1-10]) bound to its
       // slug — this test only cares about tab/pane shell behavior, so a
       // never-resolving promise keeps AskPanel harmlessly in its loading
@@ -92,5 +98,23 @@ describe('App shell', () => {
 
     expect(screen.getAllByRole('tab', { name: 'Attention Is All You Need' })).toHaveLength(1)
     expect(screen.queryByLabelText(/search papers by title/i)).not.toBeInTheDocument()
+  })
+
+  it('clicking Create opens IngestModal, and ingesting a paper opens it into a new tab', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Create' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /add paper/i })).toBeInTheDocument()
+
+    const input = screen.getByPlaceholderText(/1706\.03762/)
+    await user.type(input, '1706.03762')
+    await user.click(screen.getByRole('button', { name: /add paper/i }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(await screen.findByRole('tab', { name: 'Attention Is All You Need' })).toBeInTheDocument()
   })
 })

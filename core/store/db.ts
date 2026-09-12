@@ -6,7 +6,7 @@
 // ever touches the state DB — never write paper markdown/PDF bytes here.
 
 import { existsSync, mkdirSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { dirname, resolve } from 'node:path'
 
 import Database from 'better-sqlite3'
 
@@ -15,9 +15,21 @@ import { runMigrations } from './migrate.js'
 export interface OpenDbOptions {
   /** Override the DB file path. Defaults to `data/app.db` under `cwd`. Pass `:memory:` for tests. */
   path?: string
+  /** Override the native binding location. Auto-detected for Electron if omitted. */
+  nativeBinding?: string
 }
 
 const DEFAULT_DB_PATH = 'data/app.db'
+
+function resolveNativeBinding(): string | undefined {
+  if (process.versions.electron) {
+    const electronBinding = resolve(process.cwd(), 'resources/native/better_sqlite3.electron.node')
+    if (existsSync(electronBinding)) {
+      return electronBinding
+    }
+  }
+  return undefined
+}
 
 /**
  * Open (creating if needed) the Vellum state database and bring its schema
@@ -34,7 +46,8 @@ export function openDb(options: OpenDbOptions = {}): Database.Database {
     }
   }
 
-  const db = new Database(path)
+  const nativeBinding = options.nativeBinding ?? resolveNativeBinding()
+  const db = new Database(path, nativeBinding ? { nativeBinding } : undefined)
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
 

@@ -1,5 +1,5 @@
 import { resolve } from 'node:path'
-import { defineConfig } from 'electron-vite'
+import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 
 // Single-package Electron layout:
@@ -8,10 +8,18 @@ import react from '@vitejs/plugin-react'
 //   core/      -> backend logic imported by the main process
 export default defineConfig({
   main: {
+    plugins: [
+      externalizeDepsPlugin({
+        exclude: ['@agentclientprotocol/sdk', 'unpdf', 'pdfjs-dist'],
+      }),
+    ],
     build: {
       rollupOptions: {
         input: resolve('electron/main.ts'),
-        output: { entryFileNames: 'index.js' },
+        output: {
+          entryFileNames: 'index.cjs',
+          format: 'cjs',
+        },
       },
     },
     resolve: {
@@ -19,6 +27,7 @@ export default defineConfig({
     },
   },
   preload: {
+    plugins: [externalizeDepsPlugin()],
     build: {
       rollupOptions: {
         input: resolve('electron/preload.ts'),

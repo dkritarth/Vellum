@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { IngestModal } from './IngestModal'
 import { Library } from './Library'
 import { Reader } from './Reader'
 import { ReaderToolbar } from './ReaderToolbar'
@@ -12,7 +13,8 @@ import styles from './App.module.css'
 // Vellum shell — [P1-07] anara-style frame, [P1-08] wires in real data:
 //   top: TabStrip (open papers as tabs — one per opened paper, keyed by slug)
 //   left: Sidebar (Create / Home / Library / Search + folder tree); selecting
-//     'Library' swaps the center pane to the Library grid
+//     'Library' swaps the center pane to the Library grid; selecting 'Create'
+//     opens the IngestModal.
 //   center: Library grid (click a card -> opens/focuses that paper's tab and
 //     switches back to the Reader) or the [P1-09] Reader for the active tab
 //   right: RightPanel (Ask | Notes | Details | Annotations)
@@ -27,6 +29,7 @@ export function App(): JSX.Element {
   const [tabs, setTabs] = useState<PaperTab[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
   const [view, setView] = useState<'reader' | 'library'>('reader')
+  const [isIngestOpen, setIsIngestOpen] = useState(false)
 
   useEffect(() => {
     window.vellum?.ping().then(setPong).catch(() => setPong('no-bridge'))
@@ -44,7 +47,11 @@ export function App(): JSX.Element {
   }
 
   function handleNavChange(item: NavItem): void {
-    setView(item === 'Library' ? 'library' : 'reader')
+    if (item === 'Create') {
+      setIsIngestOpen(true)
+    } else {
+      setView(item === 'Library' ? 'library' : 'reader')
+    }
   }
 
   return (
@@ -64,6 +71,14 @@ export function App(): JSX.Element {
         </main>
         <RightPanel slug={activeTabId ?? undefined} />
       </div>
+      <IngestModal
+        isOpen={isIngestOpen}
+        onClose={() => setIsIngestOpen(false)}
+        onSuccess={(paper) => {
+          setIsIngestOpen(false)
+          openPaper(paper)
+        }}
+      />
       <footer className={styles.statusBar}>
         <span>Vellum</span>
         <span className={styles.statusBarSpacer} />

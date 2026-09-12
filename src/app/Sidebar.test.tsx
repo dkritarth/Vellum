@@ -10,12 +10,12 @@ afterEach(() => {
 })
 
 describe('Sidebar', () => {
-  it('defaults to the Files view showing the folder-tree stub linking [P2-05]', () => {
+  it('defaults to the Files view showing the active Collections tree [L2-01]', () => {
     render(<Sidebar />)
 
     expect(screen.getByRole('tab', { name: 'Files' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByText(/Folders — coming soon/i)).toBeInTheDocument()
-    expect(screen.getByText(/P2-05/)).toBeInTheDocument()
+    expect(screen.getByRole('tree', { name: 'Collections' })).toBeInTheDocument()
+    expect(screen.getByText('All Papers')).toBeInTheDocument()
   })
 
   it('switches to Chats and shows its "coming soon" stub linking [P2-06]', async () => {

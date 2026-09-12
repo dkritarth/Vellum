@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { ComingSoon } from './ComingSoon'
 import styles from './Sidebar.module.css'
 import { WorkspaceSwitcher } from './WorkspaceSwitcher'
+import { CollectionsTree } from './CollectionsTree'
 
 const NAV_ITEMS = ['Create', 'Home', 'Library', 'Search'] as const
 export type NavItem = (typeof NAV_ITEMS)[number]
@@ -27,9 +28,15 @@ interface SidebarProps {
    * Library grid when 'Library' is selected — everything else (Create/Home/
    * Search) is out of this card's scope and just keeps the current pane. */
   onNavChange?: (item: NavItem) => void
+  selectedCollectionId?: number | null
+  onSelectCollection?: (id: number | null, name: string | null) => void
 }
 
-export function Sidebar({ onNavChange }: SidebarProps = {}): JSX.Element {
+export function Sidebar({
+  onNavChange,
+  selectedCollectionId = null,
+  onSelectCollection,
+}: SidebarProps = {}): JSX.Element {
   const [active, setActive] = useState<NavItem>('Home')
   const [libraryView, setLibraryView] = useState<LibraryView>('Files')
   const [footerView, setFooterView] = useState<FooterItem | null>(null)
@@ -81,7 +88,12 @@ export function Sidebar({ onNavChange }: SidebarProps = {}): JSX.Element {
         {footerView ? (
           <ComingSoon label={footerView} note={FOOTER_NOTES[footerView]} />
         ) : libraryView === 'Files' ? (
-          <ComingSoon label="Folders" note="Folder tree / collections — wiki card [P2-05]" />
+          <CollectionsTree
+            selectedCollectionId={selectedCollectionId}
+            onSelectCollection={(id, name) => {
+              onSelectCollection?.(id, name)
+            }}
+          />
         ) : (
           <ComingSoon label="Chats" note="Chats library view — wiki card [P2-06]" />
         )}

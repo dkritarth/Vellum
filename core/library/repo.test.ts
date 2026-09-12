@@ -249,5 +249,22 @@ describe('repo', () => {
         db.close()
       }
     })
+
+    it('filters papers by collectionId [L2-01]', () => {
+      const db = openDb({ path: ':memory:' })
+      try {
+        seed(db)
+        db.prepare("INSERT INTO collections (id, name) VALUES (1, 'Transformers')").run()
+        db.prepare("INSERT INTO paper_collections (paper_slug, collection_id) VALUES ('attention', 1), ('bert', 1)").run()
+
+        const inColl = listPapers(db, { collectionId: 1 })
+        expect(inColl.map((r) => r.slug).sort()).toEqual(['attention', 'bert'])
+
+        const searchInColl = listPapers(db, { collectionId: 1, search: 'BERT' })
+        expect(searchInColl.map((r) => r.slug)).toEqual(['bert'])
+      } finally {
+        db.close()
+      }
+    })
   })
 })

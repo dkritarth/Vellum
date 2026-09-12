@@ -17,6 +17,18 @@ import type { IngestResult } from '../core/ingest/index.js'
 import { getPaper, listPapers } from '../core/library/repo.js'
 import type { ListPapersOptions, PaperRecord, PaperSortColumn } from '../core/library/repo.js'
 import { deleteNote, getNote, upsertNote } from '../core/notes/repo.js'
+import {
+  assignPaperToCollection,
+  createCollection,
+  deleteCollection,
+  getCollectionsTree,
+  listCollections,
+  listPaperCollections,
+  removePaperFromCollection,
+  renameCollection,
+  type CollectionRecord,
+  type CollectionTreeItem,
+} from '../core/collections/repo.js'
 import type { NoteRecord } from '../core/notes/repo.js'
 import { createHighlight, deleteHighlight, listHighlights } from '../core/highlights/repo.js'
 import type { HighlightRecord } from '../core/highlights/repo.js'
@@ -127,8 +139,9 @@ function toListPapersOptions(value: unknown): ListPapersOptions {
     ? (candidate['sort'] as PaperSortColumn)
     : undefined
   const order = candidate['order'] === 'asc' || candidate['order'] === 'desc' ? candidate['order'] : undefined
+  const collectionId = typeof candidate['collectionId'] === 'number' ? candidate['collectionId'] : undefined
 
-  return { search, sort, order }
+  return { search, collectionId, sort, order }
 }
 
 // Library grid data [P1-08]. Read-only, no slug/path handling needed (unlike
@@ -357,4 +370,72 @@ app.on('window-all-closed', () => {
 // leaving them to be reaped by process exit.
 app.on('before-quit', () => {
   chatManager?.disposeAll().catch(() => undefined)
+})
+
+// [L2-01] Collections & Library filtering ------------------------------------
+ipcMain.handle('vellum:collections-list', (): CollectionRecord[] => {
+  return listCollections(getDb())
+})
+
+ipcMain.handle('vellum:collections-tree', (): CollectionTreeItem[] => {
+  return getCollectionsTree(getDb())
+})
+
+ipcMain.handle('vellum:collections-create', (_event, params: unknown): CollectionRecord => {
+  if (typeof params !== 'object' || params === null) {
+    throw new Error('vellum:collections-create: params must be an object')
+  }
+  const { name, parentId } = params as { name: unknown; parentId?: unknown }
+  if (typeof name !== 'string') {
+    throw new Error('vellum:collections-create: name must be a string')
+  }
+  const pid = typeof parentId === 'number' ? parentId : null
+  return createCollection(getDb(), { name, parentId: pid })
+})
+
+ipcMain.handle('vellum:collections-rename', (_event, params: unknown): void => {
+  if (typeof params !== 'object' || params === null) {
+    throw new Error('vellum:collections-rename: params must be an object')
+  }
+  const { id, name } = params as { id: unknown; name: unknown }
+  if (typeof id !== 'number' || typeof name !== 'string') {
+    throw new Error('vellum:collections-rename: id must be number and name must be string')
+  }
+  renameCollection(getDb(), id, name)
+})
+
+ipcMain.handle('vellum:collections-delete', (_event, id: unknown): void => {
+  if (typeof id !== 'number') {
+    throw new Error('vellum:collections-delete: id must be a number')
+  }
+  deleteCollection(getDb(), id)
+})
+
+ipcMain.handle('vellum:collections-assign', (_event, params: unknown): void => {
+  if (typeof params !== 'object' || params === null) {
+    throw new Error('vellum:collections-assign: params must be an object')
+  }
+  const { paperSlug, collectionId } = params as { paperSlug: unknown; collectionId: unknown }
+  if (typeof paperSlug !== 'string' || typeof collectionId !== 'number') {
+    throw new Error('vellum:collections-assign: paperSlug must be string and collectionId must be number')
+  }
+  assignPaperToCollection(getDb(), { paperSlug, collectionId })
+})
+
+ipcMain.handle('vellum:collections-remove', (_event, params: unknown): void => {
+  if (typeof params !== 'object' || params === null) {
+    throw new Error('vellum:collections-remove: params must be an object')
+  }
+  const { paperSlug, collectionId } = params as { paperSlug: unknown; collectionId: unknown }
+  if (typeof paperSlug !== 'string' || typeof collectionId !== 'number') {
+    throw new Error('vellum:collections-remove: paperSlug must be string and collectionId must be number')
+  }
+  removePaperFromCollection(getDb(), { paperSlug, collectionId })
+})
+
+ipcMain.handle('vellum:collections-for-paper', (_event, paperSlug: unknown): CollectionRecord[] => {
+  if (typeof paperSlug !== 'string') {
+    throw new Error('vellum:collections-for-paper: paperSlug must be a string')
+  }
+  return listPaperCollections(getDb(), paperSlug)
 })

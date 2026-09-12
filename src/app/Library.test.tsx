@@ -117,4 +117,30 @@ describe('Library', () => {
 
     await waitFor(() => expect(screen.getByText(/no papers match/i)).toBeInTheDocument())
   })
+  it('filters by selectedCollectionId and renders filter banner and collection tags [L2-01]', async () => {
+    listPapers.mockResolvedValue([makePaper({ slug: 'paper-1', title: 'Paper in Collection' })])
+    const collectionsForPaper = vi.fn().mockResolvedValue([{ id: 10, name: 'Machine Learning', parentId: null }])
+    Object.defineProperty(window, 'vellum', {
+      configurable: true,
+      value: { listPapers, collectionsForPaper },
+    })
+
+    const onClear = vi.fn()
+    render(
+      <Library
+        onOpenPaper={vi.fn()}
+        selectedCollectionId={10}
+        selectedCollectionName="Machine Learning"
+        onClearCollectionFilter={onClear}
+      />
+    )
+
+    expect(await screen.findByText(/Filtered by collection:/)).toBeInTheDocument()
+    expect(screen.getAllByText('Machine Learning').length).toBe(2)
+    expect(listPapers).toHaveBeenCalledWith(expect.objectContaining({ collectionId: 10 }))
+
+    const clearBtn = screen.getByRole('button', { name: 'Clear filter' })
+    clearBtn.click()
+    expect(onClear).toHaveBeenCalled()
+  })
 })

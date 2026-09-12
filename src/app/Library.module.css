@@ -76,3 +76,45 @@
   font-size: 12px;
   color: var(--vellum-text-dim, #8a8a8a);
 }
+
+.filterBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--vellum-surface-active, #262626);
+  border: 1px solid var(--vellum-border, #3a3a3a);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--vellum-text, #eaeaea);
+}
+
+.clearFilterButton {
+  background: transparent;
+  border: 1px solid var(--vellum-border, #444444);
+  color: var(--vellum-text-dim, #aaaaaa);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.clearFilterButton:hover {
+  background: var(--vellum-surface-hover, #333333);
+  color: var(--vellum-text, #ffffff);
+}
+
+.collectionsTagList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.collectionTag {
+  font-size: 11px;
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border-radius: 4px;
+  padding: 2px 6px;
+}

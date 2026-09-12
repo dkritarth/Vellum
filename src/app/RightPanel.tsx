@@ -35,6 +35,8 @@ interface RightPanelProps {
   onJumpToHighlight?: (highlight: HighlightRecord) => void
   /** [R1-05] Injected prompt from PDF text selection actions */
   injectedPrompt?: InjectedPrompt | null
+  /** [L2-02] Target chat session to open in AskPanel */
+  targetSessionId?: number | null
 }
 
 export function RightPanel({
@@ -44,6 +46,7 @@ export function RightPanel({
   slug,
   onJumpToHighlight,
   injectedPrompt,
+  targetSessionId,
 }: RightPanelProps): JSX.Element {
   const [internalTab, setInternalTab] = useState<RightPanelTab>(defaultTab)
   const activeTab = controlledActiveTab ?? internalTab
@@ -74,7 +77,7 @@ export function RightPanel({
       </div>
 
       <div className={styles.tabPanel} role="tabpanel">
-        {renderTabContent(activeTab, slug, onJumpToHighlight, injectedPrompt)}
+        {renderTabContent(activeTab, slug, onJumpToHighlight, injectedPrompt, targetSessionId)}
       </div>
     </aside>
   )
@@ -85,10 +88,11 @@ function renderTabContent(
   slug: string | undefined,
   onJumpToHighlight: ((highlight: HighlightRecord) => void) | undefined,
   injectedPrompt: InjectedPrompt | null | undefined,
+  targetSessionId?: number | null,
 ): JSX.Element {
   switch (tab) {
     case 'Ask':
-      if (slug) return <AskPanel slug={slug} injectedPrompt={injectedPrompt} />
+      if (slug) return <AskPanel slug={slug} injectedPrompt={injectedPrompt} targetSessionId={targetSessionId} />
       return (
         <div className={styles.askTab}>
           <p className={styles.placeholder}>Open a paper to start asking questions.</p>

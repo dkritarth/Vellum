@@ -43,9 +43,11 @@ interface AskPanelProps {
   slug: string
   /** [R1-05] Contextual prompt injected from PDF text selection (Add to chat or Explain) */
   injectedPrompt?: InjectedPrompt | null
+  /** [L2-02] Target chat session ID to restore from Chats library */
+  targetSessionId?: number | null
 }
 
-export function AskPanel({ slug, injectedPrompt }: AskPanelProps): JSX.Element {
+export function AskPanel({ slug, injectedPrompt, targetSessionId }: AskPanelProps): JSX.Element {
   const [sessionId, setSessionId] = useState<number | null>(null)
   const [messages, setMessages] = useState<DisplayMessage[]>([])
   const [input, setInput] = useState('')
@@ -68,7 +70,7 @@ export function AskPanel({ slug, injectedPrompt }: AskPanelProps): JSX.Element {
     activeRequestId.current = null
 
     window.vellum
-      .askOpen(slug)
+      .askOpen(targetSessionId ? { slug, sessionId: targetSessionId } : slug)
       .then((result) => {
         if (cancelled) return
         setSessionId(result.session.id)
@@ -88,7 +90,7 @@ export function AskPanel({ slug, injectedPrompt }: AskPanelProps): JSX.Element {
     return () => {
       cancelled = true
     }
-  }, [slug])
+  }, [slug, targetSessionId])
 
   // Single subscription for the lifetime of the component. Main broadcasts
   // to this window; we filter by `activeRequestId.current` so events from an

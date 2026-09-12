@@ -143,3 +143,134 @@ export function addChatMessage(
     createdAt,
   }
 }
+
+export interface ChatSessionSummary {
+  id: number
+  paperSlug: string
+  paperTitle: string | null
+  backend: string
+  title: string
+  preview: string | null
+  messageCount: number
+  createdAt: string
+  lastActiveAt: string
+}
+
+export interface ListChatSessionsOptions {
+  search?: string
+  limit?: number
+}
+
+/**
+ * List all chat sessions across papers, ordered by most recent activity.
+ * Stable title fallback is derived from first user message if title is not set.
+ * Returns paper title from `papers` table (or null if paper was deleted).
+ */
+export function listChatSessions(
+  db: Database,
+  options: ListChatSessionsOptions = {},
+): ChatSessionSummary[] {
+  const { search, limit = 100 } = options
+
+  let sql = `
+    SELECT 
+      cs.id,
+      cs.paper_slug AS paperSlug,
+      p.title AS paperTitle,
+      cs.backend,
+      cs.title,
+      cs.created_at AS createdAt,
+      COUNT(cm.id) AS messageCount,
+      MAX(cm.created_at) AS lastMessageAt,
+      (
+        SELECT content FROM chat_messages 
+        WHERE session_id = cs.id AND role = 'user' 
+        ORDER BY id ASC LIMIT 1
+      ) AS firstUserMessage,
+      (
+        SELECT content FROM chat_messages 
+        WHERE session_id = cs.id 
+        ORDER BY id DESC LIMIT 1
+      ) AS lastMessage
+    FROM chat_sessions cs
+    LEFT JOIN papers p ON cs.paper_slug = p.slug
+    LEFT JOIN chat_messages cm ON cs.id = cm.session_id
+  `
+
+  const conditions: string[] = []
+  const params: unknown[] = []
+
+  if (search && search.trim().length > 0) {
+    const pattern = `%${search.trim().toLowerCase()}%`
+    conditions.push(`(
+      LOWER(COALESCE(cs.title, '')) LIKE ? OR
+      LOWER(COALESCE(p.title, '')) LIKE ? OR
+      LOWER(cs.paper_slug) LIKE ? OR
+      cs.id IN (SELECT session_id FROM chat_messages WHERE LOWER(content) LIKE ?)
+    )`)
+    params.push(pattern, pattern, pattern, pattern)
+  }
+
+  if (conditions.length > 0) {
+    sql += ` WHERE ${conditions.join(' AND ')}`
+  }
+
+  sql += `
+    GROUP BY cs.id
+    ORDER BY COALESCE(MAX(cm.created_at), cs.created_at) DESC
+    LIMIT ?
+  `
+  params.push(limit)
+
+  const rows = db.prepare(sql).all(...params) as Array<{
+    id: number
+    paperSlug: string
+    paperTitle: string | null
+    backend: string
+    title: string | null
+    createdAt: string
+    messageCount: number
+    lastMessageAt: string | null
+    firstUserMessage: string | null
+    lastMessage: string | null
+  }>
+
+  return rows.map((row) => {
+    let displayTitle = row.title
+    if (!displayTitle || displayTitle.trim().length === 0) {
+      if (row.firstUserMessage && row.firstUserMessage.trim().length > 0) {
+        const cleaned = row.firstUserMessage.trim().replace(/\s+/g, ' ')
+        displayTitle = cleaned.length > 60 ? cleaned.slice(0, 57) + '...' : cleaned
+      } else {
+        displayTitle = `Chat #${row.id}`
+      }
+    }
+
+    let preview = row.lastMessage
+    if (preview && preview.length > 100) {
+      preview = preview.slice(0, 97) + '...'
+    }
+
+    return {
+      id: row.id,
+      paperSlug: row.paperSlug,
+      paperTitle: row.paperTitle,
+      backend: row.backend,
+      title: displayTitle,
+      preview: preview ?? null,
+      messageCount: Number(row.messageCount),
+      createdAt: row.createdAt,
+      lastActiveAt: row.lastMessageAt || row.createdAt,
+    }
+  })
+}
+
+/** Update the title of a chat session. */
+export function updateChatSessionTitle(db: Database, id: number, title: string): void {
+  db.prepare('UPDATE chat_sessions SET title = ? WHERE id = ?').run(title.trim(), id)
+}
+
+/** Delete a chat session and cascade delete its messages. */
+export function deleteChatSession(db: Database, id: number): void {
+  db.prepare('DELETE FROM chat_sessions WHERE id = ?').run(id)
+}

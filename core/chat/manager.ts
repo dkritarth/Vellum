@@ -20,7 +20,7 @@ import type { Database } from 'better-sqlite3'
 
 import type { AcpBackend, AcpClient, AcpSession, AcpUpdate } from '../acp/client.js'
 import type { ChatMessage, ChatSession } from './repo.js'
-import { addChatMessage, createChatSession, getChatMessages, getLatestChatSession } from './repo.js'
+import { addChatMessage, createChatSession, getChatMessages, getChatSession, getLatestChatSession } from './repo.js'
 
 const DEFAULT_BACKEND: AcpBackend = 'claude'
 
@@ -91,6 +91,7 @@ export interface OpenChatParams {
   db: Database
   paperSlug: string
   backend?: AcpBackend
+  chatSessionId?: number
 }
 
 export interface AskOpenResult {
@@ -131,7 +132,16 @@ export class ChatManager {
    */
   openChat(params: OpenChatParams): AskOpenResult {
     const backend = params.backend ?? DEFAULT_BACKEND
-    const existing = getLatestChatSession(params.db, params.paperSlug)
+    let existing: ChatSession | undefined
+    if (params.chatSessionId) {
+      const candidate = getChatSession(params.db, params.chatSessionId)
+      if (candidate && candidate.paperSlug === params.paperSlug) {
+        existing = candidate
+      }
+    }
+    if (!existing) {
+      existing = getLatestChatSession(params.db, params.paperSlug)
+    }
     const session = existing ?? createChatSession(params.db, { paperSlug: params.paperSlug, backend })
     const messages = getChatMessages(params.db, session.id)
     return { session, messages }

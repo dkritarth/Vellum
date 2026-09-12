@@ -1,0 +1,164 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.searchHeader {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-color, #2d3748);
+}
+
+.searchInput {
+  width: 100%;
+  padding: 6px 10px;
+  background-color: var(--bg-input, #1a202c);
+  border: 1px solid var(--border-color, #4a5568);
+  border-radius: 4px;
+  color: var(--text-color, #e2e8f0);
+  font-size: 12px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.searchInput:focus {
+  border-color: var(--color-primary, #3182ce);
+}
+
+.list {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+}
+
+.item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: background-color 0.15s ease;
+  user-select: none;
+}
+
+.item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.item:focus-visible,
+.itemActive {
+  background-color: rgba(66, 153, 225, 0.15);
+  border-left-color: #3182ce;
+  outline: none;
+}
+
+.itemTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.itemTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f7fafc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.deleteBtn {
+  opacity: 0;
+  background: transparent;
+  border: none;
+  color: #a0aec0;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.item:hover .deleteBtn,
+.item:focus-within .deleteBtn {
+  opacity: 1;
+}
+
+.deleteBtn:hover {
+  color: #fc8181;
+  background-color: rgba(254, 178, 178, 0.1);
+}
+
+.itemPaper {
+  font-size: 11px;
+  color: #a0aec0;
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.missingPaper {
+  font-style: italic;
+  color: #e53e3e;
+}
+
+.itemMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+  font-size: 10px;
+  color: #718096;
+}
+
+.badge {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badgeClaude {
+  background-color: rgba(214, 158, 46, 0.2);
+  color: #ecc94b;
+}
+
+.badgeCodex {
+  background-color: rgba(72, 187, 120, 0.2);
+  color: #68d391;
+}
+
+.badgeGeneric {
+  background-color: rgba(160, 174, 192, 0.2);
+  color: #cbd5e0;
+}
+
+.msgCount {
+  color: #a0aec0;
+}
+
+.timestamp {
+  margin-left: auto;
+}
+
+.emptyState,
+.errorState {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 12px;
+  color: #a0aec0;
+}
+
+.errorState {
+  color: #fc8181;
+}

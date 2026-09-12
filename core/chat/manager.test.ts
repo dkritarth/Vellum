@@ -220,4 +220,19 @@ describe('ChatManager', () => {
     expect(messages).toHaveLength(1)
     expect(messages[0]?.role).toBe('user')
   })
+  it('reopens an exact past chat session when chatSessionId is provided [L2-02]', async () => {
+    const client = new FakeClient([])
+    const manager = new ChatManager(client)
+
+    const first = manager.openChat({ db, paperSlug: slug })
+    const second = await manager.newChat({ db, paperSlug: slug })
+
+    // Without chatSessionId, openChat defaults to latest (second)
+    const latest = manager.openChat({ db, paperSlug: slug })
+    expect(latest.session.id).toBe(second.id)
+
+    // With explicit chatSessionId, openChat reopens the first session
+    const reopened = manager.openChat({ db, paperSlug: slug, chatSessionId: first.session.id })
+    expect(reopened.session.id).toBe(first.session.id)
+  })
 })

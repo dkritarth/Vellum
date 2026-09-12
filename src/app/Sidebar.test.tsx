@@ -18,14 +18,14 @@ describe('Sidebar', () => {
     expect(screen.getByText('All Papers')).toBeInTheDocument()
   })
 
-  it('switches to Chats and shows its "coming soon" stub linking [P2-06]', async () => {
+  it('switches to Chats and renders the active ChatsList [L2-02]', async () => {
     const user = userEvent.setup()
     render(<Sidebar />)
 
     await user.click(screen.getByRole('tab', { name: 'Chats' }))
 
-    expect(screen.getByText(/Chats — coming soon/i)).toBeInTheDocument()
-    expect(screen.getByText(/P2-06/)).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Chats' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('searchbox', { name: 'Search chats' })).toBeInTheDocument()
   })
 
   it('shows the Trash stub linking [P2-08]', async () => {

@@ -2,7 +2,7 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Sidebar } from './Sidebar'
 
 afterEach(() => {
@@ -59,5 +59,14 @@ describe('Sidebar', () => {
 
     await user.click(screen.getByRole('button', { name: 'Library' }))
     expect(screen.getByRole('button', { name: 'Library' })).toHaveAttribute('aria-current', 'page')
+  })
+  it('invokes onSelectTrash when Trash is clicked and handler is provided [L2-04]', async () => {
+    const user = userEvent.setup()
+    const onSelectTrash = vi.fn()
+    render(<Sidebar onSelectTrash={onSelectTrash} />)
+
+    await user.click(screen.getByRole('button', { name: 'Trash' }))
+
+    expect(onSelectTrash).toHaveBeenCalledTimes(1)
   })
 })

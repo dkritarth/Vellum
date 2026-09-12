@@ -36,6 +36,10 @@ const api = {
   listPapers: (options?: ListPapersOptions): Promise<PaperRecord[]> =>
     ipcRenderer.invoke('vellum:list-papers', options ?? {}),
   getPaper: (slug: string): Promise<PaperRecord | null> => ipcRenderer.invoke('vellum:get-paper', slug),
+  // [L2-04] Trash & Purge
+  paperTrash: (slug: string): Promise<PaperRecord | null> => ipcRenderer.invoke('vellum:paper-trash', slug),
+  paperRestore: (slug: string): Promise<PaperRecord | null> => ipcRenderer.invoke('vellum:paper-restore', slug),
+  paperPurge: (slug: string): Promise<boolean> => ipcRenderer.invoke('vellum:paper-purge', slug),
   // [P2-01] Notes tab — one freeform markdown note per paper. `notesGet`
   // resolves null when the paper has no note yet (empty-editor state).
   // `notesSave` is autosave's persistence half — upsert-by-paper-slug, so the

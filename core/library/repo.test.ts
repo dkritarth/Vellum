@@ -1,7 +1,10 @@
+import os from 'node:os'
+import fs from 'node:fs'
+import path from 'node:path'
 import type { Database } from 'better-sqlite3'
 import { describe, expect, it } from 'vitest'
 import { openDb } from '../store/db.js'
-import { getPaper, listPapers, upsertPaper } from './repo.js'
+import { getPaper, listPapers, upsertPaper, trashPaper, restorePaper, purgePaper } from './repo.js'
 import type { PaperRecord } from './repo.js'
 
 function makeRecord(overrides: Partial<PaperRecord> = {}): PaperRecord {
@@ -262,6 +265,125 @@ describe('repo', () => {
 
         const searchInColl = listPapers(db, { collectionId: 1, search: 'BERT' })
         expect(searchInColl.map((r) => r.slug)).toEqual(['bert'])
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  describe('Trash and Purge operations [L2-04]', () => {
+function seedDb(db: Database): void {
+  upsertPaper(
+    db,
+    makeRecord({
+      slug: 'attention',
+      title: 'Attention Is All You Need',
+      year: 2017,
+      addedAt: '2026-01-01T00:00:00.000Z',
+    }),
+  )
+  upsertPaper(
+    db,
+    makeRecord({
+      slug: 'bert',
+      title: 'BERT: Pre-training of Deep Bidirectional Transformers',
+      year: 2019,
+      addedAt: '2026-03-01T00:00:00.000Z',
+    }),
+  )
+  upsertPaper(
+    db,
+    makeRecord({
+      slug: 'gpt3',
+      title: 'Language Models are Few-Shot Learners',
+      year: 2020,
+      addedAt: '2026-02-01T00:00:00.000Z',
+    }),
+  )
+}
+
+    it('trashes a paper, hiding it from default library while retaining it in trashed view', () => {
+      const db = openDb({ path: ':memory:' })
+      try {
+        seedDb(db)
+        expect(listPapers(db)).toHaveLength(3)
+
+        // Trash 'bert'
+        const trashed = trashPaper(db, 'bert')
+        expect(trashed).toBeDefined()
+        expect(trashed?.slug).toBe('bert')
+        expect(trashed?.trashedAt).toBeTruthy()
+
+        // Default list excludes trashed
+        const active = listPapers(db)
+        expect(active.map((p) => p.slug)).toEqual(['gpt3', 'attention'])
+
+        // Trashed list includes bert
+        const trashList = listPapers(db, { trashed: true })
+        expect(trashList.map((p) => p.slug)).toEqual(['bert'])
+      } finally {
+        db.close()
+      }
+    })
+
+    it('restores a trashed paper back to active Library', () => {
+      const db = openDb({ path: ':memory:' })
+      try {
+        seedDb(db)
+        trashPaper(db, 'bert')
+        expect(listPapers(db)).toHaveLength(2)
+
+        const restored = restorePaper(db, 'bert')
+        expect(restored?.slug).toBe('bert')
+        expect(restored?.trashedAt).toBeUndefined()
+
+        const active = listPapers(db)
+        expect(active.map((p) => p.slug)).toContain('bert')
+        expect(listPapers(db, { trashed: true })).toHaveLength(0)
+      } finally {
+        db.close()
+      }
+    })
+
+    it('permanently purges a paper from DB and removes its directory on disk', () => {
+      const db = openDb({ path: ':memory:' })
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vellum-purge-test-'))
+      try {
+        const paperDir = path.join(tmpDir, 'papers', 'purge-me')
+        fs.mkdirSync(paperDir, { recursive: true })
+        fs.writeFileSync(path.join(paperDir, 'content.pdf'), 'fake pdf')
+
+        upsertPaper(db, makeRecord({ slug: 'purge-me', title: 'Paper To Purge' }))
+        expect(getPaper(db, 'purge-me')).toBeDefined()
+
+        const purged = purgePaper(db, 'purge-me', tmpDir)
+        expect(purged).toBe(true)
+        expect(getPaper(db, 'purge-me')).toBeUndefined()
+        expect(fs.existsSync(paperDir)).toBe(false)
+      } finally {
+        db.close()
+        fs.rmSync(tmpDir, { recursive: true, force: true })
+      }
+    })
+
+    it('purgePaper safely handles missing on-disk files without throwing', () => {
+      const db = openDb({ path: ':memory:' })
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vellum-purge-missing-'))
+      try {
+        upsertPaper(db, makeRecord({ slug: 'non-existent-files', title: 'Ghost Paper' }))
+        const purged = purgePaper(db, 'non-existent-files', tmpDir)
+        expect(purged).toBe(true)
+        expect(getPaper(db, 'non-existent-files')).toBeUndefined()
+      } finally {
+        db.close()
+        fs.rmSync(tmpDir, { recursive: true, force: true })
+      }
+    })
+
+    it('purgePaper prevents path traversal in slug', () => {
+      const db = openDb({ path: ':memory:' })
+      try {
+        expect(() => purgePaper(db, '../traversal')).toThrow(/Invalid slug format/)
       } finally {
         db.close()
       }

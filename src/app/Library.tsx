@@ -17,6 +17,8 @@ export interface LibraryProps {
   selectedCollectionId?: number | null
   selectedCollectionName?: string | null
   onClearCollectionFilter?: () => void
+  /** [L2-04] Callback when a paper is moved to Trash. */
+  onTrashPaper?: (slug: string) => void
 }
 
 const SORT_OPTIONS: { value: PaperSortColumn; label: string }[] = [
@@ -32,12 +34,25 @@ export function Library({
   selectedCollectionId = null,
   selectedCollectionName = null,
   onClearCollectionFilter,
+  onTrashPaper,
 }: LibraryProps): JSX.Element {
   const [papers, setPapers] = useState<PaperRecord[]>([])
   const [paperCollections, setPaperCollections] = useState<Record<string, string[]>>({})
   const [status, setStatus] = useState<Status>('loading')
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<PaperSortColumn>('addedAt')
+  const handleTrashPaper = async (e: React.MouseEvent, slug: string): Promise<void> => {
+    e.stopPropagation()
+    try {
+      if (window.vellum?.paperTrash) {
+        await window.vellum.paperTrash(slug)
+      }
+      setPapers((prev) => prev.filter((p) => p.slug !== slug))
+      onTrashPaper?.(slug)
+    } catch (err) {
+      console.error('Failed to move paper to trash:', err)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -126,28 +141,48 @@ export function Library({
       ) : (
         <div className={styles.grid} role="list" aria-label="Papers">
           {papers.map((paper) => (
-            <button
+            <div
               key={paper.slug}
-              type="button"
               role="listitem"
               className={styles.card}
-              onClick={() => onOpenPaper({ slug: paper.slug, title: paper.title })}
             >
-              <span className={styles.cardTitle}>{paper.title}</span>
-              <span className={styles.cardMeta}>
-                {formatAuthors(paper.authors)}
-                {paper.year ? ` · ${paper.year}` : ''}
-              </span>
-              {paperCollections[paper.slug] && paperCollections[paper.slug].length > 0 && (
-                <div className={styles.collectionsTagList}>
-                  {paperCollections[paper.slug].map((cName) => (
-                    <span key={cName} className={styles.collectionTag}>
-                      {cName}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </button>
+              <div className={styles.cardHeader}>
+                <button
+                  type="button"
+                  className={styles.cardTitleButton}
+                  onClick={() => onOpenPaper({ slug: paper.slug, title: paper.title })}
+                >
+                  <span className={styles.cardTitle}>{paper.title}</span>
+                </button>
+                <button
+                  type="button"
+                  className={styles.trashCardButton}
+                  aria-label={`Move ${paper.title} to trash`}
+                  title="Move to trash"
+                  onClick={(e) => void handleTrashPaper(e, paper.slug)}
+                >
+                  🗑️
+                </button>
+              </div>
+              <div
+                className={styles.cardBody}
+                onClick={() => onOpenPaper({ slug: paper.slug, title: paper.title })}
+              >
+                <span className={styles.cardMeta}>
+                  {formatAuthors(paper.authors)}
+                  {paper.year ? ` · ${paper.year}` : ''}
+                </span>
+                {paperCollections[paper.slug] && paperCollections[paper.slug].length > 0 && (
+                  <div className={styles.collectionsTagList}>
+                    {paperCollections[paper.slug].map((cName) => (
+                      <span key={cName} className={styles.collectionTag}>
+                        {cName}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           ))}
         </div>
       )}

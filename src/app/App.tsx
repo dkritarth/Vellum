@@ -1,3 +1,4 @@
+import { TrashView } from './TrashView.js'
 import type { ChatSessionSummary } from '../../core/chat/repo'
 import { useEffect, useState } from 'react'
 import { IngestModal } from './IngestModal'
@@ -38,7 +39,7 @@ export function App(): JSX.Element {
   const [pong, setPong] = useState<string>('…')
   const [tabs, setTabs] = useState<PaperTab[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
-  const [view, setView] = useState<'reader' | 'library'>('reader')
+  const [view, setView] = useState<'reader' | 'library' | 'trash'>('reader')
   const [isIngestOpen, setIsIngestOpen] = useState(false)
   const [highlightActive, setHighlightActive] = useState(false)
   const [highlightColor, setHighlightColor] = useState<HighlightColor>('yellow')
@@ -135,6 +136,7 @@ export function App(): JSX.Element {
           onSelectCollection={handleSelectCollection}
           selectedSessionId={selectedChatSessionId}
           onSelectSession={handleSelectChatSession}
+          onSelectTrash={() => setView('trash')}
         />
         <main className={styles.centerPane} aria-label="Paper view">
           {chatBanner && (
@@ -143,7 +145,11 @@ export function App(): JSX.Element {
               <button type="button" onClick={() => setChatBanner(null)} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}>✕</button>
             </div>
           )}
-          {view === 'library' ? (
+          {view === 'trash' ? (
+            <TrashView
+              onBackToLibrary={() => setView('library')}
+            />
+          ) : view === 'library' ? (
             <Library
               onOpenPaper={openPaper}
               selectedCollectionId={selectedCollectionId}
@@ -151,6 +157,13 @@ export function App(): JSX.Element {
               onClearCollectionFilter={() => {
                 setSelectedCollectionId(null)
                 setSelectedCollectionName(null)
+              }}
+              onTrashPaper={(slug) => {
+                setTabs((current) => current.filter((tab) => tab.id !== slug))
+                if (activeTabId === slug) {
+                  const remaining = tabs.filter((tab) => tab.id !== slug)
+                  setActiveTabId(remaining.length > 0 ? remaining[remaining.length - 1].id : null)
+                }
               }}
             />
           ) : (

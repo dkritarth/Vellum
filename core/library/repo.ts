@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 // Paper CRUD against the `papers` table (core/store/schema.ts SCHEMA_V1).
 // Owns all SQL for the papers table — parameterized statements only, no
 // string interpolation of caller-supplied values. This is the storage seam
@@ -34,6 +36,8 @@ export interface PaperRecord {
   /** Section outline from core/ingest/extract.ts's ExtractResult.sections. */
   sections?: unknown[]
   addedAt: string
+  /** [L2-04] Timestamp when paper was moved to Trash; undefined/null if active. */
+  trashedAt?: string | null
 }
 
 interface PaperRow {
@@ -51,6 +55,7 @@ interface PaperRow {
   pdf_path: string | null
   sections: string | null
   added_at: string
+  trashed_at: string | null
 }
 
 function toRecord(row: PaperRow): PaperRecord {
@@ -71,6 +76,7 @@ function toRecord(row: PaperRow): PaperRecord {
     pdfPath: row.pdf_path ?? undefined,
     sections: row.sections ? (JSON.parse(row.sections) as unknown[]) : [],
     addedAt: row.added_at,
+    trashedAt: row.trashed_at ?? undefined,
   }
 }
 
@@ -81,8 +87,8 @@ function toRecord(row: PaperRow): PaperRecord {
  */
 export function upsertPaper(db: Database, paper: PaperRecord): void {
   db.prepare(
-    `INSERT INTO papers (slug, title, authors, author_orcids, year, venue, doi, arxiv_id, abstract, summary, md_path, pdf_path, sections, added_at)
-     VALUES (@slug, @title, @authors, @authorOrcids, @year, @venue, @doi, @arxivId, @abstract, @summary, @mdPath, @pdfPath, @sections, @addedAt)
+    `INSERT INTO papers (slug, title, authors, author_orcids, year, venue, doi, arxiv_id, abstract, summary, md_path, pdf_path, sections, added_at, trashed_at)
+     VALUES (@slug, @title, @authors, @authorOrcids, @year, @venue, @doi, @arxivId, @abstract, @summary, @mdPath, @pdfPath, @sections, @addedAt, @trashedAt)
      ON CONFLICT(slug) DO UPDATE SET
        title         = excluded.title,
        authors       = excluded.authors,
@@ -96,7 +102,8 @@ export function upsertPaper(db: Database, paper: PaperRecord): void {
        md_path       = excluded.md_path,
        pdf_path      = excluded.pdf_path,
        sections      = excluded.sections,
-       added_at      = excluded.added_at`,
+       added_at      = excluded.added_at,
+       trashed_at    = excluded.trashed_at`,
   ).run({
     slug: paper.slug,
     title: paper.title,
@@ -112,6 +119,7 @@ export function upsertPaper(db: Database, paper: PaperRecord): void {
     pdfPath: paper.pdfPath ?? null,
     sections: JSON.stringify(paper.sections ?? []),
     addedAt: paper.addedAt,
+    trashedAt: paper.trashedAt ?? null,
   })
 }
 
@@ -147,6 +155,8 @@ export interface ListPapersOptions {
   sort?: PaperSortColumn
   /** Sort direction. Defaults to `desc`. */
   order?: 'asc' | 'desc'
+  /** [L2-04] If true, lists only trashed papers. If false/omitted, excludes trashed papers. */
+  trashed?: boolean
 }
 
 /** Escape SQLite LIKE metacharacters (`%`, `_`) plus the escape char itself
@@ -176,6 +186,12 @@ export function listPapers(db: Database, options: ListPapersOptions = {}): Paper
   const params: unknown[] = []
   const conditions: string[] = []
 
+  if (options.trashed) {
+    conditions.push('papers.trashed_at IS NOT NULL')
+  } else {
+    conditions.push('papers.trashed_at IS NULL')
+  }
+
   if (collectionId !== undefined) {
     sql += ' JOIN paper_collections pc ON pc.paper_slug = papers.slug'
     conditions.push('pc.collection_id = ?')
@@ -195,4 +211,48 @@ export function listPapers(db: Database, options: ListPapersOptions = {}): Paper
 
   const rows = db.prepare(sql).all(...params) as PaperRow[]
   return rows.map(toRecord)
+}
+
+/** [L2-04] Move a paper to Trash (soft delete). */
+export function trashPaper(db: Database, slug: string): PaperRecord | undefined {
+  const now = new Date().toISOString()
+  db.prepare('UPDATE papers SET trashed_at = ? WHERE slug = ?').run(now, slug)
+  return getPaper(db, slug)
+}
+
+/** [L2-04] Restore a paper from Trash back to active Library. */
+export function restorePaper(db: Database, slug: string): PaperRecord | undefined {
+  db.prepare('UPDATE papers SET trashed_at = NULL WHERE slug = ?').run(slug)
+  return getPaper(db, slug)
+}
+
+/**
+ * [L2-04] Permanently purge a paper from SQLite and delete its on-disk assets.
+ * Cascades to notes, highlights, chats, collections, and questions.
+ */
+export function purgePaper(db: Database, slug: string, libraryDir?: string): boolean {
+  if (!/^[a-z0-9-]+$/i.test(slug)) {
+    throw new Error(`Invalid slug format: ${slug}`)
+  }
+
+  const paper = getPaper(db, slug)
+  if (!paper) return false
+
+  if (libraryDir) {
+    const targetDir = path.resolve(libraryDir, 'papers', slug)
+    const papersRoot = path.resolve(libraryDir, 'papers')
+    if (!targetDir.startsWith(papersRoot + path.sep)) {
+      throw new Error(`Path traversal detected: ${targetDir}`)
+    }
+    try {
+      if (fs.existsSync(targetDir)) {
+        fs.rmSync(targetDir, { recursive: true, force: true })
+      }
+    } catch (err) {
+      throw new Error(`Failed to remove paper files from disk: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  const result = db.prepare('DELETE FROM papers WHERE slug = ?').run(slug)
+  return result.changes > 0
 }

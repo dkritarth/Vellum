@@ -46,6 +46,8 @@ beforeEach(() => {
       highlightsList: vi.fn().mockResolvedValue([]),
       highlightsCreate: vi.fn(),
       highlightsDelete: vi.fn().mockResolvedValue(undefined),
+      paperRestore: vi.fn().mockResolvedValue(null),
+      paperPurge: vi.fn().mockResolvedValue(true),
     },
   })
 })
@@ -121,5 +123,15 @@ describe('App shell', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(await screen.findByRole('tab', { name: 'Attention Is All You Need' })).toBeInTheDocument()
+  })
+  it('switches to Trash view when Trash footer item is clicked [L2-04]', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const trashBtn = screen.getByRole('button', { name: 'Trash' })
+    await user.click(trashBtn)
+
+    expect(await screen.findByRole('region', { name: 'Trash view' })).toBeInTheDocument()
+    expect(screen.getByText('Attention Is All You Need')).toBeInTheDocument()
   })
 })

@@ -34,6 +34,8 @@ interface SidebarProps {
   onSelectCollection?: (id: number | null, name: string | null) => void
   selectedSessionId?: number | null
   onSelectSession?: (session: ChatSessionSummary) => void
+  /** [L2-04] Callback when Trash is selected */
+  onSelectTrash?: () => void
 }
 
 export function Sidebar({
@@ -42,6 +44,7 @@ export function Sidebar({
   onSelectCollection,
   selectedSessionId = null,
   onSelectSession,
+  onSelectTrash,
 }: SidebarProps = {}): JSX.Element {
   const [active, setActive] = useState<NavItem>('Home')
   const [libraryView, setLibraryView] = useState<LibraryView>('Files')
@@ -117,7 +120,14 @@ export function Sidebar({
             type="button"
             className={item === footerView ? `${styles.footerItem} ${styles.footerItemActive}` : styles.footerItem}
             aria-pressed={item === footerView}
-            onClick={() => setFooterView((current) => (current === item ? null : item))}
+            onClick={() => {
+              if (item === 'Trash' && onSelectTrash) {
+                setFooterView(null)
+                onSelectTrash()
+              } else {
+                setFooterView((current) => (current === item ? null : item))
+              }
+            }}
           >
             {item}
           </button>

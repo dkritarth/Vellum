@@ -17,6 +17,7 @@
     "test:gate:reading": "node test/reading-gate.mjs",
     "test:gate:collections": "node test/collections-live.mjs",
     "test:gate:chats": "node test/chats-live.mjs",
+    "test:gate:questions": "node test/questions-live.mjs",
     "dist": "electron-vite build && electron-builder"
   },
   "dependencies": {

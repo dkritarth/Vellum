@@ -28,6 +28,7 @@ describe('runMigrations', () => {
         'chat_messages',
         'notes',
         'highlights',
+        'suggested_questions',
       ]),
     )
   })
@@ -37,7 +38,7 @@ describe('runMigrations', () => {
     runMigrations(db)
 
     const version = db.pragma('user_version', { simple: true })
-    expect(version).toBe(5)
+    expect(version).toBe(6)
   })
 
   it('adds the author_orcids column to papers [P2-04]', () => {
@@ -76,10 +77,28 @@ describe('runMigrations', () => {
     runMigrations(db)
 
     const version = db.pragma('user_version', { simple: true })
-    expect(version).toBe(5)
+    expect(version).toBe(6)
 
     const row = db.prepare('SELECT * FROM papers WHERE slug = ?').get('a')
     expect(row).toBeTruthy()
+  })
+
+
+  it('creates the suggested_questions table and index [L2-03]', () => {
+    db = new Database(':memory:')
+    runMigrations(db)
+
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+      .all()
+      .map((row) => (row as { name: string }).name)
+    expect(tables).toContain('suggested_questions')
+
+    const indexes = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'suggested_questions'")
+      .all()
+      .map((row) => (row as { name: string }).name)
+    expect(indexes).toContain('idx_suggested_questions_paper')
   })
 
   it('applies only migrations newer than the current version, in order', () => {

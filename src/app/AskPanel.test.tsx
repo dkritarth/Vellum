@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AskPanel } from './AskPanel'
@@ -31,7 +31,7 @@ beforeEach(() => {
 
   Object.defineProperty(window, 'vellum', {
     configurable: true,
-    value: { askOpen, askNewChat, askStart, onAskUpdate },
+    value: { askOpen, askNewChat, askStart, onAskUpdate, questionsGet: vi.fn().mockResolvedValue([]), questionsRegenerate: vi.fn().mockResolvedValue([]) },
   })
 })
 
@@ -191,5 +191,24 @@ describe('AskPanel', () => {
 
     expect(await screen.findByText('Target session question')).toBeInTheDocument()
     expect(askOpen).toHaveBeenCalledWith({ slug: 'p1', sessionId: 42 })
+  })
+  it('starts an Ask turn when clicking a suggested question chip [L2-03]', async () => {
+    const mockQuestions = [
+      { id: 1, paperSlug: 'p1', backend: 'claude', question: 'How does attention scale with sequence length?', category: 'methodology', createdAt: 't' }
+    ]
+    window.vellum.questionsGet = vi.fn().mockResolvedValue(mockQuestions)
+
+    render(<AskPanel slug="p1" />)
+
+    const chip = await screen.findByText('How does attention scale with sequence length?')
+    fireEvent.click(chip)
+
+    await waitFor(() => {
+      expect(askStart).toHaveBeenCalledWith({
+        chatSessionId: 1,
+        slug: 'p1',
+        text: 'How does attention scale with sequence length?',
+      })
+    })
   })
 })

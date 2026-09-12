@@ -1,3 +1,4 @@
+import type { SuggestedQuestionRecord, QuestionCategory } from '../core/questions/repo.js'
 import type { ChatSessionSummary, ListChatSessionsOptions } from '../core/chat/repo.js'
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
@@ -84,6 +85,11 @@ const api = {
   chatDeleteSession: (id: number): Promise<void> => ipcRenderer.invoke('vellum:chat-delete-session', id),
   chatRenameSession: (params: { id: number; title: string }): Promise<void> =>
     ipcRenderer.invoke('vellum:chat-rename-session', params),
+  // [L2-03] Suggested questions methods
+  questionsGet: (slug: string, backend?: string): Promise<SuggestedQuestionRecord[]> =>
+    ipcRenderer.invoke('vellum:questions-get', slug, backend),
+  questionsRegenerate: (slug: string, backend?: string): Promise<SuggestedQuestionRecord[]> =>
+    ipcRenderer.invoke('vellum:questions-regenerate', slug, backend),
   // "New chat": fresh session, empty history, fresh agent conversation.
   askNewChat: (params: { slug: string; backend: AcpBackend }): Promise<AskOpenResult> =>
     ipcRenderer.invoke('vellum:ask-new-chat', params),
@@ -105,4 +111,4 @@ contextBridge.exposeInMainWorld('vellum', api)
 
 export type VellumApi = typeof api
 
-export type { CollectionRecord, CollectionTreeItem, ChatSessionSummary, ListChatSessionsOptions }
+export type { CollectionRecord, CollectionTreeItem, ChatSessionSummary, ListChatSessionsOptions, SuggestedQuestionRecord, QuestionCategory }

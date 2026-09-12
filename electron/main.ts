@@ -1,3 +1,10 @@
+import {
+  clearSuggestedQuestions,
+  derivePaperQuestions,
+  getCachedQuestions,
+  saveSuggestedQuestions,
+} from '../core/questions/repo.js'
+import type { SuggestedQuestionRecord } from '../core/questions/repo.js'
 import { deleteChatSession, listChatSessions, updateChatSessionTitle } from '../core/chat/repo.js'
 import type { ChatSessionSummary } from '../core/chat/repo.js'
 import { app, BrowserWindow, ipcMain } from 'electron'
@@ -491,4 +498,60 @@ ipcMain.handle('vellum:collections-for-paper', (_event, paperSlug: unknown): Col
     throw new Error('vellum:collections-for-paper: paperSlug must be a string')
   }
   return listPaperCollections(getDb(), paperSlug)
+})
+
+// [L2-03] Paper-specific suggested questions IPC handlers
+function parseQuestionsParams(slugOrParams: unknown, maybeBackend?: unknown): { slug: string; backend: string } {
+  if (typeof slugOrParams === 'object' && slugOrParams !== null) {
+    const candidate = slugOrParams as Record<string, unknown>
+    const slug = requireSlug(candidate['slug'], 'vellum:questions')
+    const backend = candidate['backend'] === 'codex' ? 'codex' : 'claude'
+    return { slug, backend }
+  }
+  const slug = requireSlug(slugOrParams, 'vellum:questions')
+  const backend = maybeBackend === 'codex' ? 'codex' : 'claude'
+  return { slug, backend }
+}
+
+ipcMain.handle('vellum:questions-get', (_event, slugOrParams: unknown, maybeBackend?: unknown): SuggestedQuestionRecord[] => {
+  const { slug, backend } = parseQuestionsParams(slugOrParams, maybeBackend)
+  const db = getDb()
+  const cached = getCachedQuestions(db, slug, backend)
+  if (cached.length > 0) return cached
+
+  const paper = getPaper(db, slug)
+  if (!paper) return []
+
+  const parsedSections = Array.isArray(paper.sections)
+    ? (paper.sections as Array<{ title: string; page?: number }>)
+    : []
+
+  const generated = derivePaperQuestions({
+    title: paper.title,
+    abstract: paper.abstract,
+    sections: parsedSections,
+  })
+
+  return saveSuggestedQuestions(db, slug, backend, generated)
+})
+
+ipcMain.handle('vellum:questions-regenerate', (_event, slugOrParams: unknown, maybeBackend?: unknown): SuggestedQuestionRecord[] => {
+  const { slug, backend } = parseQuestionsParams(slugOrParams, maybeBackend)
+  const db = getDb()
+  clearSuggestedQuestions(db, slug, backend)
+
+  const paper = getPaper(db, slug)
+  if (!paper) return []
+
+  const parsedSections = Array.isArray(paper.sections)
+    ? (paper.sections as Array<{ title: string; page?: number }>)
+    : []
+
+  const generated = derivePaperQuestions({
+    title: paper.title,
+    abstract: paper.abstract,
+    sections: parsedSections,
+  })
+
+  return saveSuggestedQuestions(db, slug, backend, generated)
 })

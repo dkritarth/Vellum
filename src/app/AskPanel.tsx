@@ -1,3 +1,4 @@
+import { SuggestedQuestions } from './SuggestedQuestions'
 // AskPanel — [P1-10] grounded chat over ACP. Mounted in RightPanel's Ask tab
 // once a paper is open (bound to its slug). Talks only to `window.vellum`
 // (preload bridge) — never imports Node/core directly, per AGENTS.md.
@@ -216,6 +217,12 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId }: AskPanelProp
         ) : null}
       </div>
 
+      <SuggestedQuestions
+        slug={slug}
+        backend={backend}
+        disabled={disabled}
+        onSelectQuestion={(prompt) => void sendTurn(prompt)}
+      />
       <QuickActions disabled={disabled} onPrompt={(prompt) => void sendTurn(prompt)} />
 
       <form

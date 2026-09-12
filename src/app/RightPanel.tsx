@@ -13,6 +13,7 @@ import { useState } from 'react'
 import { AnnotationsPanel } from './AnnotationsPanel'
 import { AskInput } from './AskInput'
 import { AskPanel } from './AskPanel'
+import type { InjectedPrompt } from './AskPanel'
 import { DetailsPanel } from './DetailsPanel'
 import { NotesPanel } from './NotesPanel'
 import type { HighlightRecord } from '../../core/highlights/repo'
@@ -23,6 +24,8 @@ export type RightPanelTab = (typeof RIGHT_PANEL_TABS)[number]
 
 interface RightPanelProps {
   defaultTab?: RightPanelTab
+  activeTab?: RightPanelTab
+  onTabChange?: (tab: RightPanelTab) => void
   /** Slug of the currently open paper, if any — scopes the Ask/Notes/
    * Annotations tabs. Undefined = no paper open, each tab shows its own
    * empty state instead. */
@@ -30,10 +33,28 @@ interface RightPanelProps {
   /** [P2-02] Drives the Reader to a clicked annotation's page. Undefined =
    * jump seam not wired (e.g. tests rendering RightPanel standalone). */
   onJumpToHighlight?: (highlight: HighlightRecord) => void
+  /** [R1-05] Injected prompt from PDF text selection actions */
+  injectedPrompt?: InjectedPrompt | null
 }
 
-export function RightPanel({ defaultTab = 'Ask', slug, onJumpToHighlight }: RightPanelProps): JSX.Element {
-  const [activeTab, setActiveTab] = useState<RightPanelTab>(defaultTab)
+export function RightPanel({
+  defaultTab = 'Ask',
+  activeTab: controlledActiveTab,
+  onTabChange,
+  slug,
+  onJumpToHighlight,
+  injectedPrompt,
+}: RightPanelProps): JSX.Element {
+  const [internalTab, setInternalTab] = useState<RightPanelTab>(defaultTab)
+  const activeTab = controlledActiveTab ?? internalTab
+
+  function handleTabSelect(tab: RightPanelTab): void {
+    if (onTabChange) {
+      onTabChange(tab)
+    } else {
+      setInternalTab(tab)
+    }
+  }
 
   return (
     <aside className={styles.rightPanel} aria-label="Paper panel">
@@ -45,7 +66,7 @@ export function RightPanel({ defaultTab = 'Ask', slug, onJumpToHighlight }: Righ
             role="tab"
             aria-selected={tab === activeTab}
             className={tab === activeTab ? `${styles.tabButton} ${styles.tabButtonActive}` : styles.tabButton}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => handleTabSelect(tab)}
           >
             {tab}
           </button>
@@ -53,7 +74,7 @@ export function RightPanel({ defaultTab = 'Ask', slug, onJumpToHighlight }: Righ
       </div>
 
       <div className={styles.tabPanel} role="tabpanel">
-        {renderTabContent(activeTab, slug, onJumpToHighlight)}
+        {renderTabContent(activeTab, slug, onJumpToHighlight, injectedPrompt)}
       </div>
     </aside>
   )
@@ -63,10 +84,11 @@ function renderTabContent(
   tab: RightPanelTab,
   slug: string | undefined,
   onJumpToHighlight: ((highlight: HighlightRecord) => void) | undefined,
+  injectedPrompt: InjectedPrompt | null | undefined,
 ): JSX.Element {
   switch (tab) {
     case 'Ask':
-      if (slug) return <AskPanel slug={slug} />
+      if (slug) return <AskPanel slug={slug} injectedPrompt={injectedPrompt} />
       return (
         <div className={styles.askTab}>
           <p className={styles.placeholder}>Open a paper to start asking questions.</p>

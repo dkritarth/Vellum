@@ -8,7 +8,8 @@ import { Sidebar } from './Sidebar'
 import type { NavItem } from './Sidebar'
 import { TabStrip } from './TabStrip'
 import type { PaperTab } from './TabStrip'
-import { RightPanel } from './RightPanel'
+import { RightPanel, type RightPanelTab } from './RightPanel'
+import type { InjectedPrompt } from './AskPanel'
 import type { HighlightRecord } from '../../core/highlights/repo'
 import styles from './App.module.css'
 
@@ -41,6 +42,30 @@ export function App(): JSX.Element {
   const [highlightActive, setHighlightActive] = useState(false)
   const [highlightColor, setHighlightColor] = useState<HighlightColor>('yellow')
   const [jumpTarget, setJumpTarget] = useState<{ page: number; highlightId: string; nonce: number } | null>(null)
+  const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('Ask')
+  const [injectedPrompt, setInjectedPrompt] = useState<InjectedPrompt | null>(null)
+
+  function handleAddToChat(quote: string, page: number): void {
+    setRightPanelTab('Ask')
+    setInjectedPrompt({
+      text: `> "${quote}" (p. ${page})
+
+`,
+      autoSend: false,
+      nonce: Date.now(),
+    })
+  }
+
+  function handleExplain(quote: string, page: number): void {
+    setRightPanelTab('Ask')
+    setInjectedPrompt({
+      text: `Explain this passage from page ${page}:
+
+> "${quote}"`,
+      autoSend: true,
+      nonce: Date.now(),
+    })
+  }
 
   useEffect(() => {
     window.vellum?.ping().then(setPong).catch(() => setPong('no-bridge'))
@@ -93,11 +118,19 @@ export function App(): JSX.Element {
                 slug={activeTabId ?? undefined}
                 highlightTool={{ active: highlightActive, color: highlightColor }}
                 jumpTarget={jumpTarget}
+                onAddToChat={handleAddToChat}
+                onExplain={handleExplain}
               />
             </>
           )}
         </main>
-        <RightPanel slug={activeTabId ?? undefined} onJumpToHighlight={jumpToHighlight} />
+        <RightPanel
+          slug={activeTabId ?? undefined}
+          activeTab={rightPanelTab}
+          onTabChange={setRightPanelTab}
+          onJumpToHighlight={jumpToHighlight}
+          injectedPrompt={injectedPrompt}
+        />
       </div>
       <IngestModal
         isOpen={isIngestOpen}

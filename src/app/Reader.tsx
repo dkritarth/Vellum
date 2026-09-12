@@ -24,6 +24,7 @@ import workerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import type { HighlightColor } from './ReaderToolbar'
 import type { HighlightRecord } from '../../core/highlights/repo'
 import { CitationTooltip } from './CitationTooltip'
+import { SelectionMenu } from './SelectionMenu'
 import styles from './Reader.module.css'
 
 GlobalWorkerOptions.workerSrc = workerSrc
@@ -416,11 +417,24 @@ interface ReaderProps {
    * re-jumping to the same target (clicked twice in a row) re-trigger the
    * effect even though `page`/`highlightId` didn't change. */
   jumpTarget?: { page: number; highlightId: string; nonce: number } | null
+  /** [R1-05] Callback when user clicks 'Add to chat' on selected text */
+  onAddToChat?: (quote: string, page: number) => void
+  /** [R1-05] Callback when user clicks 'Explain' on selected text */
+  onExplain?: (quote: string, page: number) => void
 }
 
 const FLASH_DURATION_MS = 1500
 
-export function Reader({ slug, highlightTool, jumpTarget }: ReaderProps): JSX.Element {
+interface ActiveSelection {
+  x: number
+  y: number
+  quote: string
+  page: number
+  anchor: { start: number; end: number }
+}
+
+export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain }: ReaderProps): JSX.Element {
+  const [activeSelection, setActiveSelection] = useState<ActiveSelection | null>(null)
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [numPages, setNumPages] = useState(0)
   const [pageNumber, setPageNumber] = useState(1)
@@ -463,6 +477,7 @@ export function Reader({ slug, highlightTool, jumpTarget }: ReaderProps): JSX.El
     setReferenceIndex(new Map())
     setCitationFlash(null)
     setHoveredCitation(null)
+    setActiveSelection(null)
 
     if (!slug) return
 
@@ -644,10 +659,12 @@ export function Reader({ slug, highlightTool, jumpTarget }: ReaderProps): JSX.El
   }, [highlights, pageNumber, textLayerVersion, flashId])
 
   function goToPage(next: number): void {
+    setActiveSelection(null)
     setPageNumber(clampPage(next, numPages))
   }
 
   function zoomBy(delta: number): void {
+    setActiveSelection(null)
     setScale((current) => clampScale(current + delta))
   }
 
@@ -656,9 +673,12 @@ export function Reader({ slug, highlightTool, jumpTarget }: ReaderProps): JSX.El
   // highlight from that selection (page, quote, anchor) and clears the
   // native selection so it doesn't linger visually once the overlay paints.
   function handleTextLayerMouseUp(): void {
-    if (!highlightTool?.active || !slug) return
+    if (!slug) return
     const selection = window.getSelection()
-    if (!selection || selection.isCollapsed || selection.rangeCount === 0) return
+    if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+      setActiveSelection(null)
+      return
+    }
 
     const container = textLayerRef.current
     if (!container) return
@@ -666,19 +686,61 @@ export function Reader({ slug, highlightTool, jumpTarget }: ReaderProps): JSX.El
     if (!container.contains(range.commonAncestorContainer)) return
 
     const quote = selection.toString().trim()
-    if (!quote) return
+    if (!quote) {
+      setActiveSelection(null)
+      return
+    }
     const anchor = anchorFromRange(container, range)
     if (!anchor) return
 
     const page = pageNumber
-    const color = highlightTool.color
+    if (highlightTool?.active) {
+      const color = highlightTool.color
+      void window.vellum
+        .highlightsCreate({ slug, page, color, quote, anchor: JSON.stringify(anchor) })
+        .then((record) => {
+          setHighlights((current) => [...current, record])
+          selection.removeAllRanges()
+          setActiveSelection(null)
+        })
+        .catch(() => undefined)
+      return
+    }
+
+    const rangeRect = typeof range.getBoundingClientRect === 'function'
+      ? range.getBoundingClientRect()
+      : { left: 0, top: 0, width: 0, height: 0 }
+    const containerRect = typeof container.getBoundingClientRect === 'function'
+      ? container.getBoundingClientRect()
+      : { left: 0, top: 0, width: 0, height: 0 }
+    const x = rangeRect.left - containerRect.left + rangeRect.width / 2
+    const y = rangeRect.top - containerRect.top
+    setActiveSelection({ x, y, quote, page, anchor })
+  }
+
+  function handleMenuHighlight(color: HighlightColor): void {
+    if (!slug || !activeSelection) return
+    const { page, quote, anchor } = activeSelection
     void window.vellum
       .highlightsCreate({ slug, page, color, quote, anchor: JSON.stringify(anchor) })
       .then((record) => {
         setHighlights((current) => [...current, record])
-        selection.removeAllRanges()
+        window.getSelection()?.removeAllRanges()
+        setActiveSelection(null)
       })
       .catch(() => undefined)
+  }
+
+  function handleMenuAddToChat(): void {
+    if (!activeSelection) return
+    onAddToChat?.(activeSelection.quote, activeSelection.page)
+    setActiveSelection(null)
+  }
+
+  function handleMenuExplain(): void {
+    if (!activeSelection) return
+    onExplain?.(activeSelection.quote, activeSelection.page)
+    setActiveSelection(null)
   }
 
   // [P2-03] Event delegation on the text layer (rather than imperative
@@ -874,6 +936,18 @@ export function Reader({ slug, highlightTool, jumpTarget }: ReaderProps): JSX.El
             </div>
             {hoveredCitation ? (
               <CitationTooltip text={hoveredCitation.text} left={hoveredCitation.left} top={hoveredCitation.top} />
+            ) : null}
+            {activeSelection ? (
+              <SelectionMenu
+                x={activeSelection.x}
+                y={activeSelection.y}
+                quote={activeSelection.quote}
+                page={activeSelection.page}
+                onAddToChat={handleMenuAddToChat}
+                onExplain={handleMenuExplain}
+                onHighlight={handleMenuHighlight}
+                onClose={() => setActiveSelection(null)}
+              />
             ) : null}
           </div>
         </div>

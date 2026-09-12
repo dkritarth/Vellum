@@ -32,12 +32,20 @@ interface DisplayMessage {
 
 const STREAMING_ID = 'streaming-reply'
 
+export interface InjectedPrompt {
+  text: string
+  autoSend?: boolean
+  nonce: number
+}
+
 interface AskPanelProps {
   /** Slug of the currently open paper — the chat is scoped to it. */
   slug: string
+  /** [R1-05] Contextual prompt injected from PDF text selection (Add to chat or Explain) */
+  injectedPrompt?: InjectedPrompt | null
 }
 
-export function AskPanel({ slug }: AskPanelProps): JSX.Element {
+export function AskPanel({ slug, injectedPrompt }: AskPanelProps): JSX.Element {
   const [sessionId, setSessionId] = useState<number | null>(null)
   const [messages, setMessages] = useState<DisplayMessage[]>([])
   const [input, setInput] = useState('')
@@ -47,6 +55,8 @@ export function AskPanel({ slug }: AskPanelProps): JSX.Element {
   const [backend, setBackend] = useState<ChatBackend>('claude')
   const [switchingSession, setSwitchingSession] = useState(false)
   const activeRequestId = useRef<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const lastHandledNonce = useRef<number | null>(null)
 
   // Reload history whenever the open paper changes.
   useEffect(() => {
@@ -63,11 +73,16 @@ export function AskPanel({ slug }: AskPanelProps): JSX.Element {
         if (cancelled) return
         setSessionId(result.session.id)
         setBackend(result.session.backend === 'codex' ? 'codex' : 'claude')
-        setMessages(result.messages.map((m) => ({ id: m.id, role: m.role, content: m.content })))
+        setMessages(
+          result.messages.map((m) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+          })),
+        )
       })
       .catch((err: unknown) => {
-        if (cancelled) return
-        setLoadError(err instanceof Error ? err.message : String(err))
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : String(err))
       })
 
     return () => {
@@ -75,8 +90,9 @@ export function AskPanel({ slug }: AskPanelProps): JSX.Element {
     }
   }, [slug])
 
-  // One subscription for the panel's lifetime; every event is routed by
-  // `activeRequestId` so a stale/late event from a superseded turn is dropped.
+  // Single subscription for the lifetime of the component. Main broadcasts
+  // to this window; we filter by `activeRequestId.current` so events from an
+  // aborted turn or a previous paper's turn are dropped.
   useEffect(() => {
     return window.vellum.onAskUpdate(({ requestId, event }) => {
       if (requestId !== activeRequestId.current) return
@@ -124,6 +140,20 @@ export function AskPanel({ slug }: AskPanelProps): JSX.Element {
       setSending(false)
     }
   }, [input, sessionId, sending, slug])
+
+  // [R1-05] Process injected prompt from PDF text selection actions
+  useEffect(() => {
+    if (!injectedPrompt || sessionId === null) return
+    if (lastHandledNonce.current === injectedPrompt.nonce) return
+    lastHandledNonce.current = injectedPrompt.nonce
+
+    if (injectedPrompt.autoSend) {
+      void sendTurn(injectedPrompt.text)
+    } else {
+      setInput((current) => (current ? `${current}\n\n${injectedPrompt.text}` : injectedPrompt.text))
+      inputRef.current?.focus()
+    }
+  }, [injectedPrompt, sessionId, sendTurn])
 
   const startNewChat = useCallback((nextBackend: ChatBackend = backend) => {
     setError(null)
@@ -194,6 +224,7 @@ export function AskPanel({ slug }: AskPanelProps): JSX.Element {
         }}
       >
         <input
+          ref={inputRef}
           type="text"
           className={styles.textInput}
           placeholder="Ask a question about this paper…"

@@ -50,8 +50,12 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
       saveTimer.current = null
     }
     if (!outgoingSlug || !dirtyRef.current) return
+    const pendingBody = bodyRef.current
     dirtyRef.current = false
-    window.vellum.notesSave({ slug: outgoingSlug, body: bodyRef.current }).catch(() => undefined)
+    window.vellum.notesSave({ slug: outgoingSlug, body: pendingBody }).catch(() => {
+      dirtyRef.current = true
+      setStatus('idle')
+    })
   }, [])
 
   // Reload the note whenever the open paper changes. This cleanup fires both
@@ -67,6 +71,7 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
       return
     }
 
+    setBody('')
     let cancelled = false
     window.vellum
       .notesGet(slug)
@@ -106,13 +111,18 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
       clearTimeout(saveTimer.current)
       saveTimer.current = null
     }
+    const previousBody = bodyRef.current
     dirtyRef.current = false
     setBody('')
     setStatus('saving')
     window.vellum
       .notesDelete(slug)
       .then(() => setStatus('idle'))
-      .catch(() => setStatus('idle'))
+      .catch(() => {
+        setBody(previousBody)
+        dirtyRef.current = true
+        setStatus('idle')
+      })
   }, [slug])
 
   if (!slug) return <p className={styles.placeholder}>Open a paper to add notes.</p>
@@ -144,7 +154,10 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
             window.vellum
               .notesSave({ slug, body: next })
               .then(() => setStatus('saved'))
-              .catch(() => setStatus('idle'))
+              .catch(() => {
+                dirtyRef.current = true
+                setStatus('idle')
+              })
           }, SAVE_DEBOUNCE_MS)
         }}
       />

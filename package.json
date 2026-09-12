@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke:acp": "tsx core/acp/smoke.ts",
+    "test:gate:reading": "node test/reading-gate.mjs",
     "dist": "electron-vite build && electron-builder"
   },
   "dependencies": {

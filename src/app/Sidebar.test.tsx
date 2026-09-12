@@ -53,6 +53,16 @@ describe('Sidebar', () => {
     expect(screen.getByRole('button', { name: /switch workspace/i })).toBeInTheDocument()
   })
 
+  it('calls onSelectUsage when Usage footer item is clicked [L2-05]', async () => {
+    const user = userEvent.setup()
+    const onSelectUsage = vi.fn()
+    render(<Sidebar onSelectUsage={onSelectUsage} />)
+
+    await user.click(screen.getByRole('button', { name: 'Usage' }))
+
+    expect(onSelectUsage).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps primary nav working alongside the new sidebar chrome', async () => {
     const user = userEvent.setup()
     render(<Sidebar />)

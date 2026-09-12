@@ -21,6 +21,7 @@ import type { Database } from 'better-sqlite3'
 import type { AcpBackend, AcpClient, AcpSession, AcpUpdate } from '../acp/client.js'
 import type { ChatMessage, ChatSession } from './repo.js'
 import { addChatMessage, createChatSession, getChatMessages, getChatSession, getLatestChatSession } from './repo.js'
+import { recordTurnUsage } from '../usage/repo.js'
 
 const DEFAULT_BACKEND: AcpBackend = 'claude'
 
@@ -190,6 +191,16 @@ export class ChatManager {
     const promptText = buildPromptText(params.mdPath, params.text, freshlySpawned ? priorMessages : [])
 
     let accumulated = ''
+    let latestUsageUpdate: { used?: number; size?: number; costAmount?: number; costCurrency?: string } | undefined
+    let promptUsage: {
+      inputTokens?: number | null
+      outputTokens?: number | null
+      thoughtTokens?: number | null
+      cachedReadTokens?: number | null
+      cachedWriteTokens?: number | null
+      totalTokens?: number | null
+    } | null = null
+
     try {
       for await (const update of acpSession.prompt({ text: promptText, contextFiles: [params.mdPath] })) {
         if (update.kind === 'text') {
@@ -200,6 +211,16 @@ export class ChatManager {
           }
         } else if (update.kind === 'tool_call' || update.kind === 'tool_result') {
           onEvent({ kind: 'tool_activity' })
+        } else if (update.kind === 'usage_update') {
+          const u = update.data as { used?: number; size?: number; cost?: { amount?: number; currency?: string } } | undefined
+          if (u) {
+            latestUsageUpdate = {
+              used: typeof u.used === 'number' ? u.used : undefined,
+              size: typeof u.size === 'number' ? u.size : undefined,
+              costAmount: typeof u.cost?.amount === 'number' ? u.cost.amount : undefined,
+              costCurrency: u.cost?.currency ?? 'USD',
+            }
+          }
         } else if (update.kind === 'error') {
           // A broken turn likely means a broken session — evict the cache
           // so the next turn spawns fresh rather than reusing a dead one.
@@ -207,6 +228,10 @@ export class ChatManager {
           onEvent({ kind: 'error', message: errorMessageFromUpdate(update) })
           return
         } else if (update.kind === 'done') {
+          const doneData = update.data as { usage?: { inputTokens?: number; outputTokens?: number; thoughtTokens?: number; cachedReadTokens?: number; cachedWriteTokens?: number; totalTokens?: number } | null } | undefined
+          if (doneData?.usage) {
+            promptUsage = doneData.usage
+          }
           break
         }
       }
@@ -214,6 +239,31 @@ export class ChatManager {
       await this.disposeSession(params.paperSlug, backend)
       onEvent({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
       return
+    }
+
+    const turnIndex = priorMessages.filter((m) => m.role === 'user').length
+    const hasMetrics = !!(promptUsage || latestUsageUpdate)
+    try {
+      recordTurnUsage(params.db, {
+        sessionId: params.chatSessionId,
+        backend,
+        turnIndex,
+        inputTokens: promptUsage?.inputTokens ?? null,
+        outputTokens: promptUsage?.outputTokens ?? null,
+        thoughtTokens: promptUsage?.thoughtTokens ?? null,
+        cachedReadTokens: promptUsage?.cachedReadTokens ?? null,
+        cachedWriteTokens: promptUsage?.cachedWriteTokens ?? null,
+        totalTokens: promptUsage?.totalTokens ?? (promptUsage?.inputTokens && promptUsage?.outputTokens ? promptUsage.inputTokens + promptUsage.outputTokens : null),
+        contextUsed: latestUsageUpdate?.used ?? null,
+        contextSize: latestUsageUpdate?.size ?? null,
+        costAmount: latestUsageUpdate?.costAmount ?? null,
+        costCurrency: latestUsageUpdate?.costCurrency ?? 'USD',
+        hasMetrics,
+        recordedAt: new Date().toISOString(),
+      })
+    } catch {
+      // Usage recording is non-blocking telemetry; database recording failure
+      // must never fail the user chat turn.
     }
 
     const message = addChatMessage(params.db, {

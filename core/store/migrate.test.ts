@@ -38,7 +38,7 @@ describe('runMigrations', () => {
     runMigrations(db)
 
     const version = db.pragma('user_version', { simple: true })
-    expect(version).toBe(7)
+    expect(version).toBe(8)
   })
 
   it('adds the author_orcids column to papers [P2-04]', () => {
@@ -77,7 +77,7 @@ describe('runMigrations', () => {
     runMigrations(db)
 
     const version = db.pragma('user_version', { simple: true })
-    expect(version).toBe(7)
+    expect(version).toBe(8)
 
     const row = db.prepare('SELECT * FROM papers WHERE slug = ?').get('a')
     expect(row).toBeTruthy()
@@ -112,6 +112,25 @@ describe('runMigrations', () => {
       .map((row) => (row as { name: string }).name)
 
     expect(columns).toContain('trashed_at')
+  })
+
+  it('creates the usage_records table and indexes [L2-05]', () => {
+    db = new Database(':memory:')
+    runMigrations(db)
+
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+      .all()
+      .map((row) => (row as { name: string }).name)
+    expect(tables).toContain('usage_records')
+
+    const indexes = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'usage_records'")
+      .all()
+      .map((row) => (row as { name: string }).name)
+    expect(indexes).toContain('idx_usage_records_backend')
+    expect(indexes).toContain('idx_usage_records_recorded_at')
+    expect(indexes).toContain('idx_usage_records_session')
   })
 
   it('applies only migrations newer than the current version, in order', () => {

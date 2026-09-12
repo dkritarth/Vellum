@@ -112,6 +112,11 @@ describe('mapSessionUpdate', () => {
     expect(mapSessionUpdate(raw as never)).toEqual({ kind: 'tool_result', data: raw })
   })
 
+  it('maps usage_update to a usage_update update', () => {
+    const raw = { sessionUpdate: 'usage_update', used: 1500, size: 200000 }
+    expect(mapSessionUpdate(raw as never)).toEqual({ kind: 'usage_update', data: raw })
+  })
+
   it('falls back to tool_result for update kinds with no dedicated AcpUpdate kind', () => {
     const raw = { sessionUpdate: 'plan', entries: [] }
     expect(mapSessionUpdate(raw as never)).toEqual({ kind: 'tool_result', data: raw })

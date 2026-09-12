@@ -1,0 +1,192 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-size: 13px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px 8px;
+  color: var(--vellum-text-dim, #8a8a8a);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.addButton {
+  background: transparent;
+  border: none;
+  color: var(--vellum-text-dim, #8a8a8a);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.addButton:hover {
+  background: var(--vellum-surface-hover, #222222);
+  color: var(--vellum-text, #eaeaea);
+}
+
+.tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow-y: auto;
+}
+
+.allPapersItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--vellum-text-dim, #8a8a8a);
+  margin-bottom: 4px;
+}
+
+.allPapersItem:hover {
+  background: var(--vellum-surface-hover, #222222);
+  color: var(--vellum-text, #eaeaea);
+}
+
+.allPapersActive {
+  background: var(--vellum-surface-active, #262626);
+  color: var(--vellum-text, #eaeaea);
+  font-weight: 500;
+}
+
+.treeItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--vellum-text-dim, #8a8a8a);
+  user-select: none;
+}
+
+.treeItem:hover {
+  background: var(--vellum-surface-hover, #222222);
+  color: var(--vellum-text, #eaeaea);
+}
+
+.treeItemActive {
+  background: var(--vellum-surface-active, #262626);
+  color: var(--vellum-text, #eaeaea);
+  font-weight: 500;
+}
+
+.itemLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.folderIcon {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.collectionName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+}
+
+.treeItem:hover .itemActions {
+  opacity: 1;
+}
+
+.actionBtn {
+  background: transparent;
+  border: none;
+  color: var(--vellum-text-dim, #8a8a8a);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.actionBtn:hover {
+  background: var(--vellum-surface-active, #333333);
+  color: var(--vellum-text, #eaeaea);
+}
+
+.countBadge {
+  font-size: 10px;
+  background: var(--vellum-border, #333333);
+  color: var(--vellum-text-dim, #aaaaaa);
+  padding: 1px 5px;
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+}
+
+.nameInput {
+  flex: 1;
+  background: #111111;
+  border: 1px solid var(--vellum-border, #3a3a3a);
+  border-radius: 4px;
+  color: var(--vellum-text, #ffffff);
+  padding: 4px 6px;
+  font-size: 12px;
+  outline: none;
+}
+
+.nameInput:focus {
+  border-color: #555555;
+}
+
+.confirmBtn {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.cancelBtn {
+  background: transparent;
+  color: #888888;
+  border: 1px solid #444444;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.emptyTree {
+  color: var(--vellum-text-dim, #666666);
+  font-size: 12px;
+  font-style: italic;
+  padding: 8px 6px;
+}

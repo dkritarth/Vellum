@@ -141,6 +141,8 @@ const SORT_COLUMNS: Record<PaperSortColumn, string> = {
 export interface ListPapersOptions {
   /** Case-insensitive substring match against title. Omitted/empty = no filter. */
   search?: string
+  /** Filter papers belonging to a specific collection. Omitted/undefined = all collections. */
+  collectionId?: number
   /** Column to sort by. Defaults to `addedAt`. */
   sort?: PaperSortColumn
   /** Sort direction. Defaults to `desc`. */
@@ -168,12 +170,29 @@ export function listPapers(db: Database, options: ListPapersOptions = {}): Paper
   const sortColumn = SORT_COLUMNS[options.sort as PaperSortColumn] ?? SORT_COLUMNS.addedAt
   const direction = options.order === 'asc' ? 'ASC' : 'DESC'
   const search = typeof options.search === 'string' ? options.search.trim() : ''
+  const collectionId = typeof options.collectionId === 'number' ? options.collectionId : undefined
 
-  const rows = search
-    ? (db
-        .prepare(`SELECT * FROM papers WHERE title LIKE ? ESCAPE '\\' ORDER BY ${sortColumn} ${direction}`)
-        .all(`%${escapeLikeTerm(search)}%`) as PaperRow[])
-    : (db.prepare(`SELECT * FROM papers ORDER BY ${sortColumn} ${direction}`).all() as PaperRow[])
+  let sql = 'SELECT papers.* FROM papers'
+  const params: unknown[] = []
+  const conditions: string[] = []
 
+  if (collectionId !== undefined) {
+    sql += ' JOIN paper_collections pc ON pc.paper_slug = papers.slug'
+    conditions.push('pc.collection_id = ?')
+    params.push(collectionId)
+  }
+
+  if (search) {
+    conditions.push("papers.title LIKE ? ESCAPE '\\'")
+    params.push(`%${escapeLikeTerm(search)}%`)
+  }
+
+  if (conditions.length > 0) {
+    sql += ' WHERE ' + conditions.join(' AND ')
+  }
+
+  sql += ` ORDER BY papers.${sortColumn} ${direction}`
+
+  const rows = db.prepare(sql).all(...params) as PaperRow[]
   return rows.map(toRecord)
 }

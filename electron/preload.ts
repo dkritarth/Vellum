@@ -5,6 +5,7 @@ import type { IngestResult } from '../core/ingest/index.js'
 import type { ListPapersOptions, PaperRecord } from '../core/library/repo.js'
 import type { NoteRecord } from '../core/notes/repo.js'
 import type { HighlightRecord } from '../core/highlights/repo.js'
+import type { CollectionRecord, CollectionTreeItem } from '../core/collections/repo.js'
 import type { AcpBackend } from '../core/acp/client.js'
 
 export interface AskUpdatePayload {
@@ -42,6 +43,20 @@ const api = {
     ipcRenderer.invoke('vellum:notes-save', params),
   // Delete half of Notes CRUD — "Clear note" action.
   notesDelete: (slug: string): Promise<void> => ipcRenderer.invoke('vellum:notes-delete', slug),
+  // [L2-01] Collections & Library filtering ------------------------------------
+  collectionsList: (): Promise<CollectionRecord[]> => ipcRenderer.invoke('vellum:collections-list'),
+  collectionsTree: (): Promise<CollectionTreeItem[]> => ipcRenderer.invoke('vellum:collections-tree'),
+  collectionsCreate: (params: { name: string; parentId?: number | null }): Promise<CollectionRecord> =>
+    ipcRenderer.invoke('vellum:collections-create', params),
+  collectionsRename: (params: { id: number; name: string }): Promise<void> =>
+    ipcRenderer.invoke('vellum:collections-rename', params),
+  collectionsDelete: (id: number): Promise<void> => ipcRenderer.invoke('vellum:collections-delete', id),
+  collectionsAssign: (params: { paperSlug: string; collectionId: number }): Promise<void> =>
+    ipcRenderer.invoke('vellum:collections-assign', params),
+  collectionsRemove: (params: { paperSlug: string; collectionId: number }): Promise<void> =>
+    ipcRenderer.invoke('vellum:collections-remove', params),
+  collectionsForPaper: (paperSlug: string): Promise<CollectionRecord[]> =>
+    ipcRenderer.invoke('vellum:collections-for-paper', paperSlug),
   // [P2-02] Highlight tool + Annotations tab. `anchor` is an opaque JSON
   // string the renderer produces from the pdf.js text-layer selection (see
   // Reader.tsx's `anchorFromRange`/`rangeFromAnchor`) and consumes to
@@ -78,3 +93,5 @@ const api = {
 contextBridge.exposeInMainWorld('vellum', api)
 
 export type VellumApi = typeof api
+
+export type { CollectionRecord, CollectionTreeItem }

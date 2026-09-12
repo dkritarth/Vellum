@@ -44,6 +44,14 @@ export function App(): JSX.Element {
   const [jumpTarget, setJumpTarget] = useState<{ page: number; highlightId: string; nonce: number } | null>(null)
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('Ask')
   const [injectedPrompt, setInjectedPrompt] = useState<InjectedPrompt | null>(null)
+  const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null)
+  const [selectedCollectionName, setSelectedCollectionName] = useState<string | null>(null)
+
+  function handleSelectCollection(id: number | null, name: string | null): void {
+    setSelectedCollectionId(id)
+    setSelectedCollectionName(name)
+    setView('library')
+  }
 
   function handleAddToChat(quote: string, page: number): void {
     setRightPanelTab('Ask')
@@ -102,10 +110,22 @@ export function App(): JSX.Element {
     <div className={styles.shell}>
       <TabStrip tabs={tabs} activeTabId={activeTabId} onSelectTab={selectTab} />
       <div className={styles.body}>
-        <Sidebar onNavChange={handleNavChange} />
+        <Sidebar
+          onNavChange={handleNavChange}
+          selectedCollectionId={selectedCollectionId}
+          onSelectCollection={handleSelectCollection}
+        />
         <main className={styles.centerPane} aria-label="Paper view">
           {view === 'library' ? (
-            <Library onOpenPaper={openPaper} />
+            <Library
+              onOpenPaper={openPaper}
+              selectedCollectionId={selectedCollectionId}
+              selectedCollectionName={selectedCollectionName}
+              onClearCollectionFilter={() => {
+                setSelectedCollectionId(null)
+                setSelectedCollectionName(null)
+              }}
+            />
           ) : (
             <>
               <ReaderToolbar

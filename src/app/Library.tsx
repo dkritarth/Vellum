@@ -14,6 +14,9 @@ import styles from './Library.module.css'
 
 export interface LibraryProps {
   onOpenPaper: (paper: { slug: string; title: string }) => void
+  selectedCollectionId?: number | null
+  selectedCollectionName?: string | null
+  onClearCollectionFilter?: () => void
 }
 
 const SORT_OPTIONS: { value: PaperSortColumn; label: string }[] = [
@@ -24,8 +27,14 @@ const SORT_OPTIONS: { value: PaperSortColumn; label: string }[] = [
 
 type Status = 'loading' | 'ready' | 'error'
 
-export function Library({ onOpenPaper }: LibraryProps): JSX.Element {
+export function Library({
+  onOpenPaper,
+  selectedCollectionId = null,
+  selectedCollectionName = null,
+  onClearCollectionFilter,
+}: LibraryProps): JSX.Element {
   const [papers, setPapers] = useState<PaperRecord[]>([])
+  const [paperCollections, setPaperCollections] = useState<Record<string, string[]>>({})
   const [status, setStatus] = useState<Status>('loading')
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<PaperSortColumn>('addedAt')
@@ -36,16 +45,31 @@ export function Library({ onOpenPaper }: LibraryProps): JSX.Element {
 
     const options: ListPapersOptions = {
       search: search.trim() || undefined,
+      collectionId: selectedCollectionId ?? undefined,
       sort,
       order: sort === 'title' ? 'asc' : 'desc',
     }
 
     window.vellum
       .listPapers(options)
-      .then((rows) => {
+      .then(async (rows) => {
         if (cancelled) return
         setPapers(rows)
         setStatus('ready')
+
+        // Fetch collection tags for displayed papers
+        if (window.vellum?.collectionsForPaper) {
+          const tags: Record<string, string[]> = {}
+          for (const paper of rows) {
+            try {
+              const colls = await window.vellum.collectionsForPaper(paper.slug)
+              tags[paper.slug] = colls.map((c) => c.name)
+            } catch {
+              // ignore error
+            }
+          }
+          if (!cancelled) setPaperCollections(tags)
+        }
       })
       .catch(() => {
         if (!cancelled) setStatus('error')
@@ -54,10 +78,24 @@ export function Library({ onOpenPaper }: LibraryProps): JSX.Element {
     return () => {
       cancelled = true
     }
-  }, [search, sort])
+  }, [search, sort, selectedCollectionId])
 
   return (
     <div className={styles.library}>
+      {selectedCollectionId !== null && (
+        <div className={styles.filterBanner} role="status">
+          <span>
+            Filtered by collection: <strong>{selectedCollectionName || 'Collection'}</strong>
+          </span>
+          <button
+            type="button"
+            className={styles.clearFilterButton}
+            onClick={onClearCollectionFilter}
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
       <div className={styles.controls}>
         <input
           type="search"
@@ -100,6 +138,15 @@ export function Library({ onOpenPaper }: LibraryProps): JSX.Element {
                 {formatAuthors(paper.authors)}
                 {paper.year ? ` · ${paper.year}` : ''}
               </span>
+              {paperCollections[paper.slug] && paperCollections[paper.slug].length > 0 && (
+                <div className={styles.collectionsTagList}>
+                  {paperCollections[paper.slug].map((cName) => (
+                    <span key={cName} className={styles.collectionTag}>
+                      {cName}
+                    </span>
+                  ))}
+                </div>
+              )}
             </button>
           ))}
         </div>

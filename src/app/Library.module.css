@@ -118,3 +118,50 @@
   border-radius: 4px;
   padding: 2px 6px;
 }
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+.trashCardButton {
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  opacity: 0.4;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: opacity 0.15s, background-color 0.15s;
+  flex-shrink: 0;
+}
+
+.card:hover .trashCardButton,
+.trashCardButton:focus {
+  opacity: 1;
+}
+
+.trashCardButton:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.cardTitleButton {
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  flex: 1;
+}
+
+.cardBody {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

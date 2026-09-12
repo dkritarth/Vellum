@@ -123,3 +123,9 @@ CREATE TABLE IF NOT EXISTS suggested_questions (
 );
 CREATE INDEX IF NOT EXISTS idx_suggested_questions_paper ON suggested_questions(paper_slug, backend);
 `
+
+// [L2-04] Recoverable Trash: nullable trashed_at timestamp on papers.
+// NULL means active in Library. Non-NULL means moved to Trash.
+export const SCHEMA_V7_TRASH = `
+ALTER TABLE papers ADD COLUMN trashed_at TEXT;
+`

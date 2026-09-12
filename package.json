@@ -18,6 +18,7 @@
     "test:gate:collections": "node test/collections-live.mjs",
     "test:gate:chats": "node test/chats-live.mjs",
     "test:gate:questions": "node test/questions-live.mjs",
+    "test:gate:trash": "node test/trash-live.mjs",
     "dist": "electron-vite build && electron-builder"
   },
   "dependencies": {

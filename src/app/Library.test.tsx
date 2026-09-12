@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Library } from './Library'
@@ -142,5 +142,26 @@ describe('Library', () => {
     const clearBtn = screen.getByRole('button', { name: 'Clear filter' })
     clearBtn.click()
     expect(onClear).toHaveBeenCalled()
+  })
+  it('clicking trash button on a paper card invokes paperTrash and removes it [L2-04]', async () => {
+    listPapers.mockResolvedValue([makePaper()])
+    const paperTrash = vi.fn().mockResolvedValue(null)
+    const collectionsForPaper = vi.fn().mockResolvedValue([])
+    Object.defineProperty(window, 'vellum', {
+      configurable: true,
+      value: { listPapers, collectionsForPaper, paperTrash },
+    })
+
+    const onTrash = vi.fn()
+    render(<Library onOpenPaper={vi.fn()} onTrashPaper={onTrash} />)
+
+    const trashBtn = await screen.findByRole('button', { name: 'Move Attention Is All You Need to trash' })
+    fireEvent.click(trashBtn)
+
+    await waitFor(() => {
+      expect(paperTrash).toHaveBeenCalledWith('arxiv-1706.03762')
+      expect(onTrash).toHaveBeenCalledWith('arxiv-1706.03762')
+      expect(screen.queryByText('Attention Is All You Need')).not.toBeInTheDocument()
+    })
   })
 })

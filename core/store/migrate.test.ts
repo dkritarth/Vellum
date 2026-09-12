@@ -38,7 +38,7 @@ describe('runMigrations', () => {
     runMigrations(db)
 
     const version = db.pragma('user_version', { simple: true })
-    expect(version).toBe(6)
+    expect(version).toBe(7)
   })
 
   it('adds the author_orcids column to papers [P2-04]', () => {
@@ -77,7 +77,7 @@ describe('runMigrations', () => {
     runMigrations(db)
 
     const version = db.pragma('user_version', { simple: true })
-    expect(version).toBe(6)
+    expect(version).toBe(7)
 
     const row = db.prepare('SELECT * FROM papers WHERE slug = ?').get('a')
     expect(row).toBeTruthy()
@@ -99,6 +99,19 @@ describe('runMigrations', () => {
       .all()
       .map((row) => (row as { name: string }).name)
     expect(indexes).toContain('idx_suggested_questions_paper')
+  })
+
+
+  it('adds the trashed_at column to papers [L2-04]', () => {
+    db = new Database(':memory:')
+    runMigrations(db)
+
+    const columns = db
+      .prepare("PRAGMA table_info(papers)")
+      .all()
+      .map((row) => (row as { name: string }).name)
+
+    expect(columns).toContain('trashed_at')
   })
 
   it('applies only migrations newer than the current version, in order', () => {

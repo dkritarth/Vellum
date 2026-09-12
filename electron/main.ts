@@ -23,7 +23,7 @@ import { ChatManager } from '../core/chat/manager.js'
 import { getChatSession } from '../core/chat/repo.js'
 import { ingest } from '../core/ingest/index.js'
 import type { IngestResult } from '../core/ingest/index.js'
-import { getPaper, listPapers } from '../core/library/repo.js'
+import { getPaper, listPapers, trashPaper, restorePaper, purgePaper } from '../core/library/repo.js'
 import type { ListPapersOptions, PaperRecord, PaperSortColumn } from '../core/library/repo.js'
 import { deleteNote, getNote, upsertNote } from '../core/notes/repo.js'
 import {
@@ -149,8 +149,9 @@ function toListPapersOptions(value: unknown): ListPapersOptions {
     : undefined
   const order = candidate['order'] === 'asc' || candidate['order'] === 'desc' ? candidate['order'] : undefined
   const collectionId = typeof candidate['collectionId'] === 'number' ? candidate['collectionId'] : undefined
+  const trashed = typeof candidate['trashed'] === 'boolean' ? candidate['trashed'] : undefined
 
-  return { search, collectionId, sort, order }
+  return { search, collectionId, sort, order, trashed }
 }
 
 // Library grid data [P1-08]. Read-only, no slug/path handling needed (unlike
@@ -161,6 +162,19 @@ ipcMain.handle('vellum:list-papers', (_event, options: unknown): PaperRecord[] =
 
 ipcMain.handle('vellum:get-paper', (_event, slug: unknown): PaperRecord | null => {
   return getPaper(getDb(), requireSlug(slug, 'vellum:get-paper')) ?? null
+})
+
+// [L2-04] Trash and Purge operations ----------------------------------------
+ipcMain.handle('vellum:paper-trash', (_event, slug: unknown): PaperRecord | null => {
+  return trashPaper(getDb(), requireSlug(slug, 'vellum:paper-trash')) ?? null
+})
+
+ipcMain.handle('vellum:paper-restore', (_event, slug: unknown): PaperRecord | null => {
+  return restorePaper(getDb(), requireSlug(slug, 'vellum:paper-restore')) ?? null
+})
+
+ipcMain.handle('vellum:paper-purge', (_event, slug: unknown): boolean => {
+  return purgePaper(getDb(), requireSlug(slug, 'vellum:paper-purge'), 'data')
 })
 
 // [P2-01] Notes tab — one freeform markdown note per paper. -----------------

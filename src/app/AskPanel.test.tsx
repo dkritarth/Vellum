@@ -150,4 +150,33 @@ describe('AskPanel', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/db locked/i)
   })
+
+  it('pre-populates input when injectedPrompt has autoSend false [R1-05]', async () => {
+    render(
+      <AskPanel
+        slug="p1"
+        injectedPrompt={{ text: '> "Attention is all you need" (p. 1)', autoSend: false, nonce: 1 }}
+      />,
+    )
+    await waitFor(() => expect(askOpen).toHaveBeenCalled())
+    const input = await screen.findByLabelText(/ask a question/i)
+    await waitFor(() => expect(input).toHaveValue('> "Attention is all you need" (p. 1)'))
+  })
+
+  it('automatically triggers askStart when injectedPrompt has autoSend true [R1-05]', async () => {
+    render(
+      <AskPanel
+        slug="p1"
+        injectedPrompt={{ text: 'Explain this passage: "Transformer"', autoSend: true, nonce: 2 }}
+      />,
+    )
+    await waitFor(() => expect(askOpen).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(askStart).toHaveBeenCalledWith({
+        chatSessionId: 1,
+        slug: 'p1',
+        text: 'Explain this passage: "Transformer"',
+      }),
+    )
+  })
 })

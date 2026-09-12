@@ -672,3 +672,37 @@ describe('Reader highlight overlay + citation marker interaction [P2-02 x P2-03]
     expect(rect.style.background).toBe('yellow')
   })
 })
+
+describe('Reader selection actions [R1-05]', () => {
+  it('opens SelectionMenu on mouseup with selected text, triggering onAddToChat and onExplain', async () => {
+    const onAddToChat = vi.fn()
+    const onExplain = vi.fn()
+    const { container } = render(
+      <Reader slug="my-paper" onAddToChat={onAddToChat} onExplain={onExplain} />,
+    )
+    await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2'))
+
+    const textLayer = getTextLayer(container)
+    await waitFor(() => expect(textLayer.querySelector('span')).not.toBeNull())
+
+    const textNode = textLayer.querySelector('span')!.firstChild!
+    const range = document.createRange()
+    range.setStart(textNode, 0)
+    range.setEnd(textNode, 12)
+    const selection = window.getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
+
+    fireEvent.mouseUp(textLayer)
+
+    // Selection menu toolbar should appear
+    const addToChat = await screen.findByRole('button', { name: 'Add to chat' })
+    const explain = screen.getByRole('button', { name: 'Explain' })
+    expect(addToChat).toBeInTheDocument()
+    expect(explain).toBeInTheDocument()
+
+    // Clicking Add to chat calls callback with quote and page number
+    fireEvent.click(addToChat)
+    expect(onAddToChat).toHaveBeenCalledWith('Introduction', 1)
+  })
+})

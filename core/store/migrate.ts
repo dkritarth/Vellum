@@ -12,7 +12,7 @@
 
 import type { Database } from 'better-sqlite3'
 
-import { SCHEMA_V1, SCHEMA_V3_NOTES, SCHEMA_V4_HIGHLIGHTS, SCHEMA_V5_AUTHOR_ORCIDS } from './schema.js'
+import { SCHEMA_V1, SCHEMA_V3_NOTES, SCHEMA_V4_HIGHLIGHTS, SCHEMA_V5_AUTHOR_ORCIDS, SCHEMA_V6_SUGGESTED_QUESTIONS } from './schema.js'
 
 export interface Migration {
   version: number
@@ -26,6 +26,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 3, sql: SCHEMA_V3_NOTES }, // [P2-01] notes table
   { version: 4, sql: SCHEMA_V4_HIGHLIGHTS }, // [P2-02] highlights table
   { version: 5, sql: SCHEMA_V5_AUTHOR_ORCIDS }, // [P2-04] author_orcids column
+  { version: 6, sql: SCHEMA_V6_SUGGESTED_QUESTIONS }, // [L2-03] suggested_questions table
 ]
 
 /**

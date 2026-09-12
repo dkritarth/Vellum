@@ -109,3 +109,17 @@ CREATE INDEX IF NOT EXISTS idx_highlights_paper ON highlights(paper_slug);
 export const SCHEMA_V5_AUTHOR_ORCIDS = `
 ALTER TABLE papers ADD COLUMN author_orcids TEXT;
 `
+
+// [L2-03] Suggested questions: cached paper-specific questions generated
+// per paper and backend. Cascades on paper deletion.
+export const SCHEMA_V6_SUGGESTED_QUESTIONS = `
+CREATE TABLE IF NOT EXISTS suggested_questions (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  paper_slug  TEXT NOT NULL REFERENCES papers(slug) ON DELETE CASCADE,
+  backend     TEXT NOT NULL,
+  question    TEXT NOT NULL,
+  category    TEXT,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_suggested_questions_paper ON suggested_questions(paper_slug, backend);
+`

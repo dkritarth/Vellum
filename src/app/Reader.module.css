@@ -188,3 +188,30 @@
   opacity: 0.65;
   outline: 2px solid var(--vellum-text, #eaeaea);
 }
+
+/* [P2-03] Inline citation markers — `[n]`/`[n, m]`/`[n-m]` markers whose
+   number resolves in the current document's reference index are wrapped in
+   one of these buttons by `injectCitationMarkers`. Text stays transparent
+   like the rest of the (invisible, selection-only) text layer — the visible
+   glyph is the canvas raster underneath — with a hover/focus tint standing
+   in for an underline so the marker still reads as clickable. */
+.citationMarker {
+  border: none;
+  background: transparent;
+  color: transparent;
+  font: inherit;
+  padding: 0;
+  border-radius: 2px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.citationMarker:hover,
+.citationMarker:focus-visible {
+  background: rgba(234, 234, 234, 0.25);
+}
+
+.citationMarkerFlash {
+  outline: 2px solid var(--vellum-text, #eaeaea);
+  outline-offset: 1px;
+}

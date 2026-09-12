@@ -40,6 +40,10 @@ export interface RawMetadata {
   year: number | undefined
   venue: string | undefined
   abstract: string | undefined
+  /** Bare ORCID ids (e.g. "0000-0002-1825-0097"), positionally aligned to
+   * `authors`; null for authors with no known ORCID. Crossref-only signal —
+   * undefined when the source (e.g. arXiv) never carries ORCIDs. */
+  authorOrcids?: (string | null)[]
 }
 
 export interface FetchedSource {
@@ -115,12 +119,22 @@ async function fetchArxivPdf(arxivId: string): Promise<Uint8Array> {
 interface CrossrefWork {
   message: {
     title?: string[]
-    author?: Array<{ given?: string; family?: string; name?: string }>
+    author?: Array<{ given?: string; family?: string; name?: string; ORCID?: unknown }>
     published?: { 'date-parts'?: number[][] }
     'published-print'?: { 'date-parts'?: number[][] }
     'container-title'?: string[]
     abstract?: string
   }
+}
+
+// Crossref's ORCID field is a URL like "http://orcid.org/0000-0002-1825-0097"
+// or "https://orcid.org/0000-0002-1825-0097/" — normalize to the bare id.
+// Defensive: any non-string or unrecognized shape yields null rather than
+// throwing (ORCID is a best-effort signal, never load-bearing for ingest).
+function normalizeOrcid(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const stripped = value.trim().replace(/^https?:\/\/orcid\.org\//i, '').replace(/\/+$/, '')
+  return /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/.test(stripped) ? stripped : null
 }
 
 async function fetchCrossrefMetadata(doi: string): Promise<RawMetadata> {
@@ -136,9 +150,12 @@ async function fetchCrossrefMetadata(doi: string): Promise<RawMetadata> {
     throw new Error(`Crossref API: missing title for ${doi}`)
   }
 
-  const authors = (work.author ?? []).map((a) =>
+  const crossrefAuthors = work.author ?? []
+  const authors = crossrefAuthors.map((a) =>
     a.name ?? [a.given, a.family].filter(Boolean).join(' '),
   )
+  const authorOrcids = crossrefAuthors.map((a) => normalizeOrcid(a.ORCID))
+  const hasAnyOrcid = authorOrcids.some((id) => id !== null)
 
   const dateParts =
     work.published?.['date-parts']?.[0] ?? work['published-print']?.['date-parts']?.[0]
@@ -152,6 +169,7 @@ async function fetchCrossrefMetadata(doi: string): Promise<RawMetadata> {
     year,
     venue,
     abstract: work.abstract ? normalizeWhitespace(stripJats(work.abstract)) : undefined,
+    authorOrcids: hasAnyOrcid ? authorOrcids : undefined,
   }
 }
 

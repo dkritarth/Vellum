@@ -89,6 +89,57 @@ describe('repo', () => {
     }
   })
 
+  describe('author_orcids [P2-04]', () => {
+    it('round-trips authorOrcids, including null entries for unknown authors', () => {
+      const db = openDb({ path: ':memory:' })
+      try {
+        upsertPaper(
+          db,
+          makeRecord({
+            slug: 'orcid-paper',
+            authors: ['Jane Doe', 'John Smith'],
+            authorOrcids: ['0000-0002-1825-0097', null],
+          }),
+        )
+
+        const row = getPaper(db, 'orcid-paper')
+        expect(row?.authors).toEqual(['Jane Doe', 'John Smith'])
+        expect(row?.authorOrcids).toEqual(['0000-0002-1825-0097', null])
+      } finally {
+        db.close()
+      }
+    })
+
+    it('a paper upserted without authorOrcids reads back with authorOrcids undefined, authors intact', () => {
+      const db = openDb({ path: ':memory:' })
+      try {
+        upsertPaper(db, makeRecord({ slug: 'no-orcids' }))
+
+        const row = getPaper(db, 'no-orcids')
+        expect(row?.authorOrcids).toBeUndefined()
+        expect(row?.authors).toEqual(['Jane Doe', 'John Smith'])
+      } finally {
+        db.close()
+      }
+    })
+
+    it('an old row (author_orcids column NULL) reads back with authorOrcids undefined', () => {
+      const db = openDb({ path: ':memory:' })
+      try {
+        // Simulate a pre-[P2-04] row inserted without touching the new column at all.
+        db.prepare(
+          `INSERT INTO papers (slug, title, authors, added_at) VALUES (?, ?, ?, ?)`,
+        ).run('legacy', 'Legacy Paper', JSON.stringify(['Old Author']), '2026-01-01T00:00:00.000Z')
+
+        const row = getPaper(db, 'legacy')
+        expect(row?.authorOrcids).toBeUndefined()
+        expect(row?.authors).toEqual(['Old Author'])
+      } finally {
+        db.close()
+      }
+    })
+  })
+
   it('listPapers orders most-recently-added first', () => {
     const db = openDb({ path: ':memory:' })
     try {

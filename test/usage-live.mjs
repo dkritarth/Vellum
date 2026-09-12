@@ -69,7 +69,7 @@ async function runLiveVerification() {
   await backBtn.click()
   await window.waitForTimeout(500)
 
-  const libSearch = await window.waitForSelector('input[aria-label="Search papers by title, author, abstract, or DOI"]')
+  const libSearch = await window.waitForSelector('input[aria-label="Search papers by title"]')
   assert.ok(libSearch, 'Should navigate back to Library view')
   console.log('✓ Back to Library button navigates successfully')
 

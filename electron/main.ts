@@ -24,6 +24,7 @@ import { getChatSession } from '../core/chat/repo.js'
 import { ingest } from '../core/ingest/index.js'
 import type { IngestResult } from '../core/ingest/index.js'
 import { getPaper, listPapers, trashPaper, restorePaper, purgePaper } from '../core/library/repo.js'
+import { getUsageSummary, listUsageRecords, type ListUsageOptions } from '../core/usage/repo.js'
 import type { ListPapersOptions, PaperRecord, PaperSortColumn } from '../core/library/repo.js'
 import { deleteNote, getNote, upsertNote } from '../core/notes/repo.js'
 import {
@@ -175,6 +176,16 @@ ipcMain.handle('vellum:paper-restore', (_event, slug: unknown): PaperRecord | nu
 
 ipcMain.handle('vellum:paper-purge', (_event, slug: unknown): boolean => {
   return purgePaper(getDb(), requireSlug(slug, 'vellum:paper-purge'), 'data')
+})
+
+// [L2-05] Usage & Telemetry operations ---------------------------------------
+ipcMain.handle('vellum:usage-summary', () => {
+  return getUsageSummary(getDb())
+})
+
+ipcMain.handle('vellum:usage-list', (_event, options: unknown) => {
+  const opts = (typeof options === 'object' && options !== null) ? options as ListUsageOptions : {}
+  return listUsageRecords(getDb(), opts)
 })
 
 // [P2-01] Notes tab — one freeform markdown note per paper. -----------------

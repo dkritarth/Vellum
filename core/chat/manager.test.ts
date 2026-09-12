@@ -10,6 +10,7 @@ import { upsertPaper } from '../library/repo.js'
 import { openDb } from '../store/db.js'
 import { ChatManager } from './manager.js'
 import { getChatMessages } from './repo.js'
+import { listUsageRecords, getUsageSummary } from '../usage/repo.js'
 
 class FakeSession implements AcpSession {
   disposed = false
@@ -234,5 +235,60 @@ describe('ChatManager', () => {
     // With explicit chatSessionId, openChat reopens the first session
     const reopened = manager.openChat({ db, paperSlug: slug, chatSessionId: first.session.id })
     expect(reopened.session.id).toBe(first.session.id)
+  })
+
+  it('records turn telemetry when adapter emits usage metadata [L2-05]', async () => {
+    const usageData = {
+      inputTokens: 1500,
+      outputTokens: 300,
+      totalTokens: 1800,
+    }
+    const client = new FakeClient([
+      textUpdate('response with usage'),
+      { kind: 'usage_update', data: { used: 12000, size: 200000, cost: { amount: 0.02 } } },
+      { kind: 'done', data: { stopReason: 'end_turn', usage: usageData } },
+    ])
+    const manager = new ChatManager(client)
+    const { session } = manager.openChat({ db, paperSlug: slug, backend: 'claude' })
+
+    await manager.runTurn({ db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'hello' }, () => {})
+
+    const records = listUsageRecords(db, { sessionId: session.id })
+    expect(records).toHaveLength(1)
+    expect(records[0].hasMetrics).toBe(true)
+    expect(records[0].inputTokens).toBe(1500)
+    expect(records[0].outputTokens).toBe(300)
+    expect(records[0].totalTokens).toBe(1800)
+    expect(records[0].contextUsed).toBe(12000)
+    expect(records[0].costAmount).toBe(0.02)
+
+    const summary = getUsageSummary(db)
+    expect(summary.totalTurns).toBe(1)
+    expect(summary.turnsWithMetrics).toBe(1)
+    expect(summary.totalTokens).toBe(1800)
+  })
+
+  it('records turn with honest unavailable state when adapter lacks telemetry [L2-05]', async () => {
+    const client = new FakeClient([
+      textUpdate('response without usage'),
+      { kind: 'done', data: { stopReason: 'end_turn' } },
+    ])
+    const manager = new ChatManager(client)
+    const { session } = manager.openChat({ db, paperSlug: slug, backend: 'codex' })
+
+    await manager.runTurn({ db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'hello' }, () => {})
+
+    const records = listUsageRecords(db, { sessionId: session.id })
+    expect(records).toHaveLength(1)
+    expect(records[0].hasMetrics).toBe(false)
+    expect(records[0].inputTokens).toBeNull()
+    expect(records[0].outputTokens).toBeNull()
+    expect(records[0].totalTokens).toBeNull()
+
+    const summary = getUsageSummary(db)
+    expect(summary.totalTurns).toBe(1)
+    expect(summary.turnsWithMetrics).toBe(0)
+    expect(summary.totalTokens).toBeNull() // Honest null, never 0
+    expect(summary.backends.codex.totalTokens).toBeNull()
   })
 })

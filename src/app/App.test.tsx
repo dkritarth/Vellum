@@ -48,6 +48,19 @@ beforeEach(() => {
       highlightsDelete: vi.fn().mockResolvedValue(undefined),
       paperRestore: vi.fn().mockResolvedValue(null),
       paperPurge: vi.fn().mockResolvedValue(true),
+      usageGetSummary: vi.fn().mockResolvedValue({
+        totalTurns: 0,
+        turnsWithMetrics: 0,
+        totalInputTokens: null,
+        totalOutputTokens: null,
+        totalTokens: null,
+        totalCost: null,
+        backends: {
+          claude: { backend: 'claude', turnsCount: 0, turnsWithMetrics: 0, totalInputTokens: null, totalOutputTokens: null, totalTokens: null, contextUsedLatest: null, contextSizeLatest: null, totalCost: null, costCurrency: null, lastRecordedAt: null },
+          codex: { backend: 'codex', turnsCount: 0, turnsWithMetrics: 0, totalInputTokens: null, totalOutputTokens: null, totalTokens: null, contextUsedLatest: null, contextSizeLatest: null, totalCost: null, costCurrency: null, lastRecordedAt: null },
+        },
+      }),
+      usageGetList: vi.fn().mockResolvedValue([]),
     },
   })
 })
@@ -133,5 +146,15 @@ describe('App shell', () => {
 
     expect(await screen.findByRole('region', { name: 'Trash view' })).toBeInTheDocument()
     expect(screen.getByText('Attention Is All You Need')).toBeInTheDocument()
+  })
+
+  it('opens Usage view from the sidebar footer [L2-05]', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'Usage' }))
+
+    expect(await screen.findByRole('region', { name: /usage and telemetry view/i })).toBeInTheDocument()
+    expect(screen.getByText('ACP Usage & Plan Telemetry')).toBeInTheDocument()
   })
 })

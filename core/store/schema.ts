@@ -129,3 +129,32 @@ CREATE INDEX IF NOT EXISTS idx_suggested_questions_paper ON suggested_questions(
 export const SCHEMA_V7_TRASH = `
 ALTER TABLE papers ADD COLUMN trashed_at TEXT;
 `
+
+// [L2-05] Honest ACP usage metrics: per-turn and session telemetry recorded
+// without storing privacy-sensitive prompt text. UNIQUE(session_id, turn_index)
+// ensures retries/resumed turns update rather than double-counting.
+export const SCHEMA_V8_USAGE = `
+CREATE TABLE IF NOT EXISTS usage_records (
+  id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id          INTEGER REFERENCES chat_sessions(id) ON DELETE SET NULL,
+  backend             TEXT NOT NULL,
+  model               TEXT,
+  turn_index          INTEGER NOT NULL DEFAULT 0,
+  input_tokens        INTEGER,
+  output_tokens       INTEGER,
+  thought_tokens      INTEGER,
+  cached_read_tokens  INTEGER,
+  cached_write_tokens INTEGER,
+  total_tokens        INTEGER,
+  context_used        INTEGER,
+  context_size        INTEGER,
+  cost_amount         REAL,
+  cost_currency       TEXT,
+  has_metrics         INTEGER NOT NULL DEFAULT 0,
+  recorded_at         TEXT NOT NULL,
+  UNIQUE(session_id, turn_index)
+);
+CREATE INDEX IF NOT EXISTS idx_usage_records_backend ON usage_records(backend);
+CREATE INDEX IF NOT EXISTS idx_usage_records_recorded_at ON usage_records(recorded_at);
+CREATE INDEX IF NOT EXISTS idx_usage_records_session ON usage_records(session_id);
+`

@@ -27,7 +27,7 @@ export interface AcpPromptRequest {
 }
 
 export interface AcpUpdate {
-  kind: 'text' | 'tool_call' | 'tool_result' | 'done' | 'error'
+  kind: 'text' | 'tool_call' | 'tool_result' | 'usage_update' | 'done' | 'error'
   data: unknown
 }
 

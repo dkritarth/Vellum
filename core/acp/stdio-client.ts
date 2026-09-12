@@ -168,7 +168,9 @@ export function mapSessionUpdate(update: SessionUpdate): AcpUpdate {
       return { kind: 'tool_call', data: update }
     case 'tool_call_update':
       return { kind: 'tool_result', data: update }
-    // plan / mode / config / usage / command updates don't have a bespoke
+    case 'usage_update':
+      return { kind: 'usage_update', data: update }
+    // plan / mode / config / command updates don't have a bespoke
     // AcpUpdate kind yet (contract only defines text/tool_call/tool_result/
     // done/error). Surface them as tool_result so nothing is silently
     // dropped; revisit the contract if a UI needs to key off these directly.
@@ -338,7 +340,7 @@ class StdioAcpSession implements AcpSession {
         if (settled) return
         settled = true
         timeout.cancel()
-        queue.push({ kind: 'done', data: { stopReason: res.stopReason } })
+        queue.push({ kind: 'done', data: { stopReason: res.stopReason, ...(res.usage ? { usage: res.usage } : {}) } })
         queue.close()
       })
       .catch((err: unknown) => {

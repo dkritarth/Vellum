@@ -8,6 +8,7 @@ import type { ListPapersOptions, PaperRecord } from '../core/library/repo.js'
 import type { NoteRecord } from '../core/notes/repo.js'
 import type { HighlightRecord } from '../core/highlights/repo.js'
 import type { CollectionRecord, CollectionTreeItem } from '../core/collections/repo.js'
+import type { UsageRecord, UsageSummary, BackendUsageSummary, ListUsageOptions } from '../core/usage/repo.js'
 import type { AcpBackend } from '../core/acp/client.js'
 
 export interface AskUpdatePayload {
@@ -40,6 +41,10 @@ const api = {
   paperTrash: (slug: string): Promise<PaperRecord | null> => ipcRenderer.invoke('vellum:paper-trash', slug),
   paperRestore: (slug: string): Promise<PaperRecord | null> => ipcRenderer.invoke('vellum:paper-restore', slug),
   paperPurge: (slug: string): Promise<boolean> => ipcRenderer.invoke('vellum:paper-purge', slug),
+  // [L2-05] Usage & Plan Telemetry
+  usageGetSummary: (): Promise<UsageSummary> => ipcRenderer.invoke('vellum:usage-summary'),
+  usageGetList: (options?: ListUsageOptions): Promise<UsageRecord[]> =>
+    ipcRenderer.invoke('vellum:usage-list', options),
   // [P2-01] Notes tab — one freeform markdown note per paper. `notesGet`
   // resolves null when the paper has no note yet (empty-editor state).
   // `notesSave` is autosave's persistence half — upsert-by-paper-slug, so the
@@ -115,4 +120,4 @@ contextBridge.exposeInMainWorld('vellum', api)
 
 export type VellumApi = typeof api
 
-export type { CollectionRecord, CollectionTreeItem, ChatSessionSummary, ListChatSessionsOptions, SuggestedQuestionRecord, QuestionCategory }
+export type { CollectionRecord, CollectionTreeItem, ChatSessionSummary, ListChatSessionsOptions, SuggestedQuestionRecord, QuestionCategory, UsageRecord, UsageSummary, BackendUsageSummary, ListUsageOptions }

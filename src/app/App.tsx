@@ -1,4 +1,5 @@
 import { TrashView } from './TrashView.js'
+import { UsageView } from './UsageView.js'
 import type { ChatSessionSummary } from '../../core/chat/repo'
 import { useEffect, useState } from 'react'
 import { IngestModal } from './IngestModal'
@@ -39,7 +40,7 @@ export function App(): JSX.Element {
   const [pong, setPong] = useState<string>('…')
   const [tabs, setTabs] = useState<PaperTab[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
-  const [view, setView] = useState<'reader' | 'library' | 'trash'>('reader')
+  const [view, setView] = useState<'reader' | 'library' | 'trash' | 'usage'>('reader')
   const [isIngestOpen, setIsIngestOpen] = useState(false)
   const [highlightActive, setHighlightActive] = useState(false)
   const [highlightColor, setHighlightColor] = useState<HighlightColor>('yellow')
@@ -137,6 +138,7 @@ export function App(): JSX.Element {
           selectedSessionId={selectedChatSessionId}
           onSelectSession={handleSelectChatSession}
           onSelectTrash={() => setView('trash')}
+          onSelectUsage={() => setView('usage')}
         />
         <main className={styles.centerPane} aria-label="Paper view">
           {chatBanner && (
@@ -147,6 +149,10 @@ export function App(): JSX.Element {
           )}
           {view === 'trash' ? (
             <TrashView
+              onBackToLibrary={() => setView('library')}
+            />
+          ) : view === 'usage' ? (
+            <UsageView
               onBackToLibrary={() => setView('library')}
             />
           ) : view === 'library' ? (

@@ -4,7 +4,7 @@
   "description": "Vellum — local-first AI paper workspace that runs on your own Claude/Codex plan via ACP. No extra API key.",
   "author": "Kritarth Dandapat",
   "license": "MIT",
-  "main": "out/main/index.js",
+  "main": "out/main/index.cjs",
   "type": "module",
   "scripts": {
     "dev": "electron-vite dev",
@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.2.1",
-    "better-sqlite3": "^13.0.1",
+    "better-sqlite3": "12.11.1",
     "pdfjs-dist": "^6.1.200",
     "unpdf": "^1.6.2"
   },
@@ -35,6 +35,7 @@
     "electron-builder": "^25.0.0",
     "electron-vite": "^2.3.0",
     "jsdom": "^25.0.1",
+    "playwright": "^1.63.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "tsx": "^4.23.1",
@@ -44,6 +45,7 @@
   },
   "//": "@agentclientprotocol/sdk is the current canonical ACP TS lib (verified on npm 2026-07-21). @zed-industries/agent-client-protocol is deprecated and renamed to this package. better-sqlite3 bumped 11->13: v11's prebuilt/native build doesn't compile against newer V8 (Node 26) — v13 fixes the V8 API compat, no behavior change for our usage.",
   "allowScripts": {
+    "better-sqlite3@12.11.1": true,
     "better-sqlite3@13.0.1": true,
     "electron@32.3.3": true,
     "esbuild@0.21.5": true,

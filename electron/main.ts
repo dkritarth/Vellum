@@ -1,3 +1,5 @@
+import { deleteChatSession, listChatSessions, updateChatSessionTitle } from '../core/chat/repo.js'
+import type { ChatSessionSummary } from '../core/chat/repo.js'
 import { app, BrowserWindow, ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { randomUUID } from 'node:crypto'
@@ -266,11 +268,62 @@ function requireSlug(value: unknown, channel: string): string {
   return value
 }
 
-// Open (or reload) the Ask tab for a paper: returns the most recent chat
-// session for this slug + its full history, creating a fresh session if
-// none exists yet. Cheap — never touches the ACP layer.
-ipcMain.handle('vellum:ask-open', (_event, slug: unknown): AskOpenResult => {
-  return getChatManager().openChat({ db: getDb(), paperSlug: requireSlug(slug, 'vellum:ask-open') })
+function parseAskOpenParams(value: unknown, maybeSessionId?: unknown): { slug: string; sessionId?: number } {
+  if (typeof value === 'object' && value !== null) {
+    const candidate = value as Record<string, unknown>
+    const slug = requireSlug(candidate['slug'], 'vellum:ask-open')
+    const sessionId = typeof candidate['sessionId'] === 'number' && Number.isInteger(candidate['sessionId'])
+      ? candidate['sessionId']
+      : undefined
+    return { slug, sessionId }
+  }
+  const slug = requireSlug(value, 'vellum:ask-open')
+  const sessionId = typeof maybeSessionId === 'number' && Number.isInteger(maybeSessionId)
+    ? maybeSessionId
+    : undefined
+  return { slug, sessionId }
+}
+
+// Open (or reload) the Ask tab for a paper: returns the requested or most
+// recent chat session for this slug + its full history.
+ipcMain.handle('vellum:ask-open', (_event, slugOrParams: unknown, maybeSessionId?: unknown): AskOpenResult => {
+  const { slug, sessionId } = parseAskOpenParams(slugOrParams, maybeSessionId)
+  return getChatManager().openChat({ db: getDb(), paperSlug: slug, chatSessionId: sessionId })
+})
+
+// [L2-02] Cross-paper chat library IPC handlers
+ipcMain.handle('vellum:chat-list-sessions', (_event, options: unknown): ChatSessionSummary[] => {
+  let search: string | undefined
+  let limit: number | undefined
+  if (typeof options === 'object' && options !== null) {
+    const opts = options as Record<string, unknown>
+    if (typeof opts['search'] === 'string') search = opts['search']
+    if (typeof opts['limit'] === 'number' && Number.isInteger(opts['limit']) && opts['limit'] > 0) {
+      limit = opts['limit']
+    }
+  }
+  return listChatSessions(getDb(), { search, limit })
+})
+
+ipcMain.handle('vellum:chat-delete-session', (_event, id: unknown): void => {
+  if (typeof id !== 'number' || !Number.isInteger(id)) {
+    throw new Error('vellum:chat-delete-session: id must be an integer')
+  }
+  deleteChatSession(getDb(), id)
+})
+
+ipcMain.handle('vellum:chat-rename-session', (_event, params: unknown): void => {
+  if (typeof params !== 'object' || params === null) {
+    throw new Error('vellum:chat-rename-session: params must be an object')
+  }
+  const { id, title } = params as Record<string, unknown>
+  if (typeof id !== 'number' || !Number.isInteger(id)) {
+    throw new Error('vellum:chat-rename-session: id must be an integer')
+  }
+  if (typeof title !== 'string' || title.trim().length === 0) {
+    throw new Error('vellum:chat-rename-session: title must be a non-empty string')
+  }
+  updateChatSessionTitle(getDb(), id, title)
 })
 
 // "New chat" action: fresh chat_sessions row + disposes any cached ACP

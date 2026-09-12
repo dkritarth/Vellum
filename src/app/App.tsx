@@ -1,3 +1,4 @@
+import type { ChatSessionSummary } from '../../core/chat/repo'
 import { useEffect, useState } from 'react'
 import { IngestModal } from './IngestModal'
 import { Library } from './Library'
@@ -46,6 +47,24 @@ export function App(): JSX.Element {
   const [injectedPrompt, setInjectedPrompt] = useState<InjectedPrompt | null>(null)
   const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null)
   const [selectedCollectionName, setSelectedCollectionName] = useState<string | null>(null)
+  const [selectedChatSessionId, setSelectedChatSessionId] = useState<number | null>(null)
+  const [chatBanner, setChatBanner] = useState<string | null>(null)
+
+  async function handleSelectChatSession(session: ChatSessionSummary): Promise<void> {
+    setSelectedChatSessionId(session.id)
+    try {
+      const paper = await window.vellum.getPaper(session.paperSlug)
+      if (paper) {
+        setChatBanner(null)
+        openPaper({ slug: paper.slug, title: paper.title })
+        setRightPanelTab('Ask')
+      } else {
+        setChatBanner(`Chat "${session.title}" references paper "${session.paperSlug}" which was not found in your library.`)
+      }
+    } catch {
+      setChatBanner(`Could not load paper for chat "${session.title}".`)
+    }
+  }
 
   function handleSelectCollection(id: number | null, name: string | null): void {
     setSelectedCollectionId(id)
@@ -114,8 +133,16 @@ export function App(): JSX.Element {
           onNavChange={handleNavChange}
           selectedCollectionId={selectedCollectionId}
           onSelectCollection={handleSelectCollection}
+          selectedSessionId={selectedChatSessionId}
+          onSelectSession={handleSelectChatSession}
         />
         <main className={styles.centerPane} aria-label="Paper view">
+          {chatBanner && (
+            <div role="alert" style={{ background: '#742a2a', color: '#fff', padding: '6px 12px', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>{chatBanner}</span>
+              <button type="button" onClick={() => setChatBanner(null)} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}>✕</button>
+            </div>
+          )}
           {view === 'library' ? (
             <Library
               onOpenPaper={openPaper}
@@ -150,6 +177,7 @@ export function App(): JSX.Element {
           onTabChange={setRightPanelTab}
           onJumpToHighlight={jumpToHighlight}
           injectedPrompt={injectedPrompt}
+          targetSessionId={selectedChatSessionId}
         />
       </div>
       <IngestModal

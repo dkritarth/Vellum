@@ -1,3 +1,4 @@
+import type { ChatSessionSummary, ListChatSessionsOptions } from '../core/chat/repo.js'
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import type { AskOpenResult, AskStartParams, AskStreamEvent } from '../core/chat/manager.js'
@@ -72,7 +73,17 @@ const api = {
   highlightsDelete: (id: string): Promise<void> => ipcRenderer.invoke('vellum:highlights-delete', id),
   // [P1-10] Ask tab — grounded chat over ACP. -----------------------------
   // Open (or reload) the most recent chat session + history for a paper.
-  askOpen: (slug: string): Promise<AskOpenResult> => ipcRenderer.invoke('vellum:ask-open', slug),
+  // Open (or reload) a chat session + history for a paper.
+  askOpen: (
+    slugOrParams: string | { slug: string; sessionId?: number },
+    sessionId?: number,
+  ): Promise<AskOpenResult> => ipcRenderer.invoke('vellum:ask-open', slugOrParams, sessionId),
+  // [L2-02] Cross-paper chat library methods
+  chatListSessions: (options?: ListChatSessionsOptions): Promise<ChatSessionSummary[]> =>
+    ipcRenderer.invoke('vellum:chat-list-sessions', options),
+  chatDeleteSession: (id: number): Promise<void> => ipcRenderer.invoke('vellum:chat-delete-session', id),
+  chatRenameSession: (params: { id: number; title: string }): Promise<void> =>
+    ipcRenderer.invoke('vellum:chat-rename-session', params),
   // "New chat": fresh session, empty history, fresh agent conversation.
   askNewChat: (params: { slug: string; backend: AcpBackend }): Promise<AskOpenResult> =>
     ipcRenderer.invoke('vellum:ask-new-chat', params),
@@ -94,4 +105,4 @@ contextBridge.exposeInMainWorld('vellum', api)
 
 export type VellumApi = typeof api
 
-export type { CollectionRecord, CollectionTreeItem }
+export type { CollectionRecord, CollectionTreeItem, ChatSessionSummary, ListChatSessionsOptions }

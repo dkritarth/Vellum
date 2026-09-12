@@ -1,3 +1,5 @@
+import { ChatsList } from './ChatsList'
+import type { ChatSessionSummary } from '../../core/chat/repo'
 // Left sidebar — workspace switcher + primary nav (Create / Home / Library /
 // Search) + a Files/Chats view toggle + footer (Trash / Usage). [P1-07] was
 // layout-only for nav; [P1-14] fills in the rest of anara's sidebar chrome as
@@ -30,12 +32,16 @@ interface SidebarProps {
   onNavChange?: (item: NavItem) => void
   selectedCollectionId?: number | null
   onSelectCollection?: (id: number | null, name: string | null) => void
+  selectedSessionId?: number | null
+  onSelectSession?: (session: ChatSessionSummary) => void
 }
 
 export function Sidebar({
   onNavChange,
   selectedCollectionId = null,
   onSelectCollection,
+  selectedSessionId = null,
+  onSelectSession,
 }: SidebarProps = {}): JSX.Element {
   const [active, setActive] = useState<NavItem>('Home')
   const [libraryView, setLibraryView] = useState<LibraryView>('Files')
@@ -95,7 +101,12 @@ export function Sidebar({
             }}
           />
         ) : (
-          <ComingSoon label="Chats" note="Chats library view — wiki card [P2-06]" />
+          <ChatsList
+            selectedSessionId={selectedSessionId}
+            onSelectSession={(session) => {
+              onSelectSession?.(session)
+            }}
+          />
         )}
       </div>
 

@@ -179,4 +179,17 @@ describe('AskPanel', () => {
       }),
     )
   })
+  it('reopens exact chat session when targetSessionId is passed [L2-02]', async () => {
+    askOpen.mockResolvedValue({
+      session: { id: 42, paperSlug: 'p1', backend: 'claude', title: 'Prior Discussion', createdAt: 't' },
+      messages: [
+        { id: 10, sessionId: 42, role: 'user', content: 'Target session question', createdAt: 't' },
+      ],
+    })
+
+    render(<AskPanel slug="p1" targetSessionId={42} />)
+
+    expect(await screen.findByText('Target session question')).toBeInTheDocument()
+    expect(askOpen).toHaveBeenCalledWith({ slug: 'p1', sessionId: 42 })
+  })
 })

@@ -1,0 +1,46 @@
+{
+  "commit": "a21d596e3fca6de7edef1e63576a8beb00183e5e",
+  "date": "2026-08-22",
+  "workspace": "/tmp/vellum-issue-26-audit.ikQaIL",
+  "normalDataTouched": false,
+  "steps": [
+    {
+      "id": "boot-unmodified",
+      "action": "Launch Electron from the unmodified production/dev output contract",
+      "actual": "Renderer appeared, status stayed at bridge: ..., and main logged missing out/preload/index.js",
+      "result": "fail",
+      "evidence": "01-preload-failure.png",
+      "issue": 51
+    },
+    {
+      "id": "empty-after-preload-bypass",
+      "action": "Launch with detached-worktree-only preload path pointed at emitted preload.mjs",
+      "actual": "Empty reader appeared and status reached bridge: pong",
+      "result": "pass",
+      "evidence": "02-empty-state.png"
+    },
+    {
+      "id": "create",
+      "action": "Click visible Create button through the real Electron renderer",
+      "beforeText": "No paper open\nOpen a paper from Library to start reading.",
+      "afterText": "No paper open\nOpen a paper from Library to start reading.",
+      "changed": false,
+      "result": "fail",
+      "issue": 53
+    },
+    {
+      "id": "library",
+      "action": "Click visible Library button after the preload-only bypass",
+      "actual": "Could not load your library.",
+      "mainError": "Could not dynamically require out/build/Release/better_sqlite3.node",
+      "result": "fail",
+      "issue": 52
+    },
+    {
+      "id": "restart",
+      "action": "Stop and relaunch isolated Electron process multiple times",
+      "actual": "Unmodified launch reproduced issue 51; preload-bypass launch reproduced issue 52; no paper or chat state could be created",
+      "result": "fail"
+    }
+  ]
+}

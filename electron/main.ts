@@ -11,7 +11,7 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import type { Database } from 'better-sqlite3'
@@ -68,6 +68,14 @@ function resolvePreloadPath(): string {
   return join(__dirname, '../preload/index.js')
 }
 
+function resolveDataRoot(): string {
+  const override = process.env['VELLUM_DATA_DIR'] ?? process.env['VELLUM_DATA_ROOT']
+  if (typeof override === 'string' && override.trim() !== '') {
+    return resolve(override.trim())
+  }
+  return resolve(process.cwd(), 'data')
+}
+
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1440,
@@ -101,7 +109,7 @@ ipcMain.handle('vellum:ping', () => 'pong')
 ipcMain.handle('vellum:read-paper-file', async (_event, slug: unknown): Promise<ArrayBuffer | null> => {
   if (typeof slug !== 'string' || !SLUG_PATTERN.test(slug)) return null
 
-  const pdfPath = join(process.cwd(), 'data', 'papers', slug, 'paper.pdf')
+  const pdfPath = join(resolveDataRoot(), 'papers', slug, 'paper.pdf')
   try {
     const buffer = await readFile(pdfPath)
     return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
@@ -116,7 +124,7 @@ ipcMain.handle('vellum:read-paper-file', async (_event, slug: unknown): Promise<
 // data/ dir isn't created until a paper is actually ingested.
 let db: Database | undefined
 function getDb(): Database {
-  if (!db) db = openDb()
+  if (!db) db = openDb({ path: join(resolveDataRoot(), 'app.db') })
   return db
 }
 
@@ -130,7 +138,7 @@ ipcMain.handle('vellum:ingest', async (_event, input: unknown): Promise<IngestRe
   if (typeof input !== 'string' || input.trim().length === 0) {
     throw new Error('vellum:ingest: input must be a non-empty string')
   }
-  return ingest(input, { db: getDb() })
+  return ingest(input, { db: getDb(), dataDir: resolveDataRoot() })
 })
 
 const SORT_COLUMN_VALUES: readonly PaperSortColumn[] = ['addedAt', 'year', 'title']
@@ -175,7 +183,7 @@ ipcMain.handle('vellum:paper-restore', (_event, slug: unknown): PaperRecord | nu
 })
 
 ipcMain.handle('vellum:paper-purge', (_event, slug: unknown): boolean => {
-  return purgePaper(getDb(), requireSlug(slug, 'vellum:paper-purge'), 'data')
+  return purgePaper(getDb(), requireSlug(slug, 'vellum:paper-purge'), resolveDataRoot())
 })
 
 // [L2-05] Usage & Telemetry operations ---------------------------------------

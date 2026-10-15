@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { fetchSource } from './fetch'
+import { fetchSource, fetchPdfFromUrl } from './fetch'
 import type { ClassifiedInput } from './classify'
 
 const ARXIV_ATOM_FIXTURE = `<?xml version="1.0" encoding="UTF-8"?>
@@ -70,7 +70,7 @@ describe('fetchSource', () => {
     })
 
     const input: ClassifiedInput = { kind: 'arxiv', slug: 'arxiv-2401.12345', value: '2401.12345' }
-    const result = await fetchSource(input)
+    const result = await fetchSource(input, { lookup: async () => [{ address: '93.184.216.34', family: 4 }] })
 
     expect(result.pdfBytes).toEqual(new Uint8Array([1, 2, 3, 4]))
     expect(result.metadata).toEqual({
@@ -107,7 +107,7 @@ describe('fetchSource', () => {
       slug: 'doi-10.1038-s41586-021-03819-2',
       value: '10.1038/s41586-021-03819-2',
     }
-    const result = await fetchSource(input)
+    const result = await fetchSource(input, { lookup: async () => [{ address: '93.184.216.34', family: 4 }] })
 
     expect(result.pdfBytes).toEqual(new Uint8Array([9, 9]))
     expect(result.metadata).toEqual({
@@ -146,7 +146,7 @@ describe('fetchSource', () => {
       slug: 'doi-orcid-test',
       value: '10.1/orcid-test',
     }
-    const result = await fetchSource(input)
+    const result = await fetchSource(input, { lookup: async () => [{ address: '93.184.216.34', family: 4 }] })
 
     expect(result.metadata?.authors).toEqual(['Ada Lovelace', 'Alan Turing', 'Grace Hopper'])
     expect(result.metadata?.authorOrcids).toEqual([
@@ -165,7 +165,7 @@ describe('fetchSource', () => {
     })
 
     const input: ClassifiedInput = { kind: 'pdf_url', slug: 'pdf-paper', value: 'https://example.com/paper.pdf' }
-    const result = await fetchSource(input)
+    const result = await fetchSource(input, { lookup: async () => [{ address: '93.184.216.34', family: 4 }] })
 
     expect(result.pdfBytes).toEqual(new Uint8Array([5, 5, 5]))
     expect(result.metadata).toBeUndefined()
@@ -177,7 +177,7 @@ describe('fetchSource', () => {
     writeFileSync(pdfPath, Buffer.from([7, 7, 7]))
 
     const input: ClassifiedInput = { kind: 'local_pdf', slug: 'local-local', value: pdfPath }
-    const result = await fetchSource(input)
+    const result = await fetchSource(input, { lookup: async () => [{ address: '93.184.216.34', family: 4 }] })
 
     expect(Array.from(result.pdfBytes)).toEqual([7, 7, 7])
     expect(result.metadata).toBeUndefined()
@@ -196,5 +196,202 @@ describe('fetchSource', () => {
     fetchMock.mockResolvedValue(new Response('', { status: 404 }))
     const input: ClassifiedInput = { kind: 'doi', slug: 'doi-x', value: '10.1/doesnotexist' }
     await expect(fetchSource(input)).rejects.toThrow(/Crossref/)
+  })
+})
+
+describe('fetchPdfFromUrl security and resource limits', () => {
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  describe('SSRF protection', () => {
+    it('rejects loopback IPv4 addresses', async () => {
+      fetchMock.mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200 }))
+      await expect(
+        fetchSource({ kind: 'pdf_url', slug: 'pdf-loopback', value: 'http://127.0.0.1:8080/paper.pdf' }),
+      ).rejects.toThrow(/forbidden|blocked|private|loopback/i)
+      await expect(
+        fetchSource({ kind: 'pdf_url', slug: 'pdf-loopback-2', value: 'http://127.0.0.2/paper.pdf' }),
+      ).rejects.toThrow(/forbidden|blocked|private|loopback/i)
+    })
+
+    it('rejects private LAN IPv4 ranges (10.x, 192.168.x, 172.16-31.x)', async () => {
+      fetchMock.mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200 }))
+      await expect(
+        fetchSource({ kind: 'pdf_url', slug: 'pdf-private-10', value: 'http://10.0.0.1/paper.pdf' }),
+      ).rejects.toThrow(/forbidden|blocked|private|loopback/i)
+      await expect(
+        fetchSource({ kind: 'pdf_url', slug: 'pdf-private-192', value: 'http://192.168.1.1/paper.pdf' }),
+      ).rejects.toThrow(/forbidden|blocked|private|loopback/i)
+      await expect(
+        fetchSource({ kind: 'pdf_url', slug: 'pdf-private-172', value: 'http://172.16.0.1/paper.pdf' }),
+      ).rejects.toThrow(/forbidden|blocked|private|loopback/i)
+    })
+
+    it('rejects cloud metadata IPv4 address (169.254.169.254)', async () => {
+      fetchMock.mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200 }))
+      await expect(
+        fetchSource({ kind: 'pdf_url', slug: 'pdf-metadata', value: 'http://169.254.169.254/latest/meta-data/paper.pdf' }),
+      ).rejects.toThrow(/forbidden|blocked|private|loopback/i)
+    })
+
+    it('rejects loopback and private IPv6 addresses', async () => {
+      fetchMock.mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200 }))
+      await expect(
+        fetchSource({ kind: 'pdf_url', slug: 'pdf-v6-loopback', value: 'http://[::1]:8080/paper.pdf' }),
+      ).rejects.toThrow(/forbidden|blocked|private|loopback/i)
+      await expect(
+        fetchSource({ kind: 'pdf_url', slug: 'pdf-v6-mapped', value: 'http://[::ffff:127.0.0.1]/paper.pdf' }),
+      ).rejects.toThrow(/forbidden|blocked|private|loopback/i)
+      await expect(
+        fetchSource({ kind: 'pdf_url', slug: 'pdf-v6-ula', value: 'http://[fc00::1]/paper.pdf' }),
+      ).rejects.toThrow(/forbidden|blocked|private|loopback/i)
+      await expect(
+        fetchSource({ kind: 'pdf_url', slug: 'pdf-v6-linklocal', value: 'http://[fe80::1]/paper.pdf' }),
+      ).rejects.toThrow(/forbidden|blocked|private|loopback/i)
+    })
+
+    it('rejects non-http and non-https schemes', async () => {
+      fetchMock.mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200 }))
+      await expect(
+        fetchPdfFromUrl('file:///etc/passwd'),
+      ).rejects.toThrow(/protocol|scheme/i)
+      await expect(
+        fetchPdfFromUrl('ftp://example.com/paper.pdf'),
+      ).rejects.toThrow(/protocol|scheme/i)
+      await expect(
+        fetchPdfFromUrl('gopher://evil.com/paper.pdf'),
+      ).rejects.toThrow(/protocol|scheme/i)
+    })
+
+    it('rejects hostnames that resolve to private/loopback addresses via DNS', async () => {
+      fetchMock.mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200 }))
+      const fakeLookup = async () => [{ address: '127.0.0.1', family: 4 }]
+      await expect(
+        fetchPdfFromUrl('https://malicious-dns.com/paper.pdf', 'PDF URL', {
+          lookup: fakeLookup,
+        }),
+      ).rejects.toThrow(/forbidden|blocked|private|loopback/i)
+    })
+
+    it('refuses redirects to private or loopback destination addresses', async () => {
+      fetchMock.mockImplementation((url: string) => {
+        if (url === 'https://public-site.org/paper.pdf') {
+          return Promise.resolve(
+            new Response(null, {
+              status: 302,
+              headers: { location: 'http://169.254.169.254/latest/meta-data' },
+            }),
+          )
+        }
+        return Promise.resolve(new Response(new Uint8Array([1, 2, 3]), { status: 200 }))
+      })
+
+      const fakeLookup = async (host: string) => {
+        if (host === 'public-site.org') return [{ address: '93.184.216.34', family: 4 }]
+        return [{ address: '169.254.169.254', family: 4 }]
+      }
+
+      await expect(
+        fetchPdfFromUrl('https://public-site.org/paper.pdf', 'PDF URL', {
+          lookup: fakeLookup,
+        }),
+      ).rejects.toThrow(/forbidden|blocked|private|loopback/i)
+    })
+  })
+
+  describe('Timeout enforcement', () => {
+    it('times out and aborts when the request hangs longer than timeoutMs', async () => {
+      fetchMock.mockImplementation(
+        (_url: string, init?: { signal?: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              reject(new DOMException('The operation was aborted due to timeout', 'TimeoutError'))
+            })
+          }),
+      )
+
+      const fakeLookup = async () => [{ address: '93.184.216.34', family: 4 }]
+      await expect(
+        fetchPdfFromUrl('https://public-site.org/paper.pdf', 'PDF URL', {
+          timeoutMs: 50,
+          lookup: fakeLookup,
+        }),
+      ).rejects.toThrow(/timed out/i)
+    })
+  })
+
+  describe('Unbounded buffering protection', () => {
+    it('rejects early when Content-Length exceeds max allowed bytes', async () => {
+      fetchMock.mockResolvedValue(
+        new Response(new Uint8Array([1, 2, 3]), {
+          status: 200,
+          headers: { 'content-length': '60000000' },
+        }),
+      )
+
+      const fakeLookup = async () => [{ address: '93.184.216.34', family: 4 }]
+      await expect(
+        fetchPdfFromUrl('https://public-site.org/paper.pdf', 'PDF URL', {
+          maxBytes: 50 * 1024 * 1024,
+          lookup: fakeLookup,
+        }),
+      ).rejects.toThrow(/maximum.*size|exceeds/i)
+    })
+
+    it('aborts and rejects when streaming body exceeds max allowed bytes', async () => {
+
+      let cancelled = false
+      const stream = new ReadableStream({
+        pull(controller) {
+          controller.enqueue(new Uint8Array(20 * 1024 * 1024))
+        },
+        cancel() {
+          cancelled = true
+        },
+      })
+
+      fetchMock.mockResolvedValue(
+        new Response(stream, {
+          status: 200,
+        }),
+      )
+
+      const fakeLookup = async () => [{ address: '93.184.216.34', family: 4 }]
+      await expect(
+        fetchPdfFromUrl('https://public-site.org/paper.pdf', 'PDF URL', {
+          maxBytes: 50 * 1024 * 1024,
+          lookup: fakeLookup,
+        }),
+      ).rejects.toThrow(/maximum.*size|exceeds/i)
+
+      expect(cancelled).toBe(true)
+    })
+  })
+
+  describe('Legitimate URL acceptance', () => {
+    it('successfully accepts and downloads PDF from a legitimate public HTTPS URL', async () => {
+      const expectedBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34])
+      fetchMock.mockResolvedValue(
+        new Response(expectedBytes, {
+          status: 200,
+          headers: { 'content-type': 'application/pdf', 'content-length': '8' },
+        }),
+      )
+
+      const fakeLookup = async () => [{ address: '93.184.216.34', family: 4 }]
+      const bytes = await fetchPdfFromUrl('https://safe-papers.org/paper.pdf', 'PDF URL', {
+        lookup: fakeLookup,
+      })
+
+      expect(bytes).toEqual(expectedBytes)
+    })
   })
 })

@@ -7,6 +7,7 @@
 
 import { existsSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import Database from 'better-sqlite3'
 
@@ -23,7 +24,16 @@ const DEFAULT_DB_PATH = 'data/app.db'
 
 function resolveNativeBinding(): string | undefined {
   if (process.versions.electron) {
-    const electronBinding = resolve(process.cwd(), 'resources/native/better_sqlite3.electron.node')
+    // Use import.meta.url to derive a cwd-independent base path.
+    // This avoids the bindings package falling back to process.cwd() during
+    // module-root detection (which fails when the app is launched with a cwd
+    // other than the repo root).
+    const url = fileURLToPath(import.meta.url)
+    const base = dirname(url)
+    // In Electron, the native binding is bundled at
+    // <project-root>/resources/native/better_sqlite3.electron.node
+    // Resolve from db.ts's location (core/store/) two levels up to the project root.
+    const electronBinding = resolve(base, '../../resources', 'native', 'better_sqlite3.electron.node')
     if (existsSync(electronBinding)) {
       return electronBinding
     }

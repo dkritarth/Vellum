@@ -59,6 +59,27 @@ rl.on('line', (line) => {
   } else if (msg.method === 'session/new') {
     send({ jsonrpc: '2.0', id: msg.id, result: { sessionId: 'sess-1' } })
   } else if (msg.method === 'session/prompt') {
+    // 'slow-stream' answers with chunks spaced 30ms apart (total ~180ms) so
+    // a test can set an idle budget well under the total turn duration:
+    // every gap stays under the idle bound while the total exceeds it.
+    if (mode === 'slow-stream') {
+      let i = 0
+      const sendChunk = () => {
+        i++
+        send({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: msg.params.sessionId,
+            update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'chunk-' + i } },
+          },
+        })
+        if (i < 5) setTimeout(sendChunk, 30)
+        else setTimeout(() => send({ jsonrpc: '2.0', id: msg.id, result: { stopReason: 'end_turn' } }), 30)
+      }
+      setTimeout(sendChunk, 30)
+      return
+    }
     if (mode === 'prompt-error') {
       send({ jsonrpc: '2.0', id: msg.id, error: { code: -32000, message: 'boom' } })
       return
@@ -213,6 +234,21 @@ describe('StdioAcpClient', () => {
       expect(() => process.kill(-groupId, 0)).toThrow()
     },
   )
+
+  it('does NOT kill a productive turn whose total duration exceeds the idle budget', async () => {
+    // Regression test for #71: a turn that keeps streaming (gaps of ~30ms,
+    // total ~180ms) must survive an idle budget of 60ms. Under the old
+    // total-duration cap this turn died at 60ms with 'ACP turn timed out'.
+    const client = new StdioAcpClient(spawnFakeAgent('slow-stream'), { turnMs: 60 })
+    const session = await client.newSession('claude')
+    try {
+      const updates = await collect(session.prompt({ text: 'hi' }))
+      expect(updates.at(-1)).toEqual({ kind: 'done', data: { stopReason: 'end_turn' } })
+      expect(updates.filter((u) => u.kind === 'text')).toHaveLength(5)
+    } finally {
+      await session.dispose()
+    }
+  })
 
   it('fails a stalled prompt() via the turn timeout instead of hanging forever', async () => {
     const client = new StdioAcpClient(spawnFakeAgent('stall'), { turnMs: 50 })

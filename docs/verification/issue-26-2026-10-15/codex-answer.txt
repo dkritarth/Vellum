@@ -1,0 +1,23 @@
+**Reading relevant guidance**I’ll read the paper and check the architecture and layer-count wording.
+
+**Checking filesystem alternatives**
+
+**Preparing exact quotations**The paper proposes the **Transformer** architecture. Its base configuration has **6 encoder layers and 6 decoder layers**. Section 3.1, “Encoder and Decoder Stacks,” states:
+
+> “The encoder is composed of a stack of N = 6 identical layers.”
+>
+> “The decoder is also composed of a stack of N = 6 identical layers.”
+
+[Source: paper.md](/home/dandapat/code/Vellum2/data/papers/arxiv-1706.03762/paper.md:33)
+
+**Reading relevant guidance**I’ll read the paper and check the architecture and layer-count wording.
+
+**Checking filesystem alternatives**
+
+**Preparing exact quotations**The paper proposes the **Transformer** architecture. Its base configuration has **6 encoder layers and 6 decoder layers**. Section 3.1, “Encoder and Decoder Stacks,” states:
+
+> “The encoder is composed of a stack of N = 6 identical layers.”
+>
+> “The decoder is also composed of a stack of N = 6 identical layers.”
+
+[Source: paper.md](/home/dandapat/code/Vellum2/data/papers/arxiv-1706.03762/paper.md:33)

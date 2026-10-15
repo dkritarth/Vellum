@@ -11,6 +11,7 @@ import path from 'node:path'
 // go straight to disk in core/ingest/index.ts.
 
 import type { Database } from 'better-sqlite3'
+import { assertValidSlug } from './slug.js'
 
 /** In-memory shape of a `papers` row — JSON columns (authors, sections)
  * already parsed/serialized at this boundary so callers never touch raw
@@ -231,9 +232,7 @@ export function restorePaper(db: Database, slug: string): PaperRecord | undefine
  * Cascades to notes, highlights, chats, collections, and questions.
  */
 export function purgePaper(db: Database, slug: string, libraryDir?: string): boolean {
-  if (!/^[a-z0-9-]+$/i.test(slug)) {
-    throw new Error(`Invalid slug format: ${slug}`)
-  }
+  assertValidSlug(slug)
 
   const paper = getPaper(db, slug)
   if (!paper) return false
@@ -256,3 +255,5 @@ export function purgePaper(db: Database, slug: string, libraryDir?: string): boo
   const result = db.prepare('DELETE FROM papers WHERE slug = ?').run(slug)
   return result.changes > 0
 }
+
+export { assertValidSlug, isValidSlug, SLUG_PATTERN } from './slug.js'

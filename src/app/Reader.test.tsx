@@ -58,7 +58,7 @@ const getDocumentMock = vi.fn()
 // Range against, the same way pdf.js's real TextLayer would populate it.
 // Page-nav/zoom/search/TOC tests above don't touch this DOM at all, so
 // making the mock slightly more realistic doesn't affect them.
-vi.mock('pdfjs-dist', () => ({
+vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
   GlobalWorkerOptions: {},
   TextLayer: class {
     private readonly container: HTMLElement
@@ -81,7 +81,7 @@ vi.mock('pdfjs-dist', () => ({
   getDocument: (...args: unknown[]) => getDocumentMock(...args),
 }))
 
-vi.mock('pdfjs-dist/build/pdf.worker.mjs?url', () => ({ default: 'worker-url' }))
+vi.mock('pdfjs-dist/legacy/build/pdf.worker.mjs?url', () => ({ default: 'worker-url' }))
 
 beforeEach(() => {
   getDocumentMock.mockReset()

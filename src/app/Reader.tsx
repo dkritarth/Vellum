@@ -19,8 +19,8 @@
 // cards), so `slug` is optional and undefined by default — the empty state
 // below is what App.tsx shows today.
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
-import { GlobalWorkerOptions, TextLayer, getDocument, type PDFDocumentProxy } from 'pdfjs-dist'
-import workerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url'
+import { GlobalWorkerOptions, TextLayer, getDocument, type PDFDocumentProxy } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import workerSrc from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url'
 import type { HighlightColor } from './ReaderToolbar'
 import type { HighlightRecord } from '../../core/highlights/repo'
 import { CitationTooltip } from './CitationTooltip'
@@ -511,8 +511,19 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
         }
         if (cancelled) return
         setReferenceIndex(buildReferenceIndex(pagesText))
-      } catch {
-        if (!cancelled) setError('Could not open this PDF.')
+      } catch (err: unknown) {
+        console.error("[Reader] Failed to load PDF:", err);
+        if (err && typeof err === "object") {
+          const e = err as Record<string, unknown>;
+          console.error("[Reader] Error details:", {
+            name: e.name,
+            message: e.message,
+            code: e.code,
+            cause: e.cause,
+            stack: e.stack,
+          });
+        }
+        if (!cancelled) setError('Could not open this PDF.');
       } finally {
         if (!cancelled) setLoading(false)
       }

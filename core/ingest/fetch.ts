@@ -1,38 +1,40 @@
-// Fetch raw PDF bytes + raw metadata for a classified ingest input.
+// Fetch raw PDF bytes and raw bibliographic metadata for a classified input.
 //
-// - arxiv: arXiv API (export.arxiv.org/api/query, Atom XML) for metadata,
-//   export.arxiv.org/pdf/<id> for bytes.
-// - doi: Crossref REST API (api.crossref.org/works/<doi>) for metadata,
-//   the resolved DOI URL for bytes (best-effort; publishers often gate PDFs
-//   behind auth, so fetchSource() for a DOI may throw — caller decides how
-//   to surface that, e.g. prompt the user for a direct PDF URL instead).
-// - pdf_url: GET the URL directly; no separate metadata source.
-// - local_pdf: read the file from disk; no separate metadata source.
+// Network boundary:
+//   - arXiv: metadata from the Atom API, PDF bytes from export.arxiv.org/pdf.
+//   - DOI: metadata from api.crossref.org/works, PDF bytes from doi.org.
+//   - pdf_url: PDF bytes straight from the URL, metadata empty.
+//   - local_pdf: PDF bytes straight off disk, metadata empty.
 //
-// Uses the Node 20+ global `fetch`. No new HTTP dependency.
+// Why this file exists as a separate phase from extract.ts:
+//   1. arXiv and Crossref are authoritative bibliographic sources. For
+//      papers with an arXiv id or DOI, we don't need to ask an agent to
+//      guess the title, author list, or year — we have the publisher record.
+//   2. An agent run (extract.ts) costs latency and tokens; fetch.ts is cheap
+//      HTTP GETs.
+//   3. For DOIs whose publisher PDF is open-access, fetching straight from
+//      doi.org gets the real paper. For closed DOIs, the publisher redirects
+//      behind auth, so fetchSource() for a DOI may throw — caller decides how
+//      to degrade (e.g. prompt the user for a local PDF or drop to metadata-
+//      only).
 //
-// Manual real-ID check (unit tests below are hermetic/mocked — this is the
-// one live-network spot-check called for by wiki card [P1-03]). Run:
-//
-//   npx tsx -e "
-//     import('./core/ingest/classify.js').then(async ({ classifyInput }) => {
+// How to test manually without launching the UI:
+//   node -e "
+//     (async () => {
+//       const { classifyInput } = await import('./core/ingest/classify.js')
 //       const { fetchSource } = await import('./core/ingest/fetch.js')
 //       const a = await fetchSource(classifyInput('2401.12345'))
-//       console.log('arxiv:', a.pdfBytes.length, a.metadata)
+//       console.log('arXiv:', a.metadata?.title, a.pdfBytes.byteLength)
 //       const d = await fetchSource(classifyInput('10.1038/s41586-021-03819-2'))
-//       console.log('doi:', d.pdfBytes.length, d.metadata)
-//     })
+//       console.log('DOI:', d.metadata?.title, d.pdfBytes.byteLength)
+//     })()
 //   "
-//
-// (or write a throwaway .mts script importing classify.ts/fetch.ts directly
-// and run with `npx tsx script.mts`). Last run 2026-07-21 against real
-// arXiv id 2401.12345 and DOI 10.1038/s41586-021-03819-2: arXiv returned a
-// 1,968,194-byte PDF + full metadata (title/authors/year/venue/abstract);
-// DOI returned a 602,302-byte PDF via the doi.org redirect + full Crossref
+// (The DOI above is open-access and has rich, multi-author, multi-affiliation
 // metadata (AlphaFold, Nature, 2021, 34 authors). Both kinds fetched clean.
 
 import { readFile } from 'node:fs/promises'
 import type { ClassifiedInput } from './classify'
+import { assertSafeUrl, type DnsLookupFn } from './ssrf'
 
 export interface RawMetadata {
   title: string
@@ -50,6 +52,23 @@ export interface FetchedSource {
   pdfBytes: Uint8Array
   metadata: RawMetadata | undefined
 }
+
+export interface FetchPdfOptions {
+  /** Maximum time in milliseconds before aborting the request. Defaults to 30,000ms. */
+  timeoutMs?: number
+  /** Maximum bytes allowed for the PDF. Defaults to 52,428,800 (50 MB). */
+  maxBytes?: number
+  /** Custom DNS lookup function (primarily for hermetic testing). */
+  lookup?: DnsLookupFn
+  /** Custom fetch implementation (defaults to global fetch). */
+  fetch?: typeof fetch
+  /** Maximum redirect hops allowed before aborting. Defaults to 5. */
+  maxRedirects?: number
+}
+
+export const DEFAULT_PDF_TIMEOUT_MS = 30_000
+export const DEFAULT_MAX_PDF_BYTES = 50 * 1024 * 1024 // 50 MB
+export const DEFAULT_MAX_REDIRECTS = 5
 
 const ARXIV_API = 'https://export.arxiv.org/api/query'
 const ARXIV_PDF_BASE = 'https://export.arxiv.org/pdf'
@@ -110,8 +129,8 @@ function normalizeWhitespace(s: string): string {
   return s.replace(/\s+/g, ' ').trim()
 }
 
-async function fetchArxivPdf(arxivId: string): Promise<Uint8Array> {
-  return fetchPdfFromUrl(`${ARXIV_PDF_BASE}/${encodeURIComponent(arxivId)}`, 'arXiv PDF')
+async function fetchArxivPdf(arxivId: string, options?: FetchPdfOptions): Promise<Uint8Array> {
+  return fetchPdfFromUrl(`${ARXIV_PDF_BASE}/${encodeURIComponent(arxivId)}`, 'arXiv PDF', options)
 }
 
 // Crossref "work" JSON is loosely typed upstream; narrow just the fields we
@@ -179,12 +198,112 @@ function stripJats(s: string): string {
   return s.replace(/<[^>]+>/g, ' ')
 }
 
-async function fetchPdfFromUrl(url: string, label = 'PDF URL'): Promise<Uint8Array> {
-  const res = await fetch(url)
-  if (!res.ok) {
-    throw new Error(`${label} request failed: ${res.status} ${res.statusText}`)
+export async function fetchPdfFromUrl(
+  url: string,
+  label = 'PDF URL',
+  options?: FetchPdfOptions,
+): Promise<Uint8Array> {
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_PDF_TIMEOUT_MS
+  const maxBytes = options?.maxBytes ?? DEFAULT_MAX_PDF_BYTES
+  const maxRedirects = options?.maxRedirects ?? DEFAULT_MAX_REDIRECTS
+  const fetchImpl = options?.fetch ?? globalThis.fetch
+  const lookupFn = options?.lookup
+
+  const signal = AbortSignal.timeout(timeoutMs)
+  let currentUrl = url
+  let redirects = 0
+
+  while (true) {
+    await assertSafeUrl(currentUrl, lookupFn)
+
+    let res: Response
+    try {
+      res = await fetchImpl(currentUrl, {
+        signal,
+        redirect: 'manual',
+      })
+    } catch (err: unknown) {
+      if (signal.aborted) {
+        throw new Error(`${label} request timed out after ${timeoutMs}ms`)
+      }
+      throw err
+    }
+
+    // Handle redirects manually to validate destination address against SSRF
+    if (res.status >= 300 && res.status < 400) {
+      redirects++
+      if (redirects > maxRedirects) {
+        await res.body?.cancel().catch(() => {})
+        throw new Error(`${label} exceeded maximum redirect limit of ${maxRedirects}`)
+      }
+      const location = res.headers.get('location')
+      if (!location) {
+        await res.body?.cancel().catch(() => {})
+        throw new Error(`${label} redirect missing Location header (status ${res.status})`)
+      }
+      await res.body?.cancel().catch(() => {})
+      currentUrl = new URL(location, currentUrl).toString()
+      continue
+    }
+
+    if (!res.ok) {
+      await res.body?.cancel().catch(() => {})
+      throw new Error(`${label} request failed: ${res.status} ${res.statusText}`)
+    }
+
+    // Check Content-Length header early if available
+    const contentLengthHeader = res.headers.get('content-length')
+    if (contentLengthHeader) {
+      const contentLength = Number.parseInt(contentLengthHeader, 10)
+      if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+        await res.body?.cancel().catch(() => {})
+        throw new Error(
+          `${label} exceeds maximum allowed size of ${maxBytes} bytes (reported ${contentLength})`,
+        )
+      }
+    }
+
+    // Stream response body and enforce maximum size cap
+    if (!res.body) {
+      return new Uint8Array(0)
+    }
+
+    const reader = res.body.getReader()
+    const chunks: Uint8Array[] = []
+    let totalBytes = 0
+
+    try {
+      while (true) {
+        if (signal.aborted) {
+          throw new Error(`${label} request timed out after ${timeoutMs}ms`)
+        }
+        const { done, value } = await reader.read()
+        if (done) break
+        if (value) {
+          totalBytes += value.byteLength
+          if (totalBytes > maxBytes) {
+            await reader.cancel().catch(() => {})
+            throw new Error(`${label} exceeds maximum allowed size of ${maxBytes} bytes`)
+          }
+          chunks.push(value)
+        }
+      }
+    } catch (err: unknown) {
+      await reader.cancel().catch(() => {})
+      if (signal.aborted) {
+        throw new Error(`${label} request timed out after ${timeoutMs}ms`)
+      }
+      throw err
+    }
+
+    const result = new Uint8Array(totalBytes)
+    let offset = 0
+    for (const chunk of chunks) {
+      result.set(chunk, offset)
+      offset += chunk.byteLength
+    }
+    return result
   }
-  return new Uint8Array(await res.arrayBuffer())
 }
 
 /**
@@ -192,22 +311,25 @@ async function fetchPdfFromUrl(url: string, label = 'PDF URL'): Promise<Uint8Arr
  * undefined for pdf_url/local_pdf (no bibliographic source for those kinds
  * at this stage — later cards may extract it from the PDF/agent).
  */
-export async function fetchSource(input: ClassifiedInput): Promise<FetchedSource> {
+export async function fetchSource(
+  input: ClassifiedInput,
+  options?: FetchPdfOptions,
+): Promise<FetchedSource> {
   switch (input.kind) {
     case 'arxiv': {
       const [pdfBytes, metadata] = await Promise.all([
-        fetchArxivPdf(input.value),
+        fetchArxivPdf(input.value, options),
         fetchArxivMetadata(input.value),
       ])
       return { pdfBytes, metadata }
     }
     case 'doi': {
       const metadata = await fetchCrossrefMetadata(input.value)
-      const pdfBytes = await fetchPdfFromUrl(`https://doi.org/${input.value}`)
+      const pdfBytes = await fetchPdfFromUrl(`https://doi.org/${input.value}`, 'DOI PDF', options)
       return { pdfBytes, metadata }
     }
     case 'pdf_url': {
-      const pdfBytes = await fetchPdfFromUrl(input.value)
+      const pdfBytes = await fetchPdfFromUrl(input.value, 'PDF URL', options)
       return { pdfBytes, metadata: undefined }
     }
     case 'local_pdf': {

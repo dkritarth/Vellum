@@ -4,7 +4,7 @@ import path from 'node:path'
 import type { Database } from 'better-sqlite3'
 import { describe, expect, it } from 'vitest'
 import { openDb } from '../store/db.js'
-import { getPaper, listPapers, upsertPaper, trashPaper, restorePaper, purgePaper } from './repo.js'
+import { getPaper, listPapers, upsertPaper, trashPaper, restorePaper, purgePaper, isValidSlug, assertValidSlug, SLUG_PATTERN } from './repo.js'
 import type { PaperRecord } from './repo.js'
 
 function makeRecord(overrides: Partial<PaperRecord> = {}): PaperRecord {
@@ -380,6 +380,28 @@ function seedDb(db: Database): void {
       }
     })
 
+    it('permanently purges an arXiv paper with a dotted slug from DB and removes its directory on disk', () => {
+      const db = openDb({ path: ':memory:' })
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vellum-purge-arxiv-'))
+      try {
+        const slug = 'arxiv-2401.12345'
+        const paperDir = path.join(tmpDir, 'papers', slug)
+        fs.mkdirSync(paperDir, { recursive: true })
+        fs.writeFileSync(path.join(paperDir, 'paper.pdf'), 'fake pdf')
+
+        upsertPaper(db, makeRecord({ slug, title: 'Attention Is All You Need, Again' }))
+        expect(getPaper(db, slug)).toBeDefined()
+
+        const purged = purgePaper(db, slug, tmpDir)
+        expect(purged).toBe(true)
+        expect(getPaper(db, slug)).toBeUndefined()
+        expect(fs.existsSync(paperDir)).toBe(false)
+      } finally {
+        db.close()
+        fs.rmSync(tmpDir, { recursive: true, force: true })
+      }
+    })
+
     it('purgePaper prevents path traversal in slug', () => {
       const db = openDb({ path: ':memory:' })
       try {
@@ -387,6 +409,68 @@ function seedDb(db: Database): void {
       } finally {
         db.close()
       }
+    })
+
+    it.each([
+      ['parent traversal ..', '..'],
+      ['relative traversal ../etc', '../etc'],
+      ['nested traversal ../../etc/passwd', '../../etc/passwd'],
+      ['absolute root path /etc/passwd', '/etc/passwd'],
+      ['absolute path inside papers', '/tmp/papers/foo'],
+      ['empty string', ''],
+      ['hidden dotfile .hidden', '.hidden'],
+      ['leading dot .arxiv-123', '.arxiv-123'],
+      ['leading dash -paper', '-paper'],
+      ['leading underscore _paper', '_paper'],
+      ['spaces in slug', 'slug with spaces'],
+      ['forward slash', 'foo/bar'],
+      ['backward slash', 'foo\\bar'],
+      ['null byte', 'foo\0bar'],
+    ])('purgePaper rejects malformed or hostile slug: %s (%j)', (_desc, hostileSlug) => {
+      const db = openDb({ path: ':memory:' })
+      try {
+        expect(() => purgePaper(db, hostileSlug)).toThrow(/Invalid slug format/)
+      } finally {
+        db.close()
+      }
+    })
+
+    describe('canonical slug validation helper', () => {
+      it.each([
+        'arxiv-2401.12345',
+        'arxiv-2401.12345v2',
+        'doi-10.1038-s41586-021-03819-2',
+        'pdf-my.paper.name-2024',
+        'local-simple-name',
+        'Paper_123.v1',
+      ])('isValidSlug accepts valid slug: %s', (slug) => {
+        expect(isValidSlug(slug)).toBe(true)
+        expect(() => assertValidSlug(slug)).not.toThrow()
+        expect(SLUG_PATTERN.test(slug)).toBe(true)
+      })
+
+      it.each([
+        '..',
+        '../etc',
+        '/absolute/path',
+        '',
+        '.hidden',
+        '-dash',
+        '_underscore',
+        'slug with space',
+        'slug/slash',
+        'slug\\backslash',
+      ])('isValidSlug rejects invalid slug: %j', (slug) => {
+        expect(isValidSlug(slug)).toBe(false)
+        expect(() => assertValidSlug(slug)).toThrow(/Invalid slug format/)
+      })
+
+      it('isValidSlug returns false for non-string types', () => {
+        expect(isValidSlug(null)).toBe(false)
+        expect(isValidSlug(undefined)).toBe(false)
+        expect(isValidSlug(12345)).toBe(false)
+        expect(isValidSlug({})).toBe(false)
+      })
     })
   })
 })

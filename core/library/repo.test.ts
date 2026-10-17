@@ -2,8 +2,13 @@ import os from 'node:os'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Database } from 'better-sqlite3'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { openDb } from '../store/db.js'
+import { getNote, upsertNote } from '../notes/repo.js'
+import { createHighlight, listHighlights } from '../highlights/repo.js'
+import { createChatSession, addChatMessage, getChatSession, getChatMessages } from '../chat/repo.js'
+import { createCollection, assignPaperToCollection, listPaperCollections, listCollections } from '../collections/repo.js'
+import { saveSuggestedQuestions, getCachedQuestions } from '../questions/repo.js'
 import { getPaper, listPapers, upsertPaper, trashPaper, restorePaper, purgePaper, isValidSlug, assertValidSlug, SLUG_PATTERN } from './repo.js'
 import type { PaperRecord } from './repo.js'
 
@@ -379,11 +384,29 @@ function seedDb(db: Database): void {
 
         upsertPaper(db, makeRecord({ slug: 'purge-me', title: 'Paper To Purge' }))
         expect(getPaper(db, 'purge-me')).toBeDefined()
+        upsertNote(db, 'purge-me', 'Research notes')
+        createHighlight(db, {
+          id: 'purge-highlight', paperSlug: 'purge-me', page: 1, color: 'yellow',
+          quote: 'Relevant text', anchor: '{}', createdAt: '2026-01-01T00:00:00.000Z',
+        })
+        const session = createChatSession(db, { paperSlug: 'purge-me', backend: 'codex' })
+        addChatMessage(db, { sessionId: session.id, role: 'user', content: 'Explain this' })
+        const collection = createCollection(db, { name: 'Keep this collection' })
+        assignPaperToCollection(db, { paperSlug: 'purge-me', collectionId: collection.id })
+        saveSuggestedQuestions(db, 'purge-me', 'codex', [{ question: 'What changed?' }])
 
         const purged = purgePaper(db, 'purge-me', tmpDir)
         expect(purged).toBe(true)
         expect(getPaper(db, 'purge-me')).toBeUndefined()
         expect(fs.existsSync(paperDir)).toBe(false)
+        expect(fs.readdirSync(path.join(tmpDir, 'papers'))).toEqual([])
+        expect(getNote(db, 'purge-me')).toBeUndefined()
+        expect(listHighlights(db, 'purge-me')).toEqual([])
+        expect(getChatSession(db, session.id)).toBeUndefined()
+        expect(getChatMessages(db, session.id)).toEqual([])
+        expect(listPaperCollections(db, 'purge-me')).toEqual([])
+        expect(listCollections(db)).toEqual([collection])
+        expect(getCachedQuestions(db, 'purge-me', 'codex')).toEqual([])
       } finally {
         db.close()
         fs.rmSync(tmpDir, { recursive: true, force: true })
@@ -399,6 +422,246 @@ function seedDb(db: Database): void {
         expect(purged).toBe(true)
         expect(getPaper(db, 'non-existent-files')).toBeUndefined()
       } finally {
+        db.close()
+        fs.rmSync(tmpDir, { recursive: true, force: true })
+      }
+    })
+
+    it('preserves the trashed paper and its original files when another connection holds the write lock', () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vellum-purge-locked-'))
+      const dbPath = path.join(tmpDir, 'app.db')
+      const db = openDb({ path: dbPath })
+      const writer = openDb({ path: dbPath })
+      try {
+        const slug = 'locked-paper'
+        const paperDir = path.join(tmpDir, 'papers', slug)
+        fs.mkdirSync(paperDir, { recursive: true })
+        fs.writeFileSync(path.join(paperDir, 'paper.pdf'), 'original pdf bytes')
+        fs.writeFileSync(path.join(paperDir, 'paper.md'), '# Original paper')
+        upsertPaper(db, makeRecord({ slug }))
+        const original = trashPaper(db, slug)
+        db.pragma('busy_timeout = 0')
+        writer.exec('BEGIN IMMEDIATE')
+
+        expect(() => purgePaper(db, slug, tmpDir)).toThrow(/database is locked/)
+
+        expect(getPaper(db, slug)).toEqual(original)
+        expect(listPapers(db, { trashed: true })).toEqual([original])
+        expect(fs.readFileSync(path.join(paperDir, 'paper.pdf'), 'utf8')).toBe('original pdf bytes')
+        expect(fs.readFileSync(path.join(paperDir, 'paper.md'), 'utf8')).toBe('# Original paper')
+      } finally {
+        if (writer.inTransaction) writer.exec('ROLLBACK')
+        writer.close()
+        db.close()
+        fs.rmSync(tmpDir, { recursive: true, force: true })
+      }
+    })
+
+    it('restores original files and research state when the database commit fails', () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vellum-purge-commit-'))
+      const db = openDb({ path: path.join(tmpDir, 'app.db') })
+      try {
+        const slug = 'commit-failure'
+        const paperDir = path.join(tmpDir, 'papers', slug)
+        fs.mkdirSync(paperDir, { recursive: true })
+        fs.writeFileSync(path.join(paperDir, 'paper.pdf'), 'original pdf bytes')
+        fs.writeFileSync(path.join(paperDir, 'paper.md'), '# Original paper')
+        upsertPaper(db, makeRecord({ slug }))
+        const original = trashPaper(db, slug)
+        const note = upsertNote(db, slug, 'Keep my research notes')
+        // DELETE succeeds, but this deferred constraint rejects COMMIT.
+        db.exec(`
+          CREATE TABLE purge_commit_guard (
+            paper_slug TEXT REFERENCES papers(slug) DEFERRABLE INITIALLY DEFERRED
+          );
+          INSERT INTO purge_commit_guard (paper_slug) VALUES ('commit-failure');
+        `)
+
+        expect(() => purgePaper(db, slug, tmpDir)).toThrow(/FOREIGN KEY constraint failed/)
+
+        expect(db.inTransaction).toBe(false)
+        expect(getPaper(db, slug)).toEqual(original)
+        expect(getNote(db, slug)).toEqual(note)
+        expect(fs.readFileSync(path.join(paperDir, 'paper.pdf'), 'utf8')).toBe('original pdf bytes')
+        expect(fs.readFileSync(path.join(paperDir, 'paper.md'), 'utf8')).toBe('# Original paper')
+        expect(fs.readdirSync(path.join(tmpDir, 'papers'))).toEqual([slug])
+        const reopened = openDb({ path: path.join(tmpDir, 'app.db') })
+        try {
+          expect(getPaper(reopened, slug)).toEqual(original)
+          expect(getNote(reopened, slug)).toEqual(note)
+        } finally {
+          reopened.close()
+        }
+      } finally {
+        db.close()
+        fs.rmSync(tmpDir, { recursive: true, force: true })
+      }
+    })
+
+    it('preserves original files and research state when a DELETE trigger rejects purge', () => {
+      const db = openDb({ path: ':memory:' })
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vellum-purge-delete-'))
+      try {
+        const slug = 'delete-failure'
+        const paperDir = path.join(tmpDir, 'papers', slug)
+        fs.mkdirSync(paperDir, { recursive: true })
+        fs.writeFileSync(path.join(paperDir, 'paper.pdf'), 'original pdf bytes')
+        fs.writeFileSync(path.join(paperDir, 'paper.md'), '# Original paper')
+        upsertPaper(db, makeRecord({ slug }))
+        const original = trashPaper(db, slug)
+        const note = upsertNote(db, slug, 'Keep my research notes')
+        db.exec(`
+          CREATE TRIGGER reject_purge BEFORE DELETE ON papers
+          BEGIN SELECT RAISE(ABORT, 'purge rejected'); END;
+        `)
+
+        expect(() => purgePaper(db, slug, tmpDir)).toThrow('purge rejected')
+
+        expect(db.inTransaction).toBe(false)
+        expect(getPaper(db, slug)).toEqual(original)
+        expect(getNote(db, slug)).toEqual(note)
+        expect(fs.readFileSync(path.join(paperDir, 'paper.pdf'), 'utf8')).toBe('original pdf bytes')
+        expect(fs.readFileSync(path.join(paperDir, 'paper.md'), 'utf8')).toBe('# Original paper')
+        expect(fs.readdirSync(path.join(tmpDir, 'papers'))).toEqual([slug])
+      } finally {
+        db.close()
+        fs.rmSync(tmpDir, { recursive: true, force: true })
+      }
+    })
+
+    it('rejects purge inside an outer transaction that could later roll back', () => {
+      const db = openDb({ path: ':memory:' })
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vellum-purge-nested-'))
+      try {
+        const slug = 'nested-purge'
+        const paperDir = path.join(tmpDir, 'papers', slug)
+        fs.mkdirSync(paperDir, { recursive: true })
+        fs.writeFileSync(path.join(paperDir, 'paper.pdf'), 'original pdf bytes')
+        upsertPaper(db, makeRecord({ slug }))
+        const original = trashPaper(db, slug)
+        db.exec('BEGIN IMMEDIATE')
+
+        expect(() => purgePaper(db, slug, tmpDir)).toThrow(/outside an existing transaction/)
+
+        expect(db.inTransaction).toBe(true)
+        db.exec('ROLLBACK')
+        expect(getPaper(db, slug)).toEqual(original)
+        expect(fs.readFileSync(path.join(paperDir, 'paper.pdf'), 'utf8')).toBe('original pdf bytes')
+      } finally {
+        if (db.inTransaction) db.exec('ROLLBACK')
+        db.close()
+        fs.rmSync(tmpDir, { recursive: true, force: true })
+      }
+    })
+
+    it.each(['lstatSync', 'mkdtempSync', 'renameSync'] as const)(
+      'preserves files and research state when filesystem %s fails',
+      (operation) => {
+        const db = openDb({ path: ':memory:' })
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vellum-purge-filesystem-'))
+        try {
+          const slug = 'filesystem-failure'
+          const paperDir = path.join(tmpDir, 'papers', slug)
+          fs.mkdirSync(paperDir, { recursive: true })
+          fs.writeFileSync(path.join(paperDir, 'paper.pdf'), 'original pdf bytes')
+          fs.writeFileSync(path.join(paperDir, 'paper.md'), '# Original paper')
+          upsertPaper(db, makeRecord({ slug }))
+          const original = trashPaper(db, slug)
+          const note = upsertNote(db, slug, 'Keep my research notes')
+          const failure = new Error('filesystem unavailable')
+          vi.spyOn(fs, operation).mockImplementationOnce(() => { throw failure })
+
+          expect(() => purgePaper(db, slug, tmpDir)).toThrow(failure)
+
+          expect(db.inTransaction).toBe(false)
+          expect(getPaper(db, slug)).toEqual(original)
+          expect(getNote(db, slug)).toEqual(note)
+          expect(fs.readFileSync(path.join(paperDir, 'paper.pdf'), 'utf8')).toBe('original pdf bytes')
+          expect(fs.readFileSync(path.join(paperDir, 'paper.md'), 'utf8')).toBe('# Original paper')
+          expect(fs.readdirSync(path.join(tmpDir, 'papers'))).toEqual([slug])
+        } finally {
+          vi.restoreAllMocks()
+          db.close()
+          fs.rmSync(tmpDir, { recursive: true, force: true })
+        }
+      },
+    )
+
+    it('returns committed success with a recovery-path warning when cleanup partially fails', () => {
+      const db = openDb({ path: ':memory:' })
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vellum-purge-cleanup-'))
+      try {
+        const slug = 'cleanup-failure'
+        const papersRoot = path.join(tmpDir, 'papers')
+        const paperDir = path.join(papersRoot, slug)
+        fs.mkdirSync(paperDir, { recursive: true })
+        fs.writeFileSync(path.join(paperDir, 'paper.pdf'), 'original pdf bytes')
+        fs.writeFileSync(path.join(paperDir, 'paper.md'), '# Original paper')
+        upsertPaper(db, makeRecord({ slug }))
+        upsertNote(db, slug, 'Research notes')
+        const failure = new Error('cleanup interrupted')
+        vi.spyOn(fs, 'rmSync').mockImplementationOnce((directory) => {
+          fs.unlinkSync(path.join(String(directory), slug, 'paper.md'))
+          throw failure
+        })
+        const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+        expect(purgePaper(db, slug, tmpDir)).toBe(true)
+
+        expect(getPaper(db, slug)).toBeUndefined()
+        expect(getNote(db, slug)).toBeUndefined()
+        expect(fs.existsSync(paperDir)).toBe(false)
+        const remaining = fs.readdirSync(papersRoot)
+        expect(remaining).toHaveLength(1)
+        const recoveryDir = path.join(papersRoot, remaining[0]!)
+        expect(fs.readFileSync(path.join(recoveryDir, slug, 'paper.pdf'), 'utf8')).toBe('original pdf bytes')
+        expect(warning).toHaveBeenCalledWith(
+          `Paper purge committed, but recovery-file cleanup failed at ${recoveryDir}`,
+          failure,
+        )
+      } finally {
+        vi.restoreAllMocks()
+        db.close()
+        fs.rmSync(tmpDir, { recursive: true, force: true })
+      }
+    })
+
+    it('retains the recovery files and reports their path if restoring after rollback also fails', () => {
+      const db = openDb({ path: ':memory:' })
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vellum-purge-restore-'))
+      try {
+        const slug = 'restore-failure'
+        const papersRoot = path.join(tmpDir, 'papers')
+        const paperDir = path.join(papersRoot, slug)
+        fs.mkdirSync(paperDir, { recursive: true })
+        fs.writeFileSync(path.join(paperDir, 'paper.pdf'), 'original pdf bytes')
+        fs.writeFileSync(path.join(paperDir, 'paper.md'), '# Original paper')
+        upsertPaper(db, makeRecord({ slug }))
+        const original = trashPaper(db, slug)
+        const note = upsertNote(db, slug, 'Keep my research notes')
+        db.exec(`
+          CREATE TABLE purge_commit_guard (
+            paper_slug TEXT REFERENCES papers(slug) DEFERRABLE INITIALLY DEFERRED
+          );
+          INSERT INTO purge_commit_guard (paper_slug) VALUES ('restore-failure');
+        `)
+        const rename = fs.renameSync
+        vi.spyOn(fs, 'renameSync')
+          .mockImplementationOnce(rename)
+          .mockImplementationOnce(() => { throw new Error('restore unavailable') })
+
+        expect(() => purgePaper(db, slug, tmpDir)).toThrow(/original files could not be restored and remain at/)
+
+        expect(db.inTransaction).toBe(false)
+        expect(getPaper(db, slug)).toEqual(original)
+        expect(getNote(db, slug)).toEqual(note)
+        const remaining = fs.readdirSync(papersRoot)
+        expect(remaining).toHaveLength(1)
+        const recoveryPath = path.join(papersRoot, remaining[0]!, slug)
+        expect(fs.readFileSync(path.join(recoveryPath, 'paper.pdf'), 'utf8')).toBe('original pdf bytes')
+        expect(fs.readFileSync(path.join(recoveryPath, 'paper.md'), 'utf8')).toBe('# Original paper')
+      } finally {
+        vi.restoreAllMocks()
         db.close()
         fs.rmSync(tmpDir, { recursive: true, force: true })
       }

@@ -230,30 +230,82 @@ export function restorePaper(db: Database, slug: string): PaperRecord | undefine
 /**
  * [L2-04] Permanently purge a paper from SQLite and delete its on-disk assets.
  * Cascades to notes, highlights, chats, collections, and questions.
+ * Files stay in a recovery directory until COMMIT succeeds. Cleanup failure
+ * after COMMIT warns and retains remaining files; the purge is already committed.
+ * This is not crash-atomic: a process crash can leave a recovery directory that
+ * requires manual restoration or removal. No startup recovery is provided here.
  */
 export function purgePaper(db: Database, slug: string, libraryDir?: string): boolean {
   assertValidSlug(slug)
+  // A nested transaction only releases a savepoint. Its caller could roll back
+  // after recovery files have been removed, so purge must own the real COMMIT.
+  if (db.inTransaction) {
+    throw new Error('Paper purge must run outside an existing transaction')
+  }
 
-  const paper = getPaper(db, slug)
-  if (!paper) return false
+  let targetDir: string | undefined
+  let recoveryDir: string | undefined
+  let stagedPath: string | undefined
 
-  if (libraryDir) {
-    const targetDir = path.resolve(libraryDir, 'papers', slug)
-    const papersRoot = path.resolve(libraryDir, 'papers')
-    if (!targetDir.startsWith(papersRoot + path.sep)) {
-      throw new Error(`Path traversal detected: ${targetDir}`)
-    }
+  const cleanupRecovery = (committed: boolean): void => {
+    if (!recoveryDir) return
     try {
-      if (fs.existsSync(targetDir)) {
-        fs.rmSync(targetDir, { recursive: true, force: true })
-      }
+      fs.rmSync(recoveryDir, { recursive: true, force: true })
     } catch (err) {
-      throw new Error(`Failed to remove paper files from disk: ${err instanceof Error ? err.message : String(err)}`)
+      console.warn(
+        `Paper purge ${committed ? 'committed' : 'rolled back'}, but recovery-file cleanup failed at ${recoveryDir}`,
+        err,
+      )
     }
   }
 
-  const result = db.prepare('DELETE FROM papers WHERE slug = ?').run(slug)
-  return result.changes > 0
+  let purged: boolean
+  try {
+    purged = db.transaction(() => {
+      const paper = getPaper(db, slug)
+      if (!paper) return false
+
+      const result = db.prepare('DELETE FROM papers WHERE slug = ?').run(slug)
+      if (result.changes === 0) return false
+
+      if (libraryDir) {
+        targetDir = path.resolve(libraryDir, 'papers', slug)
+        const papersRoot = path.resolve(libraryDir, 'papers')
+        if (!targetDir.startsWith(papersRoot + path.sep)) {
+          throw new Error(`Path traversal detected: ${targetDir}`)
+        }
+        // Unlike existsSync, lstat reports access failures instead of treating
+        // them as missing files. Rename also preserves symlinks without following them.
+        if (fs.lstatSync(targetDir, { throwIfNoEntry: false })) {
+          recoveryDir = fs.mkdtempSync(path.join(papersRoot, '.purge-'))
+          const destination = path.join(recoveryDir, slug)
+          fs.renameSync(targetDir, destination)
+          stagedPath = destination
+        }
+      }
+
+      return true
+    }).immediate()
+  } catch (err) {
+    // The transaction wrapper rolls back DELETE and cascades, including when
+    // COMMIT fails. Put the untouched directory back before reporting failure.
+    if (stagedPath && targetDir) {
+      try {
+        fs.renameSync(stagedPath, targetDir)
+      } catch (restoreError) {
+        // Never clean the only remaining copy if filesystem recovery also fails.
+        throw new AggregateError(
+          [err, restoreError],
+          `Paper purge failed; original files could not be restored and remain at ${stagedPath}`,
+        )
+      }
+    }
+    cleanupRecovery(false)
+    throw err
+  }
+
+  cleanupRecovery(true)
+  return purged
 }
 
 export { assertValidSlug, isValidSlug, SLUG_PATTERN } from './slug.js'

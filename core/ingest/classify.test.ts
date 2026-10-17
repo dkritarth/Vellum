@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeAll, afterAll } from 'vitest'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import { classifyInput } from './classify'
 
 describe('classifyInput', () => {
@@ -22,7 +22,7 @@ describe('classifyInput', () => {
     name: string
     input: () => string
     kind: 'arxiv' | 'doi' | 'pdf_url' | 'local_pdf'
-    slug: string
+    slug: string | RegExp
     value?: string
   }> = [
     {
@@ -85,20 +85,21 @@ describe('classifyInput', () => {
       name: 'direct https PDF URL',
       input: () => 'https://example.com/papers/foo-bar.pdf',
       kind: 'pdf_url',
-      slug: 'pdf-foo-bar',
+      slug: /^pdf-foo-bar-[a-f0-9]{64}$/,
     },
     {
       name: 'direct http PDF URL with query string',
       input: () => 'http://example.com/papers/report.pdf?download=1',
       kind: 'pdf_url',
-      slug: 'pdf-report',
+      slug: /^pdf-report-[a-f0-9]{64}$/,
     },
   ]
 
   it.each(cases)('classifies $name', ({ input, kind, slug, value }) => {
     const result = classifyInput(input())
     expect(result.kind).toBe(kind)
-    expect(result.slug).toBe(slug)
+    if (typeof slug === 'string') expect(result.slug).toBe(slug)
+    else expect(result.slug).toMatch(slug)
     if (value !== undefined) {
       expect(result.value).toBe(value)
     }
@@ -107,8 +108,17 @@ describe('classifyInput', () => {
   it('classifies a local filesystem path to a .pdf', () => {
     const result = classifyInput(localPdfPath)
     expect(result.kind).toBe('local_pdf')
-    expect(result.slug).toBe('local-my-paper')
+    expect(result.slug).toMatch(/^local-my-paper-[a-f0-9]{64}$/)
     expect(result.value).toBe(localPdfPath)
+  })
+
+
+  it('normalizes equivalent local paths and URL fragments without discarding source query parameters', () => {
+    expect(classifyInput(relative(process.cwd(), localPdfPath))).toEqual(classifyInput(localPdfPath))
+    const source = classifyInput('https://EXAMPLE.com:443/paper.pdf?paper=alpha#page=1')
+    expect(source).toEqual(classifyInput('https://example.com/paper.pdf?paper=alpha#page=9'))
+    expect(source.slug).not.toBe(classifyInput('https://example.com/paper.pdf?paper=beta').slug)
+    expect(source.slug).not.toBe(classifyInput('https://another.example.com/paper.pdf?paper=alpha').slug)
   })
 
   it('rejects a local PDF path that does not exist', () => {

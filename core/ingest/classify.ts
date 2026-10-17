@@ -6,6 +6,8 @@
 // fetch.ts trusts the result and just reads the bytes).
 
 import { existsSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { basename, resolve } from 'node:path'
 
 export type InputKind = 'arxiv' | 'doi' | 'pdf_url' | 'local_pdf'
 
@@ -13,6 +15,8 @@ export interface ClassifiedInput {
   kind: InputKind
   /** Stable, filesystem-safe identifier for data/papers/<slug>/. */
   slug: string
+  /** Pre-source-identity slug, used only to reconcile existing papers safely. */
+  legacySlug?: string
   /** Normalized form of the identifier (arXiv id, DOI, URL, or path). */
   value: string
 }
@@ -37,6 +41,15 @@ function slugify(raw: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9._-]+/g, '-')
     .replace(/^-+|-+$/g, '')
+}
+
+// Source identity is location, not PDF content: changing bytes at the same
+// location remains a re-ingest. Retain query parameters; fragments are not sent
+// to the server. Keep the full digest and cap the display prefix for safe paths.
+function pdfInput(kind: 'pdf_url' | 'local_pdf', name: string, value: string): ClassifiedInput {
+  const legacySlug = `${kind === 'pdf_url' ? 'pdf' : 'local'}-${slugify(name)}`
+  const digest = createHash('sha256').update(kind + ':' + value).digest('hex')
+  return { kind, value, slug: `${legacySlug.slice(0, 80)}-${digest}`, legacySlug }
 }
 
 export function classifyInput(raw: string): ClassifiedInput {
@@ -68,7 +81,8 @@ export function classifyInput(raw: string): ClassifiedInput {
     if (/\.pdf$/i.test(parsed.pathname)) {
       const base = parsed.pathname.split('/').filter(Boolean).pop() ?? parsed.pathname
       const name = base.replace(/\.pdf$/i, '')
-      return { kind: 'pdf_url', slug: `pdf-${slugify(name)}`, value: trimmed }
+      parsed.hash = ''
+      return pdfInput('pdf_url', name, parsed.href)
     }
     throw new Error(`classifyInput: unrecognized URL (not arXiv, DOI, or .pdf): ${trimmed}`)
   }
@@ -76,18 +90,14 @@ export function classifyInput(raw: string): ClassifiedInput {
   // Local filesystem path — accept absolute or relative paths ending .pdf.
   // Existence is checked here (classify is the validation boundary); fetch.ts
   // trusts a 'local_pdf' result and reads the file directly.
-  //
-  // Known limitation: local_pdf and pdf_url slugs are derived from the
-  // basename only, so e.g. /a/paper.pdf and /b/paper.pdf collide to the same
-  // slug. Acceptable for this card (single-source ingest); a later card can
-  // disambiguate (e.g. short content hash suffix) if collisions are hit.
   if (/\.pdf$/i.test(trimmed)) {
     if (!existsSync(trimmed)) {
       throw new Error(`classifyInput: local PDF not found: ${trimmed}`)
     }
-    const base = trimmed.split('/').filter(Boolean).pop() ?? trimmed
+    const path = resolve(trimmed)
+    const base = basename(path)
     const name = base.replace(/\.pdf$/i, '')
-    return { kind: 'local_pdf', slug: `local-${slugify(name)}`, value: trimmed }
+    return pdfInput('local_pdf', name, path)
   }
 
   throw new Error(`classifyInput: unrecognized input: ${trimmed}`)

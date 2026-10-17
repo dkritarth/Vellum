@@ -130,6 +130,37 @@ describe('NotesPanel', () => {
     expect(notesSave).toHaveBeenCalledWith({ slug: 'p1', body: 'edited before unmount' })
   })
 
+  it.each(['resolve', 'reject', 'resolve after autosave'] as const)(
+    'preserves typing during a delayed load (%s) and saves it when switching papers', async (outcome) => {
+      let resolveRead!: (note: { body: string }) => void
+      let rejectRead!: (error: Error) => void
+      notesGet.mockReturnValueOnce(new Promise((resolve, reject) => {
+        resolveRead = resolve
+        rejectRead = reject
+      }))
+      const { rerender } = render(<NotesPanel slug="p1" />)
+
+      fireEvent.change(screen.getByRole('textbox', { name: /note/i }), {
+        target: { value: 'typed while loading' },
+      })
+      if (outcome === 'resolve after autosave') {
+        await act(async () => { vi.advanceTimersByTime(500) })
+      }
+      await act(async () => {
+        if (outcome === 'reject') rejectRead(new Error('read failed'))
+        else resolveRead({ body: 'old persisted note' })
+      })
+
+      expect(screen.getByRole('textbox', { name: /note/i })).toHaveValue('typed while loading')
+      if (outcome !== 'resolve after autosave') expect(notesSave).not.toHaveBeenCalled()
+
+      rerender(<NotesPanel slug="p2" />)
+      await flushPromises()
+      expect(screen.getByRole('textbox', { name: /note/i })).toHaveValue('')
+      expect(notesSave).toHaveBeenCalledWith({ slug: 'p1', body: 'typed while loading' })
+    },
+  )
+
   it('clears the note via the Clear note action', async () => {
     notesGet.mockResolvedValue({ paperSlug: 'p1', body: 'existing note text', updatedAt: 't' })
 

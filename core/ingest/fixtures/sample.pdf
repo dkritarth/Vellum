@@ -9,57 +9,47 @@ endobj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
 endobj
 4 0 obj
-<< /Length 931 >>
+<< /Length 625 >>
 stream
 BT
 /F1 24 Tf
 72 760 Td
-(Attention Is All You Need) Tj
+(Sample Paper Title) Tj
 ET
 BT
 /F1 14 Tf
-72 736 Td
-(Ashish Vaswani, Noam Shazeer, Niki Parmar) Tj
-ET
-BT
-/F1 14 Tf
-72 700 Td
+72 720 Td
 (1. Introduction) Tj
 ET
 BT
 /F1 11 Tf
-72 682 Td
-(Recurrent neural networks have been firmly established as state of the art models in sequence modeling.) Tj
+72 700 Td
+(This is the body text of the introduction section describing motivation and contributions.) Tj
 ET
 BT
 /F1 11 Tf
-72 666 Td
-(We propose a new simple network architecture, the Transformer, based solely on attention mechanisms.) Tj
+72 684 Td
+(It spans a couple of lines of plain prose to look like a real paper paragraph.) Tj
 ET
 BT
 /F1 14 Tf
-72 630 Td
+72 640 Td
 (2. Method) Tj
 ET
 BT
 /F1 11 Tf
-72 612 Td
-(Multi-head attention allows the model to jointly attend to information from different representation subspaces.) Tj
-ET
-BT
-/F1 11 Tf
-72 596 Td
-(Scaled dot-product attention weighs queries against keys and returns a weighted sum over values.) Tj
+72 620 Td
+(This section describes the method used in this research paper in plain prose.) Tj
 ET
 BT
 /F1 14 Tf
-72 560 Td
+72 580 Td
 (3. Conclusion) Tj
 ET
 BT
 /F1 11 Tf
-72 542 Td
-(We achieve state of the art results on translation tasks while cutting training time substantially.) Tj
+72 560 Td
+(This section concludes the paper and summarizes the findings briefly.) Tj
 ET
 endstream
 endobj
@@ -73,9 +63,9 @@ xref
 0000000058 00000 n 
 0000000115 00000 n 
 0000000241 00000 n 
-0000001223 00000 n 
+0000000916 00000 n 
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
-1293
+986
 %%EOF

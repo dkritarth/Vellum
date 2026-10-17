@@ -38,7 +38,7 @@ describe('runMigrations', () => {
     runMigrations(db)
 
     const version = db.pragma('user_version', { simple: true })
-    expect(version).toBe(8)
+    expect(version).toBe(9)
   })
 
   it('adds the author_orcids column to papers [P2-04]', () => {
@@ -77,7 +77,7 @@ describe('runMigrations', () => {
     runMigrations(db)
 
     const version = db.pragma('user_version', { simple: true })
-    expect(version).toBe(8)
+    expect(version).toBe(9)
 
     const row = db.prepare('SELECT * FROM papers WHERE slug = ?').get('a')
     expect(row).toBeTruthy()

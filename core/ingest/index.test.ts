@@ -94,7 +94,7 @@ describe('ingest', () => {
       expect(existsSync(result.paths.pdfPath)).toBe(true)
       expect(existsSync(result.paths.mdPath)).toBe(true)
       const md = readFileSync(result.paths.mdPath, 'utf-8')
-      expect(md).toMatch(/^# Sample Paper Title\s*$/m)
+      expect(md).toMatch(/^# Attention Is All You Need\s*$/m)
 
       const row = getPaper(db, 'local-sample')
       expect(row?.title).toBe('Sample Paper Title (agent-refined)')
@@ -253,7 +253,7 @@ describe('ingest', () => {
 
       // File still valid/parseable after a second write (not corrupted/appended).
       const md = readFileSync(second.paths.mdPath, 'utf-8')
-      expect(md).toMatch(/^# Sample Paper Title\s*$/m)
+      expect(md).toMatch(/^# Attention Is All You Need\s*$/m)
       const pdfBytesLen = readFileSync(second.paths.pdfPath).byteLength
       expect(pdfBytesLen).toBeGreaterThan(0)
     } finally {

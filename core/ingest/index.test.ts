@@ -17,7 +17,7 @@ import Database from 'better-sqlite3'
 import { MIGRATIONS, runMigrations } from '../store/migrate.js'
 
 import type { AcpClient, AcpPromptRequest, AcpSession, AcpUpdate } from '../acp/client.js'
-import { getPaper, listPapers, upsertPaper } from '../library/repo.js'
+import { getPaper, listPapers, upsertPaper, restorePaper, trashPaper } from '../library/repo.js'
 import { getNote, upsertNote } from '../notes/repo.js'
 import { addChatMessage, createChatSession, getChatMessages, getLatestChatSession } from '../chat/repo.js'
 import { openDb } from '../store/db.js'
@@ -370,6 +370,43 @@ describe('ingest', () => {
     } finally {
       db.close()
       vi.unstubAllGlobals()
+    }
+  })
+
+  it('keeps a re-ingested paper in Trash until explicit restore, persisting both states across reopen', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-'))
+    const dbPath = join(tmpDir, 'app.db')
+    let db = openDb({ path: dbPath })
+
+    try {
+      const first = await ingest(FIXTURE_PDF, {
+        db, dataDir: tmpDir, client: new FakeClient([textUpdate(AGENT_JSON), doneUpdate]),
+      })
+      const trashedAt = trashPaper(db, first.slug)?.trashedAt
+      expect(trashedAt).toBeTruthy()
+
+      const second = await ingest(FIXTURE_PDF, {
+        db, dataDir: tmpDir, client: new FakeClient([textUpdate(AGENT_JSON), doneUpdate]),
+      })
+
+      expect(second.slug).toBe(first.slug)
+      expect(getPaper(db, first.slug)?.trashedAt).toBe(trashedAt)
+      expect(listPapers(db)).toEqual([])
+      expect(listPapers(db, { trashed: true }).map((paper) => paper.slug)).toEqual([first.slug])
+
+      db.close()
+      db = openDb({ path: dbPath })
+      expect(getPaper(db, first.slug)?.trashedAt).toBe(trashedAt)
+      expect(listPapers(db)).toEqual([])
+
+      expect(restorePaper(db, first.slug)?.trashedAt).toBeUndefined()
+      db.close()
+      db = openDb({ path: dbPath })
+      expect(getPaper(db, first.slug)?.trashedAt).toBeUndefined()
+      expect(listPapers(db).map((paper) => paper.slug)).toEqual([first.slug])
+      expect(listPapers(db, { trashed: true })).toEqual([])
+    } finally {
+      db.close()
     }
   })
 

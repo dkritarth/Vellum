@@ -269,10 +269,9 @@ export interface StdioAcpClientTimeouts {
    * here regresses a previously-working (if slow) path. Default leaves
    * comfortable margin above that measured cold-start cost. */
   handshakeMs?: number
-  /** Budget for a single `prompt()` turn (send to a terminal done/error)
-   * before it's force-failed with an `error` update and the child is
-   * killed. Guards against a stalled adapter (e.g. an errored codex-acp
-   * turn, or any other hang) leaving callers awaiting forever. */
+  /** Maximum idle time during `prompt()`. Each matching session update
+   * resets this budget, so productive turns may run longer. A stalled
+   * adapter is force-failed and its process tree terminated. */
   turnMs?: number
 }
 
@@ -283,8 +282,9 @@ const DEFAULT_TURN_TIMEOUT_MS = 60_000
  * — always call it once the raced-against operation settles, otherwise the
  * timer keeps the process alive and the rejection still fires (harmlessly,
  * since nothing awaits it, but it's a leak). */
-function timeoutAfter(ms: number, message: string): { promise: Promise<never>; cancel(): void } {
+function timeoutAfter(ms: number, message: string): { promise: Promise<never>; cancel(): void; reset(): void } {
   let timer: ReturnType<typeof setTimeout>
+  let active = true
   const promise = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(message)), ms)
   })
@@ -293,7 +293,11 @@ function timeoutAfter(ms: number, message: string): { promise: Promise<never>; c
   promise.catch(() => undefined)
   return {
     promise,
-    cancel: () => clearTimeout(timer),
+    cancel: () => {
+      active = false
+      clearTimeout(timer)
+    },
+    reset: () => { if (active) timer.refresh() },
   }
 }
 
@@ -305,7 +309,7 @@ class StdioAcpSession implements AcpSession {
   private disposePromise: Promise<void> | undefined
   // Set only while a prompt() call is in flight; cleared by dispose() too so
   // an external dispose mid-turn doesn't leave a dangling timer.
-  private turnTimeout: { cancel(): void } | undefined
+  private turnTimeout: { cancel(): void; reset(): void } | undefined
 
   constructor(
     private readonly connection: ClientSideConnection,
@@ -318,7 +322,10 @@ class StdioAcpSession implements AcpSession {
    * if this is that session and a prompt is actually in flight. Called
    * directly by the `Client.sessionUpdate` handler in `StdioAcpClient`. */
   route(sessionId: string, update: AcpUpdate): void {
-    if (sessionId === this.sessionId) this.queue?.push(update)
+    if (sessionId === this.sessionId && this.queue) {
+      this.turnTimeout?.reset()
+      this.queue.push(update)
+    }
   }
 
   async *prompt(req: AcpPromptRequest): AsyncIterable<AcpUpdate> {

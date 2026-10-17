@@ -106,15 +106,19 @@ describe('main process startup and preload contract', () => {
     }
   })
 
+  // These run before valid calls initialize main's cached database, so they
+  // also prove malformed requests never open storage on first use.
   it.each([
     ['usageGetList', [{ sessionId: {} }], 'sessionId'],
     ['usageGetList', [{ limit: 1.5 }], 'limit'],
+    ['usageGetList', [{ limit: 0 }], 'limit'],
     ['usageGetList', [{ backend: 'unknown' }], 'backend'],
     ['usageGetList', [[]], 'object'],
     ['collectionsCreate', [{ name: 'Child', parentId: '1' }], 'parentId'],
     ['collectionsRename', [{ id: 1.5, name: 'Renamed' }], 'id'],
     ['collectionsDelete', [Infinity], 'id'],
     ['collectionsAssign', [{ paperSlug: 'paper', collectionId: NaN }], 'collectionId'],
+    ['collectionsAssign', [{ paperSlug: '../escape', collectionId: 1 }], 'slug'],
     ['collectionsRemove', [{ paperSlug: 'paper', collectionId: -1 }], 'collectionId'],
     ['listPapers', [{ collectionId: Number.MAX_SAFE_INTEGER + 1 }], 'collectionId'],
   ])('rejects malformed %s input before opening storage', async (method, args, field) => {

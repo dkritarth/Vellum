@@ -37,6 +37,9 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
   // not a stale closure over `body`/`slug` from whenever the effect ran.
   const bodyRef = useRef('')
   const dirtyRef = useRef(false)
+  // Unlike dirtyRef, this stays true after autosave: a delayed read must
+  // never replace an edit, even when that edit has already been saved.
+  const editedSinceLoad = useRef(false)
   const slugRef = useRef<string | undefined>(slug)
   bodyRef.current = body
   slugRef.current = slug
@@ -64,6 +67,8 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
   // paper being left.
   useEffect(() => {
     setStatus('idle')
+    editedSinceLoad.current = false
+    dirtyRef.current = false
 
     if (!slug) {
       setBody('')
@@ -76,12 +81,12 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
     window.vellum
       .notesGet(slug)
       .then((note) => {
-        if (cancelled) return
+        if (cancelled || editedSinceLoad.current) return
         setBody(note?.body ?? '')
         dirtyRef.current = false
       })
       .catch(() => {
-        if (!cancelled) {
+        if (!cancelled && !editedSinceLoad.current) {
           setBody('')
           dirtyRef.current = false
         }
@@ -107,6 +112,7 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
 
   const clearNote = useCallback(() => {
     if (!slug) return
+    editedSinceLoad.current = true
     if (saveTimer.current) {
       clearTimeout(saveTimer.current)
       saveTimer.current = null
@@ -144,6 +150,7 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
           const next = event.target.value
           setBody(next)
           bodyRef.current = next
+          editedSinceLoad.current = true
           dirtyRef.current = true
 
           if (saveTimer.current) clearTimeout(saveTimer.current)

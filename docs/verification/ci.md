@@ -10,6 +10,10 @@ Pull requests and pushes to `master` run two checks on Linux with Node 24:
   Chromium configuration and cache are temporary. Failure screenshots and logs
   upload as a workflow artifact.
 
+The repository tracks its historical wiki as a gitlink. `.gitmodules` records
+the wiki URL so clean checkouts and checkout-action credential cleanup work;
+CI does not initialize or depend on the wiki contents.
+
 The offline checks exercise degraded metadata and storage/UI behavior. They do
 not certify signed-in ACP, paper-grounded answers, or every selection gesture.
 Those remain live product checks. Never treat an offline pass as ACP evidence.

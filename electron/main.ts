@@ -160,6 +160,13 @@ ipcMain.handle('vellum:ingest', async (_event, input: unknown): Promise<IngestRe
 
 const SORT_COLUMN_VALUES: readonly PaperSortColumn[] = ['addedAt', 'year', 'title']
 
+function requirePositiveInteger(value: unknown, channel: string, field: string): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) {
+    throw new Error(`${channel}: ${field} must be a positive safe integer`)
+  }
+  return value
+}
+
 // [P1-08] Library grid data. `options` arrives from the renderer as untyped
 // `unknown` — narrowed field-by-field here rather than trusted via a cast.
 // core/library/repo.ts's listPapers() is independently defensive about a bad
@@ -174,7 +181,9 @@ function toListPapersOptions(value: unknown): ListPapersOptions {
     ? (candidate['sort'] as PaperSortColumn)
     : undefined
   const order = candidate['order'] === 'asc' || candidate['order'] === 'desc' ? candidate['order'] : undefined
-  const collectionId = typeof candidate['collectionId'] === 'number' ? candidate['collectionId'] : undefined
+  const collectionId = candidate['collectionId'] == null
+    ? undefined
+    : requirePositiveInteger(candidate['collectionId'], 'vellum:list-papers', 'collectionId')
   const trashed = typeof candidate['trashed'] === 'boolean' ? candidate['trashed'] : undefined
 
   return { search, collectionId, sort, order, trashed }
@@ -183,7 +192,8 @@ function toListPapersOptions(value: unknown): ListPapersOptions {
 // Library grid data [P1-08]. Read-only, no slug/path handling needed (unlike
 // read-paper-file) — just forwards a sanitized query to the repo.
 ipcMain.handle('vellum:list-papers', (_event, options: unknown): PaperRecord[] => {
-  return listPapers(getDb(), toListPapersOptions(options))
+  const parsed = toListPapersOptions(options)
+  return listPapers(getDb(), parsed)
 })
 
 ipcMain.handle('vellum:get-paper', (_event, slug: unknown): PaperRecord | null => {
@@ -209,7 +219,20 @@ ipcMain.handle('vellum:usage-summary', () => {
 })
 
 ipcMain.handle('vellum:usage-list', (_event, options: unknown) => {
-  const opts = (typeof options === 'object' && options !== null) ? options as ListUsageOptions : {}
+  if (options != null && (typeof options !== 'object' || Array.isArray(options))) {
+    throw new Error('vellum:usage-list: options must be an object')
+  }
+  const candidate = (options ?? {}) as Record<string, unknown>
+  const opts: ListUsageOptions = {}
+  if (candidate['backend'] !== undefined) {
+    opts.backend = requireBackend(candidate['backend'], 'vellum:usage-list')
+  }
+  if (candidate['sessionId'] !== undefined) {
+    opts.sessionId = requirePositiveInteger(candidate['sessionId'], 'vellum:usage-list', 'sessionId')
+  }
+  if (candidate['limit'] !== undefined) {
+    opts.limit = requirePositiveInteger(candidate['limit'], 'vellum:usage-list', 'limit')
+  }
   return listUsageRecords(getDb(), opts)
 })
 
@@ -499,7 +522,7 @@ ipcMain.handle('vellum:collections-create', (_event, params: unknown): Collectio
   if (typeof name !== 'string') {
     throw new Error('vellum:collections-create: name must be a string')
   }
-  const pid = typeof parentId === 'number' ? parentId : null
+  const pid = parentId == null ? null : requirePositiveInteger(parentId, 'vellum:collections-create', 'parentId')
   return createCollection(getDb(), { name, parentId: pid })
 })
 
@@ -508,17 +531,16 @@ ipcMain.handle('vellum:collections-rename', (_event, params: unknown): void => {
     throw new Error('vellum:collections-rename: params must be an object')
   }
   const { id, name } = params as { id: unknown; name: unknown }
-  if (typeof id !== 'number' || typeof name !== 'string') {
-    throw new Error('vellum:collections-rename: id must be number and name must be string')
+  const collectionId = requirePositiveInteger(id, 'vellum:collections-rename', 'id')
+  if (typeof name !== 'string') {
+    throw new Error('vellum:collections-rename: name must be a string')
   }
-  renameCollection(getDb(), id, name)
+  renameCollection(getDb(), collectionId, name)
 })
 
 ipcMain.handle('vellum:collections-delete', (_event, id: unknown): void => {
-  if (typeof id !== 'number') {
-    throw new Error('vellum:collections-delete: id must be a number')
-  }
-  deleteCollection(getDb(), id)
+  const collectionId = requirePositiveInteger(id, 'vellum:collections-delete', 'id')
+  deleteCollection(getDb(), collectionId)
 })
 
 ipcMain.handle('vellum:collections-assign', (_event, params: unknown): void => {
@@ -526,10 +548,9 @@ ipcMain.handle('vellum:collections-assign', (_event, params: unknown): void => {
     throw new Error('vellum:collections-assign: params must be an object')
   }
   const { paperSlug, collectionId } = params as { paperSlug: unknown; collectionId: unknown }
-  if (typeof paperSlug !== 'string' || typeof collectionId !== 'number') {
-    throw new Error('vellum:collections-assign: paperSlug must be string and collectionId must be number')
-  }
-  assignPaperToCollection(getDb(), { paperSlug, collectionId })
+  const slug = requireSlug(paperSlug, 'vellum:collections-assign')
+  const id = requirePositiveInteger(collectionId, 'vellum:collections-assign', 'collectionId')
+  assignPaperToCollection(getDb(), { paperSlug: slug, collectionId: id })
 })
 
 ipcMain.handle('vellum:collections-remove', (_event, params: unknown): void => {
@@ -537,10 +558,9 @@ ipcMain.handle('vellum:collections-remove', (_event, params: unknown): void => {
     throw new Error('vellum:collections-remove: params must be an object')
   }
   const { paperSlug, collectionId } = params as { paperSlug: unknown; collectionId: unknown }
-  if (typeof paperSlug !== 'string' || typeof collectionId !== 'number') {
-    throw new Error('vellum:collections-remove: paperSlug must be string and collectionId must be number')
-  }
-  removePaperFromCollection(getDb(), { paperSlug, collectionId })
+  const slug = requireSlug(paperSlug, 'vellum:collections-remove')
+  const id = requirePositiveInteger(collectionId, 'vellum:collections-remove', 'collectionId')
+  removePaperFromCollection(getDb(), { paperSlug: slug, collectionId: id })
 })
 
 ipcMain.handle('vellum:collections-for-paper', (_event, paperSlug: unknown): CollectionRecord[] => {

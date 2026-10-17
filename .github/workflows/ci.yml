@@ -1,0 +1,67 @@
+name: Code quality
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  quality:
+    name: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Check changed-file whitespace
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [[ "$BASE_SHA" =~ ^0+$ ]]; then
+            git diff-tree --check --root HEAD
+          else
+            git diff --check "$BASE_SHA" HEAD
+          fi
+
+  electron:
+    name: electron-offline
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Install Electron host libraries
+        run: npx playwright install-deps chromium
+      - run: npm run build
+      - name: Exercise isolated Electron storage and UI without adapters
+        run: xvfb-run -a node test/offline-gates.mjs
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: electron-failure-evidence
+          path: test-artifacts/
+          if-no-files-found: ignore

@@ -15,6 +15,7 @@ release/
 
 # logs / env
 *.log
+test-artifacts/
 .env
 .env.local
 

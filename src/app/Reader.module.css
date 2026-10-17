@@ -153,15 +153,81 @@
   box-shadow: 0 0 0 1px var(--vellum-border, #2a2a2a);
 }
 
-/* pdf.js text layer — positioned to exactly overlay the canvas glyph-for-glyph
-   so selection matches what's visually rendered. Text is transparent; only
-   the user's selection highlight is visible (pdf.js applies this via its own
-   inline styles/CSS custom properties on rendered spans). */
+/* Text geometry adapted from pdfjs-dist 6.1.200 web/pdf_viewer.css
+   (.textLayer and .pdfViewer .page), Copyright Mozilla Foundation,
+   Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+   TextLayer emits custom properties; these rules make them effective.
+   Keep upstream markedContent classes literal inside this CSS module. */
 .textLayer {
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+  color-scheme: only light;
   position: absolute;
+  text-align: initial;
   inset: 0;
-  overflow: hidden;
+  overflow: clip;
+  opacity: 1;
   line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 0;
+}
+
+.textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  user-select: text;
+}
+
+.textLayer > :not(:global(.markedContent)),
+.textLayer :global(.markedContent) span:not(:global(.markedContent)) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.textLayer :global(.markedContent) {
+  display: contents;
+}
+
+.textLayer span[role='img'] {
+  user-select: none;
+  cursor: default;
+}
+
+.textLayer ::selection {
+  background: rgba(0, 0, 255, 0.25);
+  color: transparent;
+}
+
+.textLayer br::selection {
+  background: transparent;
+}
+
+.textLayer[data-main-rotation='90'] {
+  transform: rotate(90deg) translateY(-100%);
+}
+
+.textLayer[data-main-rotation='180'] {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+
+.textLayer[data-main-rotation='270'] {
+  transform: rotate(270deg) translateX(-100%);
 }
 
 .textLayer[data-highlight-mode='active'] {

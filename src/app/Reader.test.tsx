@@ -3,9 +3,8 @@
 // pdf.js can't meaningfully render (no real canvas 2D context, no worker
 // thread) under jsdom, so `pdfjs-dist` is mocked wholesale here. These tests
 // cover the component's own logic — page nav, zoom, TOC, search state, and
-// the empty/error states — not pdf.js's rendering pipeline. Visual rendering
-// (canvas raster + selectable text layer) is verified manually: `npm run dev`
-// with a real `data/papers/<slug>/paper.pdf` on disk.
+// the empty/error states — not pdf.js's rendering pipeline. Real Electron
+// geometry/raster and pointer selection: test/reader-alignment-live.mjs.
 import '@testing-library/jest-dom/vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -674,7 +673,10 @@ describe('Reader highlight overlay + citation marker interaction [P2-02 x P2-03]
 })
 
 describe('Reader selection actions [R1-05]', () => {
-  it('opens SelectionMenu on mouseup with selected text, triggering onAddToChat and onExplain', async () => {
+  it.each([
+    { action: 'Add to chat', page: 1, quote: 'Introduction' },
+    { action: 'Explain', page: 2, quote: 'Vellum reads' },
+  ])('preserves selected text and page for $action after navigation/zoom', async ({ action, page, quote }) => {
     const onAddToChat = vi.fn()
     const onExplain = vi.fn()
     const { container } = render(
@@ -682,13 +684,19 @@ describe('Reader selection actions [R1-05]', () => {
     )
     await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2'))
 
+    if (page === 2) {
+      fireEvent.click(screen.getByText('+', { selector: 'button' }))
+      fireEvent.click(screen.getByText('›', { selector: 'button' }))
+      await waitFor(() => expect(getTextLayer(container).textContent).toBe(PAGE_TEXT[1]))
+    }
+
     const textLayer = getTextLayer(container)
     await waitFor(() => expect(textLayer.querySelector('span')).not.toBeNull())
 
     const textNode = textLayer.querySelector('span')!.firstChild!
     const range = document.createRange()
     range.setStart(textNode, 0)
-    range.setEnd(textNode, 12)
+    range.setEnd(textNode, quote.length)
     const selection = window.getSelection()!
     selection.removeAllRanges()
     selection.addRange(range)
@@ -696,13 +704,7 @@ describe('Reader selection actions [R1-05]', () => {
     fireEvent.mouseUp(textLayer)
 
     // Selection menu toolbar should appear
-    const addToChat = await screen.findByRole('button', { name: 'Add to chat' })
-    const explain = screen.getByRole('button', { name: 'Explain' })
-    expect(addToChat).toBeInTheDocument()
-    expect(explain).toBeInTheDocument()
-
-    // Clicking Add to chat calls callback with quote and page number
-    fireEvent.click(addToChat)
-    expect(onAddToChat).toHaveBeenCalledWith('Introduction', 1)
+    fireEvent.click(await screen.findByRole('button', { name: action }))
+    expect(action === 'Add to chat' ? onAddToChat : onExplain).toHaveBeenCalledWith(quote, page)
   })
 })

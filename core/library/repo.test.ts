@@ -67,6 +67,30 @@ describe('repo', () => {
     }
   })
 
+  it.each([
+    { label: 'omitted', overrides: {} },
+    { label: 'null', overrides: { trashedAt: null } },
+    { label: 'another timestamp', overrides: { trashedAt: '2020-01-01T00:00:00.000Z' } },
+  ])('metadata upsert preserves Trash timestamp when incoming trashedAt is $label', ({ overrides }) => {
+    const db = openDb({ path: ':memory:' })
+    try {
+      const paper = makeRecord()
+      upsertPaper(db, paper)
+      const trashedAt = trashPaper(db, paper.slug)?.trashedAt
+      expect(trashedAt).toBeTruthy()
+
+      upsertPaper(db, makeRecord({ title: 'Updated Title', year: 2025, ...overrides }))
+
+      expect(getPaper(db, paper.slug)).toMatchObject({
+        title: 'Updated Title', year: 2025, trashedAt,
+      })
+      expect(listPapers(db)).toEqual([])
+      expect(listPapers(db, { trashed: true }).map((row) => row.slug)).toEqual([paper.slug])
+    } finally {
+      db.close()
+    }
+  })
+
   it('handles missing optional fields as undefined / empty arrays, not null leaking through', () => {
     const db = openDb({ path: ':memory:' })
     try {

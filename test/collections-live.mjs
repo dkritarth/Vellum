@@ -80,7 +80,7 @@ async function runLiveVerification() {
     await window.click('button:has-text("Library")')
     await window.waitForTimeout(500)
 
-    const allCards = await window.$$eval('button[role="listitem"]', (els) => els.length)
+    const allCards = await window.$$eval('[role="list"][aria-label="Papers"] > [role="listitem"]', (els) => els.length)
     assert(allCards >= 2, 'Expected at least 2 cards in library')
     console.log(`All papers view shows ${allCards} papers.`)
 
@@ -89,13 +89,13 @@ async function runLiveVerification() {
 
     const bannerText = await window.textContent('[role="status"]')
     assert(bannerText.includes('NLP'), 'Filter banner should display NLP')
-    const filteredCards = await window.$$eval('button[role="listitem"]', (els) => els.length)
+    const filteredCards = await window.$$eval('[role="list"][aria-label="Papers"] > [role="listitem"]', (els) => els.length)
     assert.strictEqual(filteredCards, 1, 'NLP collection should filter to exactly 1 paper')
     console.log(`Filtered view shows 1 paper with active filter banner: "${bannerText.trim()}"`)
 
     await window.click('button:has-text("Clear filter")')
     await window.waitForTimeout(500)
-    const clearedCards = await window.$$eval('button[role="listitem"]', (els) => els.length)
+    const clearedCards = await window.$$eval('[role="list"][aria-label="Papers"] > [role="listitem"]', (els) => els.length)
     assert(clearedCards >= 2, 'Clearing filter restores all papers')
     console.log('Clearing filter restored full library.')
 

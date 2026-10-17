@@ -40,3 +40,9 @@ Parent harness failures were corrected without product edits: an incorrect role=
 Other discovered defects remain tracked in #78 source collisions, #79 note-load race, #80 Ask paper-switch state, and #83 IPC option validation. Native OS file picker was not tested. These five fixes do not certify all product paths or unlock milestone gates.
 
 Purge rollback is tested with lock, DELETE, COMMIT and filesystem failures. Cross-resource crash atomicity is not claimed; recovery directories can need manual intervention after a crash or failed restoration.
+
+## Independent final repetition
+
+Independent Sol verifier repeated collections, Trash and reading gates against the unchanged final production bundle. All passed. A separate visible real-paper journey passed four launches and three restarts: input focus and missing-file recovery, ingest/loading/rendering, Notes, Trash, re-ingest preserving exact timestamp, Restore, purge cancellation, confirmed purge and persisted deletion. The verifier checked actual PDF bytes, database state and absence of leftover recovery directories after successful purge. All final renderer logs were empty. Signed-in Ask/long turn were not repeated by this verifier; those remain parent evidence.
+
+The verifier independently confirmed #86 after loading finished. Text spans have static positioning and visible foreground color, consistent with missing PDF.js text-span styles. No reader fix was made in this batch. Full local report is `/tmp/vellum-independent-evidence/REPORT.md`.

@@ -85,6 +85,7 @@ function toRecord(row: PaperRow): PaperRecord {
  * Insert a paper row, or overwrite it in place if `slug` already exists
  * (re-ingest). Never produces a duplicate row for the same slug — this is
  * the idempotency guarantee [P1-06] requires of `ingest()`.
+ * Metadata refresh preserves existing Trash state; use `restorePaper` to clear it.
  */
 export function upsertPaper(db: Database, paper: PaperRecord): void {
   db.prepare(
@@ -103,8 +104,7 @@ export function upsertPaper(db: Database, paper: PaperRecord): void {
        md_path       = excluded.md_path,
        pdf_path      = excluded.pdf_path,
        sections      = excluded.sections,
-       added_at      = excluded.added_at,
-       trashed_at    = excluded.trashed_at`,
+       added_at      = excluded.added_at`,
   ).run({
     slug: paper.slug,
     title: paper.title,

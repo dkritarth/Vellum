@@ -1,0 +1,6 @@
+# Ingest fixtures are real single-page PDFs. They are pure-ASCII byte streams,
+# so git's binary sniffing classifies them as text and `git diff --check`
+# then flags the xref table's spec-mandated 20-byte entries (each ends in a
+# space before the EOL) as trailing whitespace. Mark them binary so git
+# stores and diffs them as opaque bytes instead.
+core/ingest/fixtures/*.pdf binary

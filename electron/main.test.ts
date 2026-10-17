@@ -9,7 +9,8 @@ const electron = vi.hoisted(() => {
     readyPromise,
     windows: [] as EventEmitter[],
     handlers: new Map<string, unknown>(),
-    api: {} as Record<string, () => unknown>,
+    api: {} as Record<string, (...args: unknown[]) => unknown>,
+    runHandlers: false,
     quit: vi.fn(),
     show: vi.fn(),
     loadFile: vi.fn(),
@@ -43,8 +44,10 @@ vi.mock('electron', async () => {
       },
     },
     ipcRenderer: {
-      invoke: async (channel: string) => {
-        if (!electron.handlers.has(channel)) throw new Error(`No handler registered for '${channel}'`)
+      invoke: async (channel: string, ...args: unknown[]) => {
+        const handler = electron.handlers.get(channel)
+        if (typeof handler !== 'function') throw new Error(`No handler registered for '${channel}'`)
+        if (electron.runHandlers) return handler({}, ...args)
       },
     },
     contextBridge: {
@@ -54,6 +57,12 @@ vi.mock('electron', async () => {
 })
 
 import { app } from 'electron'
+import { openDb } from '../core/store/db.js'
+
+vi.mock('../core/store/db.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../core/store/db.js')>()
+  return { ...actual, openDb: vi.fn(() => actual.openDb({ path: ':memory:' })) }
+})
 
 describe('main process startup and preload contract', () => {
   beforeAll(async () => {
@@ -62,7 +71,12 @@ describe('main process startup and preload contract', () => {
     await import('./preload.js')
   })
 
-  afterAll(() => { vi.unstubAllEnvs() })
+  afterAll(() => {
+    vi.unstubAllEnvs()
+    for (const result of vi.mocked(openDb).mock.results) {
+      if (result.type === 'return') result.value.close()
+    }
+  })
 
   it('opens and shows the workspace after readiness, recreates it on activation, and quits on close', async () => {
     expect(electron.windows).toHaveLength(0)
@@ -89,6 +103,49 @@ describe('main process startup and preload contract', () => {
     expect(requests.length).toBeGreaterThan(0)
     for (const [name, request] of requests) {
       await expect(Promise.resolve().then(() => request()), name).resolves.toBeUndefined()
+    }
+  })
+
+  // These run before valid calls initialize main's cached database, so they
+  // also prove malformed requests never open storage on first use.
+  it.each([
+    ['usageGetList', [{ sessionId: {} }], 'sessionId'],
+    ['usageGetList', [{ limit: 1.5 }], 'limit'],
+    ['usageGetList', [{ limit: 0 }], 'limit'],
+    ['usageGetList', [{ backend: 'unknown' }], 'backend'],
+    ['usageGetList', [[]], 'object'],
+    ['collectionsCreate', [{ name: 'Child', parentId: '1' }], 'parentId'],
+    ['collectionsRename', [{ id: 1.5, name: 'Renamed' }], 'id'],
+    ['collectionsDelete', [Infinity], 'id'],
+    ['collectionsAssign', [{ paperSlug: 'paper', collectionId: NaN }], 'collectionId'],
+    ['collectionsAssign', [{ paperSlug: '../escape', collectionId: 1 }], 'slug'],
+    ['collectionsRemove', [{ paperSlug: 'paper', collectionId: -1 }], 'collectionId'],
+    ['listPapers', [{ collectionId: Number.MAX_SAFE_INTEGER + 1 }], 'collectionId'],
+  ])('rejects malformed %s input before opening storage', async (method, args, field) => {
+    electron.runHandlers = true
+    vi.mocked(openDb).mockClear()
+    try {
+      await expect(Promise.resolve().then(() => electron.api[method]!(...args))).rejects.toThrow(field)
+      expect(openDb).not.toHaveBeenCalled()
+    } finally {
+      electron.runHandlers = false
+    }
+  })
+
+  it('preserves valid usage filters and collection operations through preload', async () => {
+    electron.runHandlers = true
+    try {
+      await expect(electron.api['usageGetList']!()).resolves.toEqual([])
+      await expect(electron.api['usageGetList']!({ backend: 'codex', sessionId: 1, limit: 10 })).resolves.toEqual([])
+      const collection = await electron.api['collectionsCreate']!({ name: 'Research', parentId: null })
+      expect(collection).toMatchObject({ id: 1, name: 'Research', parentId: null })
+      await electron.api['collectionsRename']!({ id: 1, name: 'Reading' })
+      await expect(electron.api['collectionsList']!()).resolves.toEqual([{ id: 1, name: 'Reading', parentId: null }])
+      await expect(electron.api['listPapers']!({ collectionId: 1 })).resolves.toEqual([])
+      await electron.api['collectionsDelete']!(1)
+      await expect(electron.api['collectionsList']!()).resolves.toEqual([])
+    } finally {
+      electron.runHandlers = false
     }
   })
 })

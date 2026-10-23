@@ -1,0 +1,3 @@
+[pageerror] Error: Cannot use the same canvas during multiple render() operations. Use different canvas or ensure previous operations were cancelled or completed.
+    at InternalRenderTask.initializeGraphics (file:///home/dandapat/.t3/worktrees/Vellum/t3-5d9664cd/out/renderer/assets/index-SCXquVRG.js:28421:15)
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-5d9664cd/out/renderer/assets/index-SCXquVRG.js:27278:26

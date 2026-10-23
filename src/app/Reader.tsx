@@ -19,7 +19,7 @@
 // cards), so `slug` is optional and undefined by default — the empty state
 // below is what App.tsx shows today.
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
-import { GlobalWorkerOptions, TextLayer, getDocument, type PDFDocumentProxy } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import { AbortException, GlobalWorkerOptions, RenderingCancelledException, TextLayer, getDocument, type PDFDocumentProxy, type RenderTask } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import workerSrc from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url'
 import type { HighlightColor } from './ReaderToolbar'
 import type { HighlightRecord } from '../../core/highlights/repo'
@@ -443,6 +443,7 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
   const [tocOpen, setTocOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [renderError, setRenderError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<SearchMatch[]>([])
   const [searchIndex, setSearchIndex] = useState(0)
@@ -558,8 +559,12 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
 
   // Render the current page (canvas + selectable text layer) on page/zoom change.
   useEffect(() => {
+    setRenderError(null)
     if (!doc) return
     let cancelled = false
+    let canvasTask: RenderTask | null = null
+    let textTask: TextLayer | null = null
+    let cancellationStage: 'canvas' | 'text' | null = null
 
     void (async () => {
       const page = await doc.getPage(pageNumber)
@@ -574,7 +579,14 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
         // jsdom (unit tests) returns null for 2d context — real Chromium
         // renderer always has one. Guard rather than crash either way.
         if (ctx) {
-          await page.render({ canvasContext: ctx, canvas, viewport }).promise
+          canvasTask = page.render({ canvasContext: ctx, canvas, viewport })
+          try {
+            await canvasTask.promise
+          } finally {
+            // Only pending tasks may be cancelled: cancelling a completed
+            // PDF.js task can release a canvas now owned by a newer render.
+            canvasTask = null
+          }
         }
       }
       if (cancelled) return
@@ -582,26 +594,50 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
       const textLayerContainer = textLayerRef.current
       if (textLayerContainer) {
         textLayerContainer.innerHTML = ''
-        textLayerContainer.style.width = `${viewport.width}px`
-        textLayerContainer.style.height = `${viewport.height}px`
+        // PDF.js 6 TextLayer sets dimensions and font geometry through CSS
+        // variables. Include UserUnit, as PageViewport does for the canvas.
+        textLayerContainer.style.setProperty('--total-scale-factor', String(viewport.scale * viewport.userUnit))
         const textContent = await page.getTextContent()
         if (cancelled) return
-        const textLayer = new TextLayer({
+        textTask = new TextLayer({
           textContentSource: textContent,
           container: textLayerContainer,
           viewport,
         })
-        await textLayer.render()
+        try {
+          await textTask.render()
+        } finally {
+          textTask = null
+        }
         if (cancelled) return
         // Bumps the overlay-recompute effect below — the text layer's DOM
         // (needed to re-locate highlight anchors) only exists after this
         // await resolves.
         setTextLayerVersion((version) => version + 1)
       }
-    })()
+    })().catch((err: unknown) => {
+      if (
+        (cancellationStage === 'canvas' && err instanceof RenderingCancelledException) ||
+        (cancellationStage === 'text' && err instanceof AbortException && err.message === 'TextLayer task cancelled.')
+      ) return
+      console.error(`[Reader] Failed to render page ${pageNumber}:`, err)
+      if (!cancelled) {
+        const detail = err instanceof Error ? `: ${err.message}` : ''
+        setRenderError(`Could not render page ${pageNumber}${detail}. Try another page or zoom level.`)
+      }
+    })
 
     return () => {
       cancelled = true
+      if (canvasTask) {
+        cancellationStage = 'canvas'
+        // PDF.js 6.1 releases canvas ownership synchronously in cancel().
+        canvasTask.cancel()
+      }
+      if (textTask) {
+        cancellationStage = 'text'
+        textTask.cancel()
+      }
     }
   }, [doc, pageNumber, scale])
 
@@ -919,7 +955,8 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
 
         <div className={styles.pageViewport}>
           {loading ? <p className={styles.loading}>Loading…</p> : null}
-          <div className={styles.pageLayer}>
+          {renderError ? <p role="alert">{renderError}</p> : null}
+          <div className={styles.pageLayer} hidden={renderError !== null}>
             <canvas ref={canvasRef} className={styles.canvas} />
             <div
               ref={textLayerRef}

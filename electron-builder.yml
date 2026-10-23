@@ -1,0 +1,16 @@
+appId: dev.vellum.app
+productName: Vellum
+directories:
+  output: release
+files:
+  - out/**/*
+  - package.json
+extraResources:
+  # npm run dist forces an Electron rebuild before this resource is copied.
+  - from: node_modules/better-sqlite3/build/Release/better_sqlite3.node
+    to: native/better_sqlite3.node
+linux:
+  executableName: vellum
+  target:
+    - tar.gz
+  category: Education

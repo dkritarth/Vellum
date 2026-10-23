@@ -68,6 +68,80 @@ describe('ChatManager', () => {
     db.close()
   })
 
+  it('rejects a concurrent prompt before creating an ACP session or persisting its question', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const client = new FakeClient([], async () => { await gate; return new FakeSession([doneUpdate]) })
+    const manager = new ChatManager(client)
+    const { session } = manager.openChat({ db, paperSlug: slug })
+    const params = { db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'first' }
+    const first = manager.runTurn(params, () => {})
+    try {
+      expect(() => manager.runTurn({ ...params, text: 'overlap' }, () => {})).toThrow(/already.*active/i)
+      expect(manager.openChat({ db, paperSlug: slug }).messages.map((m) => m.content)).toEqual(['first'])
+      expect(client.newSessionCalls).toBe(1)
+    } finally { release(); await first }
+  })
+
+  it('snapshots streaming text, leaves other papers usable, and releases ownership on error', async () => {
+    let release!: () => void
+    let started!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const streaming = new Promise<void>((resolve) => { started = resolve })
+    const client: AcpClient = { newSession: async () => ({
+      async *prompt() {
+        yield textUpdate('Partial answer')
+        started()
+        await gate
+        yield { kind: 'error', data: { message: 'Disconnected' } }
+      },
+      async dispose() {},
+    }) }
+    const manager = new ChatManager(client)
+    const { session } = manager.openChat({ db, paperSlug: slug })
+    const running = manager.runTurn({ db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'first', requestId: 'stream-1' }, () => {})
+    await streaming
+    const snapshot = manager.openChat({ db, paperSlug: slug }).activeTurn
+    try {
+      expect(snapshot).toMatchObject({ requestId: 'stream-1', text: 'Partial answer' })
+      upsertPaper(db, { slug: 'other-paper', title: 'Other paper', authors: [], addedAt: new Date().toISOString() })
+      const other = manager.openChat({ db, paperSlug: 'other-paper' })
+      expect(other.activeTurn).toBeNull()
+      const independent = manager.runTurn({ db, chatSessionId: other.session.id, paperSlug: 'other-paper', mdPath, text: 'other' }, () => {})
+      release()
+      await independent
+    } finally { release(); await running }
+    expect(manager.openChat({ db, paperSlug: slug }).activeTurn).toBeNull()
+    expect(snapshot?.text).toBe('Partial answer')
+    expect((await manager.newChat({ db, paperSlug: slug })).id).not.toBe(session.id)
+  })
+
+  it('tracks an active turn across reopen and rejects overlap before persistence or session creation', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const client = new FakeClient([], async () => {
+      await gate
+      return new FakeSession([textUpdate('answer'), doneUpdate])
+    })
+    const manager = new ChatManager(client)
+    const { session } = manager.openChat({ db, paperSlug: slug })
+    const params = { db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'first', requestId: 'active-1' }
+    const first = manager.runTurn(params, () => {})
+    try {
+      expect(manager.openChat({ db, paperSlug: slug }).activeTurn).toMatchObject({ requestId: 'active-1', chatSessionId: session.id, text: '' })
+      expect(() => manager.runTurn({ ...params, text: 'overlap' }, () => {})).toThrow(/already.*active/i)
+      await expect(manager.newChat({ db, paperSlug: slug })).rejects.toThrow(/already.*active/i)
+      expect(manager.openChat({ db, paperSlug: slug }).messages.map((m) => m.content)).toEqual(['first'])
+      expect(client.newSessionCalls).toBe(1)
+    } finally {
+      release()
+      await first
+    }
+    expect(manager.openChat({ db, paperSlug: slug }).activeTurn).toBeNull()
+    await manager.runTurn({ ...params, text: 'next' }, () => {})
+    expect(manager.openChat({ db, paperSlug: slug }).messages.map((m) => m.content)).toEqual(['first', 'answer', 'next', 'answer'])
+  })
+
   it('streams text chunks then persists the user + assistant messages', async () => {
     const client = new FakeClient([textUpdate('The core '), textUpdate('contribution is the Transformer.'), doneUpdate])
     const manager = new ChatManager(client)

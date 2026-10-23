@@ -480,7 +480,7 @@ ipcMain.handle('vellum:ask-start', (event: IpcMainInvokeEvent, params: unknown):
 
   const backend = requireBackend(chatSession.backend, 'vellum:ask-start')
   getChatManager()
-    .runTurn({ db, chatSessionId: parsed.chatSessionId, paperSlug: parsed.slug, mdPath, text: parsed.text, backend }, send)
+    .runTurn({ requestId, db, chatSessionId: parsed.chatSessionId, paperSlug: parsed.slug, mdPath, text: parsed.text, backend }, send)
     .catch((err: unknown) => {
       send({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
     })

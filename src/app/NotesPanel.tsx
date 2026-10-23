@@ -37,6 +37,10 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
   // not a stale closure over `body`/`slug` from whenever the effect ran.
   const bodyRef = useRef('')
   const dirtyRef = useRef(false)
+  // A fresh generation distinguishes revisiting the same paper from the
+  // editor that issued an earlier request. Cleanup retires outgoing results.
+  const paperGeneration = useRef(0)
+  const editRevision = useRef(0)
   // Unlike dirtyRef, this stays true after autosave: a delayed read must
   // never replace an edit, even when that edit has already been saved.
   const editedSinceLoad = useRef(false)
@@ -54,8 +58,11 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
     }
     if (!outgoingSlug || !dirtyRef.current) return
     const pendingBody = bodyRef.current
+    const generation = paperGeneration.current
+    const revision = editRevision.current
     dirtyRef.current = false
     window.vellum.notesSave({ slug: outgoingSlug, body: pendingBody }).catch(() => {
+      if (generation !== paperGeneration.current || revision !== editRevision.current) return
       dirtyRef.current = true
       setStatus('idle')
     })
@@ -66,6 +73,7 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
   // (don't discard) whatever edit is still waiting out its debounce for the
   // paper being left.
   useEffect(() => {
+    paperGeneration.current += 1
     setStatus('idle')
     editedSinceLoad.current = false
     dirtyRef.current = false
@@ -95,6 +103,7 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
     return () => {
       cancelled = true
       flushPendingSave(slug)
+      paperGeneration.current += 1
     }
   }, [slug, flushPendingSave])
 
@@ -118,13 +127,19 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
       saveTimer.current = null
     }
     const previousBody = bodyRef.current
+    const generation = paperGeneration.current
+    const revision = ++editRevision.current
     dirtyRef.current = false
     setBody('')
     setStatus('saving')
     window.vellum
       .notesDelete(slug)
-      .then(() => setStatus('idle'))
+      .then(() => {
+        if (generation !== paperGeneration.current || revision !== editRevision.current) return
+        setStatus('idle')
+      })
       .catch(() => {
+        if (generation !== paperGeneration.current || revision !== editRevision.current) return
         setBody(previousBody)
         dirtyRef.current = true
         setStatus('idle')
@@ -151,7 +166,10 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
           setBody(next)
           bodyRef.current = next
           editedSinceLoad.current = true
+          editRevision.current += 1
           dirtyRef.current = true
+          const generation = paperGeneration.current
+          const revision = editRevision.current
 
           if (saveTimer.current) clearTimeout(saveTimer.current)
           setStatus('idle')
@@ -160,8 +178,12 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
             setStatus('saving')
             window.vellum
               .notesSave({ slug, body: next })
-              .then(() => setStatus('saved'))
+              .then(() => {
+                if (generation !== paperGeneration.current || revision !== editRevision.current) return
+                setStatus('saved')
+              })
               .catch(() => {
+                if (generation !== paperGeneration.current || revision !== editRevision.current) return
                 dirtyRef.current = true
                 setStatus('idle')
               })

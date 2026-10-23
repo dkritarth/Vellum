@@ -31,6 +31,16 @@ async function flushPromises(): Promise<void> {
   })
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (error: Error) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
+}
+
 describe('NotesPanel', () => {
   it('shows a placeholder when no paper is open', () => {
     render(<NotesPanel />)
@@ -175,6 +185,106 @@ describe('NotesPanel', () => {
     expect(textarea.value).toBe('')
   })
 
+  it('ignores a Clear rejection from an outgoing paper without saving its text under the next paper', async () => {
+    const deletion = deferred<void>()
+    notesDelete.mockReturnValueOnce(deletion.promise)
+    notesGet.mockResolvedValueOnce({ body: 'A original' }).mockResolvedValueOnce({ body: 'B original' })
+    const { rerender } = render(<NotesPanel slug="p1" />)
+    await flushPromises()
+
+    fireEvent.click(screen.getByRole('button', { name: /clear note/i }))
+    rerender(<NotesPanel slug="p2" />)
+    await flushPromises()
+    fireEvent.change(screen.getByRole('textbox', { name: /note/i }), {
+      target: { value: 'B edited' },
+    })
+    await act(async () => { deletion.reject(new Error('delete failed')) })
+
+    expect.soft(screen.getByRole('textbox', { name: /note/i })).toHaveValue('B edited')
+    rerender(<NotesPanel slug="p3" />)
+    await flushPromises()
+    expect(notesSave).toHaveBeenCalledTimes(1)
+    expect(notesSave).toHaveBeenCalledWith({ slug: 'p2', body: 'B edited' })
+  })
+
+  it.each(['resolve', 'reject'] as const)(
+    'preserves a newer saved edit when an earlier Clear finishes (%s)', async (outcome) => {
+      const deletion = deferred<void>()
+      notesDelete.mockReturnValueOnce(deletion.promise)
+      notesGet.mockResolvedValueOnce({ body: 'original' })
+      const { rerender } = render(<NotesPanel slug="p1" />)
+      await flushPromises()
+
+      fireEvent.click(screen.getByRole('button', { name: /clear note/i }))
+      fireEvent.change(screen.getByRole('textbox', { name: /note/i }), {
+        target: { value: 'newer edit' },
+      })
+      await act(async () => { vi.advanceTimersByTime(500) })
+      expect(screen.getByText('Saved')).toBeInTheDocument()
+      await act(async () => {
+        if (outcome === 'resolve') deletion.resolve()
+        else deletion.reject(new Error('delete failed'))
+      })
+
+      expect.soft(screen.getByRole('textbox', { name: /note/i })).toHaveValue('newer edit')
+      expect.soft(screen.getByText('Saved')).toBeInTheDocument()
+      rerender(<NotesPanel slug="p2" />)
+      await flushPromises()
+      expect(notesSave).toHaveBeenCalledTimes(1)
+      expect(notesSave).toHaveBeenCalledWith({ slug: 'p1', body: 'newer edit' })
+    },
+  )
+
+  it.each(['resolve', 'reject'] as const)(
+    'keeps a newer save pending when an earlier autosave finishes (%s)', async (outcome) => {
+      const olderSave = deferred<void>()
+      const newerSave = deferred<void>()
+      notesSave.mockReturnValueOnce(olderSave.promise).mockReturnValueOnce(newerSave.promise)
+      render(<NotesPanel slug="p1" />)
+      await flushPromises()
+      const editor = screen.getByRole('textbox', { name: /note/i })
+
+      fireEvent.change(editor, { target: { value: 'older edit' } })
+      await act(async () => { vi.advanceTimersByTime(500) })
+      fireEvent.change(editor, { target: { value: 'newer edit' } })
+      await act(async () => { vi.advanceTimersByTime(500) })
+      expect(screen.getByText('Saving…')).toBeInTheDocument()
+      await act(async () => {
+        if (outcome === 'resolve') olderSave.resolve()
+        else olderSave.reject(new Error('old save failed'))
+      })
+
+      expect(editor).toHaveValue('newer edit')
+      expect(screen.getByText('Saving…')).toBeInTheDocument()
+      await act(async () => { newerSave.resolve() })
+      expect(screen.getByText('Saved')).toBeInTheDocument()
+    },
+  )
+
+  it('does not dirty the active paper when an outgoing flush fails', async () => {
+    const outgoingSave = deferred<void>()
+    notesSave.mockReturnValueOnce(outgoingSave.promise)
+    const { rerender } = render(<NotesPanel slug="p1" />)
+    await flushPromises()
+    fireEvent.change(screen.getByRole('textbox', { name: /note/i }), {
+      target: { value: 'A outgoing edit' },
+    })
+    rerender(<NotesPanel slug="p2" />)
+    await flushPromises()
+    expect(notesSave).toHaveBeenCalledWith({ slug: 'p1', body: 'A outgoing edit' })
+    fireEvent.change(screen.getByRole('textbox', { name: /note/i }), {
+      target: { value: 'B saved edit' },
+    })
+    await act(async () => { vi.advanceTimersByTime(500) })
+    await act(async () => { outgoingSave.reject(new Error('flush failed')) })
+
+    expect.soft(screen.queryByText('Saved')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: /note/i })).toHaveValue('B saved edit')
+    rerender(<NotesPanel slug="p3" />)
+    await flushPromises()
+    expect(notesSave).toHaveBeenCalledTimes(2)
+  })
+
   it('disables the Clear note action when there is nothing to clear', async () => {
     notesGet.mockResolvedValue(null)
 
@@ -182,5 +292,87 @@ describe('NotesPanel', () => {
     await flushPromises()
 
     expect(screen.getByRole('button', { name: /clear note/i })).toBeDisabled()
+  })
+
+  it('restores a failed Clear for the current edit and flushes it on navigation', async () => {
+    notesGet.mockResolvedValueOnce({ body: 'keep this note' })
+    notesDelete.mockRejectedValueOnce(new Error('delete failed'))
+    const { rerender } = render(<NotesPanel slug="p1" />)
+    await flushPromises()
+    fireEvent.click(screen.getByRole('button', { name: /clear note/i }))
+    await flushPromises()
+
+    expect(screen.getByRole('textbox', { name: /note/i })).toHaveValue('keep this note')
+    expect(screen.queryByText('Saving…')).not.toBeInTheDocument()
+    rerender(<NotesPanel slug="p2" />)
+    await flushPromises()
+    expect(notesSave).toHaveBeenCalledWith({ slug: 'p1', body: 'keep this note' })
+  })
+
+  it('retries the current failed autosave through the outgoing flush', async () => {
+    notesSave.mockRejectedValueOnce(new Error('save failed'))
+    const { rerender } = render(<NotesPanel slug="p1" />)
+    await flushPromises()
+    fireEvent.change(screen.getByRole('textbox', { name: /note/i }), {
+      target: { value: 'retry this edit' },
+    })
+    await act(async () => { vi.advanceTimersByTime(500) })
+    expect(screen.queryByText('Saved')).not.toBeInTheDocument()
+    rerender(<NotesPanel slug="p2" />)
+    await flushPromises()
+    expect(notesSave).toHaveBeenCalledTimes(2)
+    expect(notesSave).toHaveBeenLastCalledWith({ slug: 'p1', body: 'retry this edit' })
+  })
+
+  it.each(['resolve', 'reject'] as const)(
+    'ignores an outgoing autosave result (%s) after returning to the same paper', async (outcome) => {
+      const olderSave = deferred<void>()
+      notesSave.mockReturnValueOnce(olderSave.promise)
+      const { rerender } = render(<NotesPanel slug="p1" />)
+      await flushPromises()
+      fireEvent.change(screen.getByRole('textbox', { name: /note/i }), {
+        target: { value: 'old visit edit' },
+      })
+      await act(async () => { vi.advanceTimersByTime(500) })
+      rerender(<NotesPanel slug="p2" />)
+      await flushPromises()
+      rerender(<NotesPanel slug="p1" />)
+      await flushPromises()
+      fireEvent.change(screen.getByRole('textbox', { name: /note/i }), {
+        target: { value: 'new visit edit' },
+      })
+      await act(async () => { vi.advanceTimersByTime(500) })
+      await act(async () => {
+        if (outcome === 'resolve') olderSave.resolve()
+        else olderSave.reject(new Error('old save failed'))
+      })
+
+      expect(screen.getByRole('textbox', { name: /note/i })).toHaveValue('new visit edit')
+      expect(screen.getByText('Saved')).toBeInTheDocument()
+      rerender(<NotesPanel slug="p2" />)
+      await flushPromises()
+      expect(notesSave).toHaveBeenCalledTimes(2)
+    },
+  )
+
+  it('ignores an old Clear failure after returning to the same paper without editing', async () => {
+    const deletion = deferred<void>()
+    notesDelete.mockReturnValueOnce(deletion.promise)
+    notesGet.mockResolvedValueOnce({ body: 'old visit note' })
+      .mockResolvedValueOnce({ body: 'B note' })
+      .mockResolvedValueOnce({ body: 'current persisted note' })
+    const { rerender } = render(<NotesPanel slug="p1" />)
+    await flushPromises()
+    fireEvent.click(screen.getByRole('button', { name: /clear note/i }))
+    rerender(<NotesPanel slug="p2" />)
+    await flushPromises()
+    rerender(<NotesPanel slug="p1" />)
+    await flushPromises()
+    await act(async () => { deletion.reject(new Error('old delete failed')) })
+
+    expect(screen.getByRole('textbox', { name: /note/i })).toHaveValue('current persisted note')
+    rerender(<NotesPanel slug="p2" />)
+    await flushPromises()
+    expect(notesSave).not.toHaveBeenCalled()
   })
 })

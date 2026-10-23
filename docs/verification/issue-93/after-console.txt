@@ -1,0 +1,3 @@
+[error] [Reader] Failed to render page 1: Error: Issue 93 injected canvas failure
+    at HTMLCanvasElement.getContext (eval at evaluate (:311:30), <anonymous>:5:13)
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-5d9664cd/out/renderer/assets/index-DvmGmnNH.js:39818:29

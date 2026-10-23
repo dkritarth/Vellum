@@ -1,0 +1,67 @@
+[
+  {
+    "label": "initial",
+    "scale": 1,
+    "width": 612,
+    "height": 792,
+    "layerWidth": 612,
+    "layerHeight": 792,
+    "x": 211.5,
+    "y": 145.9375,
+    "rangeWidth": 187.15655517578125,
+    "rangeHeight": 20,
+    "ink": 740
+  },
+  {
+    "label": "rapid-final-125",
+    "scale": 1.25,
+    "width": 765,
+    "height": 990,
+    "layerWidth": 765,
+    "layerHeight": 990,
+    "x": 264.375,
+    "y": 182.921875,
+    "rangeWidth": 234.1165771484375,
+    "rangeHeight": 24,
+    "ink": 1195
+  },
+  {
+    "label": "error-recovered",
+    "scale": 1.25,
+    "width": 765,
+    "height": 990,
+    "layerWidth": 765,
+    "layerHeight": 990,
+    "x": 264.375,
+    "y": 182.921875,
+    "rangeWidth": 234.1165771484375,
+    "rangeHeight": 24,
+    "ink": 1195
+  },
+  {
+    "label": "highlight-after-navigation",
+    "scale": 1.25,
+    "width": 765,
+    "height": 990,
+    "layerWidth": 765,
+    "layerHeight": 990,
+    "x": 264.375,
+    "y": 182.921875,
+    "rangeWidth": 234.1165771484375,
+    "rangeHeight": 24,
+    "ink": 1195
+  },
+  {
+    "label": "restart",
+    "scale": 1,
+    "width": 612,
+    "height": 792,
+    "layerWidth": 612,
+    "layerHeight": 792,
+    "x": 211.5,
+    "y": 145.9375,
+    "rangeWidth": 187.15655517578125,
+    "rangeHeight": 20,
+    "ink": 740
+  }
+]

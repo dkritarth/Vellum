@@ -21,6 +21,7 @@ import {
   Reader,
   type ReferenceIndex,
 } from './Reader'
+import { AbortException, RenderingCancelledException } from 'pdfjs-dist/legacy/build/pdf.mjs'
 
 interface FakePage {
   getViewport: () => { width: number; height: number }
@@ -50,6 +51,8 @@ function fakePdfDoc(): unknown {
 }
 
 const getDocumentMock = vi.fn()
+const textLayerRenderMock = vi.fn()
+const textLayerCancelMock = vi.fn()
 
 // TextLayer's mock actually appends one <span> per text item into the given
 // container on render() (unlike a true no-op) — [P2-02]'s highlight-capture
@@ -59,6 +62,8 @@ const getDocumentMock = vi.fn()
 // making the mock slightly more realistic doesn't affect them.
 vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
   GlobalWorkerOptions: {},
+  RenderingCancelledException: class extends Error {},
+  AbortException: class extends Error {},
   TextLayer: class {
     private readonly container: HTMLElement
     private readonly items: Array<{ str: string }>
@@ -69,6 +74,8 @@ vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
     }
 
     render(): Promise<void> {
+      const pending = textLayerRenderMock(this.container)
+      if (pending) return pending
       for (const item of this.items) {
         const span = document.createElement('span')
         span.textContent = item.str
@@ -76,6 +83,8 @@ vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
       }
       return Promise.resolve()
     }
+
+    cancel(): void { textLayerCancelMock(this.container) }
   },
   getDocument: (...args: unknown[]) => getDocumentMock(...args),
 }))
@@ -83,6 +92,8 @@ vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
 vi.mock('pdfjs-dist/legacy/build/pdf.worker.mjs?url', () => ({ default: 'worker-url' }))
 
 beforeEach(() => {
+  textLayerRenderMock.mockReset()
+  textLayerCancelMock.mockReset()
   getDocumentMock.mockReset()
   getDocumentMock.mockReturnValue({ promise: Promise.resolve(fakePdfDoc()) })
 
@@ -115,6 +126,155 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  vi.restoreAllMocks()
+})
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason: unknown) => void
+  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
+  return { promise, resolve, reject }
+}
+
+describe('Reader superseded rendering', () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+  })
+
+  it('releases the canvas before zoom/navigation reuses it and leaves final text selectable', async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({} as CanvasRenderingContext2D)
+    const tasks: Array<ReturnType<typeof deferred<void>> & { cancel: () => void }> = []
+    let canvasBusy = false
+    let overlaps = 0
+    getDocumentMock.mockReturnValue({ promise: Promise.resolve({
+      numPages: 2,
+      getOutline: async () => null,
+      getPage: async (page: number) => ({
+        getViewport: ({ scale }: { scale: number }) => ({ width: 100 * scale, height: 200 * scale, scale, userUnit: 1 }),
+        getTextContent: async () => ({ items: [{ str: PAGE_TEXT[page - 1] }] }),
+        render: () => {
+          if (canvasBusy) overlaps += 1
+          canvasBusy = true
+          const pending = deferred<void>()
+          const task = { ...pending, cancel: () => {
+            canvasBusy = false
+            pending.reject(new RenderingCancelledException('Rendering cancelled', 0))
+          } }
+          tasks.push(task)
+          return task
+        },
+      }),
+    }) })
+    const onAddToChat = vi.fn()
+    const { container, unmount } = render(<Reader slug="my-paper" onAddToChat={onAddToChat} />)
+    await waitFor(() => expect(tasks).toHaveLength(1))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '+' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '›' })) })
+    expect(tasks).toHaveLength(3)
+    expect(overlaps).toBe(0)
+    await act(async () => { canvasBusy = false; tasks[2].resolve() })
+    const textLayer = getTextLayer(container)
+    await waitFor(() => expect(textLayer).toHaveTextContent(PAGE_TEXT[1]))
+    expect(container.querySelector('canvas')).toHaveAttribute('width', '125')
+    const range = document.createRange()
+    const textNode = textLayer.querySelector('span')!.firstChild!
+    range.setStart(textNode, 0)
+    range.setEnd(textNode, PAGE_TEXT[1].length)
+    window.getSelection()!.removeAllRanges()
+    window.getSelection()!.addRange(range)
+    fireEvent.mouseUp(textLayer)
+    fireEvent.click(await screen.findByRole('button', { name: 'Add to chat' }))
+    expect(onAddToChat).toHaveBeenCalledWith(PAGE_TEXT[1], 2)
+    unmount()
+  })
+
+  it('cancels pending text writes before navigation and unmount without reporting expected cancellation', async () => {
+    const first = deferred<void>()
+    const last = deferred<void>()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    textLayerRenderMock.mockReturnValueOnce(first.promise)
+    textLayerCancelMock.mockImplementationOnce(() => first.reject(new AbortException('TextLayer task cancelled.')))
+    const { container, unmount } = render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(textLayerRenderMock).toHaveBeenCalledTimes(1))
+    fireEvent.click(screen.getByRole('button', { name: '›' }))
+    await waitFor(() => expect(getTextLayer(container)).toHaveTextContent(PAGE_TEXT[1]))
+    expect(textLayerCancelMock).toHaveBeenCalledTimes(1)
+    textLayerRenderMock.mockReturnValueOnce(last.promise)
+    textLayerCancelMock.mockImplementationOnce(() => last.reject(new AbortException('TextLayer task cancelled.')))
+    fireEvent.click(screen.getByRole('button', { name: '+' }))
+    await waitFor(() => expect(textLayerRenderMock).toHaveBeenCalledTimes(3))
+    await act(async () => unmount())
+    expect(textLayerCancelMock).toHaveBeenCalledTimes(2)
+    expect(errors).not.toHaveBeenCalled()
+  })
+
+  it('does not cancel a completed canvas task while cancelling its pending text layer', async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({} as CanvasRenderingContext2D)
+    const cancelCanvas = vi.fn()
+    const pendingText = deferred<void>()
+    textLayerRenderMock.mockReturnValueOnce(pendingText.promise)
+    textLayerCancelMock.mockImplementationOnce(() => pendingText.reject(new AbortException('TextLayer task cancelled.')))
+    getDocumentMock.mockReturnValue({ promise: Promise.resolve({
+      numPages: 1,
+      getOutline: async () => null,
+      getPage: async () => ({ ...fakePage(PAGE_TEXT[0]), render: () => ({ promise: Promise.resolve(), cancel: cancelCanvas }) }),
+    }) })
+    const { unmount } = render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(textLayerRenderMock).toHaveBeenCalledTimes(1))
+    await act(async () => unmount())
+    expect(cancelCanvas).not.toHaveBeenCalled()
+    expect(textLayerCancelMock).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['canvas', 'text'] as const)('shows an actionable %s failure and recovers on a new zoom', async (stage) => {
+    const failure = new Error('PDF drawing failed')
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    if (stage === 'text') {
+      textLayerRenderMock.mockRejectedValueOnce(failure)
+    } else {
+      vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({} as CanvasRenderingContext2D)
+      const draw = vi.fn()
+        .mockImplementationOnce(() => ({ promise: Promise.reject(failure), cancel: vi.fn() }))
+        .mockImplementation(() => ({ promise: Promise.resolve(), cancel: vi.fn() }))
+      getDocumentMock.mockReturnValue({ promise: Promise.resolve({
+        numPages: 2,
+        getOutline: async () => null,
+        getPage: async () => ({ ...fakePage(PAGE_TEXT[0]), render: draw }),
+      }) })
+    }
+    const { container } = render(<Reader slug="my-paper" />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not render page 1: PDF drawing failed. Try another page or zoom level.')
+    expect(container.querySelector('canvas')!.parentElement).not.toBeVisible()
+    expect(errors).toHaveBeenCalledWith('[Reader] Failed to render page 1:', failure)
+    fireEvent.click(screen.getByRole('button', { name: '+' }))
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+    await waitFor(() => expect(getTextLayer(container)).toHaveTextContent(PAGE_TEXT[0]))
+    expect(container.querySelector('canvas')).toBeVisible()
+  })
+
+  it('reports a genuine failure already settled when cleanup runs without replacing current page state', async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({} as CanvasRenderingContext2D)
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const pending = deferred<void>()
+    const failure = new Error('Raster failure before navigation')
+    const draw = vi.fn()
+      .mockReturnValueOnce({ promise: pending.promise, cancel: vi.fn() })
+      .mockImplementation(() => ({ promise: Promise.resolve(), cancel: vi.fn() }))
+    getDocumentMock.mockReturnValue({ promise: Promise.resolve({
+      numPages: 2,
+      getOutline: async () => null,
+      getPage: async (page: number) => ({ ...fakePage(PAGE_TEXT[page - 1]), render: draw }),
+    }) })
+    const { container } = render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(draw).toHaveBeenCalledTimes(1))
+    await act(async () => {
+      pending.reject(failure)
+      fireEvent.click(screen.getByRole('button', { name: '›' }))
+    })
+    await waitFor(() => expect(getTextLayer(container)).toHaveTextContent(PAGE_TEXT[1]))
+    expect(errors).toHaveBeenCalledWith('[Reader] Failed to render page 1:', failure)
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
 })
 
 describe('pure helpers', () => {

@@ -582,8 +582,9 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
       const textLayerContainer = textLayerRef.current
       if (textLayerContainer) {
         textLayerContainer.innerHTML = ''
-        textLayerContainer.style.width = `${viewport.width}px`
-        textLayerContainer.style.height = `${viewport.height}px`
+        // PDF.js 6 TextLayer sets dimensions and font geometry through CSS
+        // variables. Include UserUnit, as PageViewport does for the canvas.
+        textLayerContainer.style.setProperty('--total-scale-factor', String(viewport.scale * viewport.userUnit))
         const textContent = await page.getTextContent()
         if (cancelled) return
         const textLayer = new TextLayer({

@@ -20,7 +20,7 @@
     "test:gate:questions": "node test/questions-live.mjs",
     "test:gate:trash": "node test/trash-live.mjs",
     "test:gate:usage": "node test/usage-live.mjs",
-    "dist": "electron-vite build && electron-builder",
+    "dist": "electron-vite build && electron-rebuild --force --only better-sqlite3 && electron-builder --linux tar.gz --publish never",
     "test:gate:reader": "node test/reader-gate.mjs"
   },
   "dependencies": {

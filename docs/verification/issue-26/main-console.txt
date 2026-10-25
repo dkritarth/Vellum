@@ -1,0 +1,22 @@
+Issue #26 main-process console excerpts captured from the isolated detached worktree.
+Commit under test: a21d596e3fca6de7edef1e63576a8beb00183e5e
+
+UNMODIFIED PRELOAD CONTRACT
+
+Unable to load preload script: /private/tmp/vellum-issue-26-audit.ikQaIL/out/preload/index.js
+Error: Cannot find module '/private/tmp/vellum-issue-26-audit.ikQaIL/out/preload/index.js'
+
+LIBRARY AFTER TEMPORARY PRELOAD-ONLY BYPASS
+
+Error occurred in handler for 'vellum:list-papers': Error: Could not dynamically require "/private/tmp/vellum-issue-26-audit.ikQaIL/out/build/Release/better_sqlite3.node". Please configure the dynamicRequireTargets or/and ignoreDynamicRequires option of @rollup/plugin-commonjs appropriately for this require call to work.
+    at commonjsRequire (file:///private/tmp/vellum-issue-26-audit.ikQaIL/out/main/index.js:10035:9)
+    at getBinding (file:///private/tmp/vellum-issue-26-audit.ikQaIL/out/main/index.js:10063:28)
+    at new Database2 (file:///private/tmp/vellum-issue-26-audit.ikQaIL/out/main/index.js:9979:19)
+    at openDb (file:///private/tmp/vellum-issue-26-audit.ikQaIL/out/main/index.js:10159:15)
+    at getDb (file:///private/tmp/vellum-issue-26-audit.ikQaIL/out/main/index.js:10210:17)
+
+Independent verifier also observed this renderer manifestation without bypassing
+the preload defect: clicking Library emptied the page and emitted
+`TypeError: Cannot read properties of undefined (reading 'listPapers')` because
+`window.vellum` was undefined. This is attributed to issue #51, not a separate
+root defect.

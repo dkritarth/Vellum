@@ -1,5 +1,10 @@
 # #89 Linux packaged runtime verification
 
+2026-10-24 follow-up: [Debian installer, host limits, installation and rollback](linux-install.md).
+The archive evidence below remains historical evidence from 2026-10-23.
+Default installed startup remains unverified. Existing renderer `sandbox: false`
+is distinct from the Chromium-wide `--no-sandbox` flag used by this test harness.
+
 Verified 2026-10-23 on Ubuntu 24.04.4 x86_64, Node 24.19.0, npm 11.17.0,
 Electron 32.3.3 and electron-builder 25.1.8. Base: `757b5f8`.
 Worktree: `/home/dandapat/.t3/worktrees/Vellum/t3-93108480`.

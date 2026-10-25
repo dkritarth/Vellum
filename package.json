@@ -4,6 +4,7 @@
   "description": "Vellum — local-first AI paper workspace that runs on your own Claude/Codex plan via ACP. No extra API key.",
   "author": "Kritarth Dandapat",
   "license": "MIT",
+  "homepage": "https://github.com/dkritarth/Vellum",
   "main": "out/main/index.cjs",
   "type": "module",
   "scripts": {
@@ -20,7 +21,7 @@
     "test:gate:questions": "node test/questions-live.mjs",
     "test:gate:trash": "node test/trash-live.mjs",
     "test:gate:usage": "node test/usage-live.mjs",
-    "dist": "electron-vite build && electron-rebuild --force --only better-sqlite3 && electron-builder --linux tar.gz --publish never",
+    "dist": "electron-vite build && electron-rebuild --force --only better-sqlite3 && electron-builder --linux --publish never",
     "test:gate:reader": "node test/reader-gate.mjs"
   },
   "dependencies": {

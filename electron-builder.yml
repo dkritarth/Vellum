@@ -12,5 +12,7 @@ extraResources:
 linux:
   executableName: vellum
   target:
+    - deb
     - tar.gz
+  maintainer: Kritarth Dandapat <dkritarth@gmail.com>
   category: Education

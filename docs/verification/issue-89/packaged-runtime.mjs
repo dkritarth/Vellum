@@ -79,7 +79,16 @@ async function launch(name, options = {}) {
   assert.equal(await window.evaluate(() => window.vellum.ping()), 'pong')
   if (name !== 'missing-native') await window.evaluate(() => window.vellum.listPapers())
   runtime[name] = await app.evaluate(({ app }) => ({ isPackaged: app.isPackaged,
-    userData: app.getPath('userData'), cwd: process.cwd(), resourcesPath: process.resourcesPath }))
+    userData: app.getPath('userData'), cwd: process.cwd(), resourcesPath: process.resourcesPath,
+    argv: process.argv, noSandbox: app.commandLine.hasSwitch('no-sandbox'),
+    processes: app.getAppMetrics().map(({ pid, type }) => ({ pid, type })) }))
+  for (const child of runtime[name].processes) {
+    try {
+      child.argv = readFileSync(`/proc/${child.pid}/cmdline`, 'utf8').split('\0').filter(Boolean)
+    } catch (error) {
+      child.error = String(error)
+    }
+  }
   return { app, window }
 }
 
@@ -212,7 +221,7 @@ try {
     encoding: 'utf8',
   })
   runtime.defaultSandbox = { verified: false, status: sandbox.status, signal: sandbox.signal,
-    error: sandbox.error?.message, stderr: sandbox.stderr }
+    error: sandbox.error?.message, stdout: sandbox.stdout, stderr: sandbox.stderr }
   for (const entry of diagnostics.filter((entry) => entry.name !== 'missing-native')) {
     assert.deepEqual(entry.renderer, [], `Renderer errors/warnings in ${entry.name}`)
   }

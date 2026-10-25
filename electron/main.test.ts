@@ -1,4 +1,7 @@
 import { EventEmitter } from 'node:events'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 const electron = vi.hoisted(() => {
@@ -15,6 +18,8 @@ const electron = vi.hoisted(() => {
     show: vi.fn(),
     loadFile: vi.fn(),
     loadURL: vi.fn(),
+    packaged: false,
+    userData: '',
   }
 })
 
@@ -23,7 +28,9 @@ vi.mock('electron', async () => {
   const app = Object.assign(new EventEmitter(), {
     whenReady: () => electron.readyPromise,
     quit: electron.quit,
+    getPath: () => electron.userData,
   })
+  Object.defineProperty(app, 'isPackaged', { get: () => electron.packaged })
   class BrowserWindow extends EventEmitter {
     constructor() {
       super()
@@ -67,12 +74,14 @@ vi.mock('../core/store/db.js', async (importOriginal) => {
 describe('main process startup and preload contract', () => {
   beforeAll(async () => {
     vi.stubEnv('ELECTRON_RENDERER_URL', '')
+    vi.stubGlobal('process', Object.assign(Object.create(process), { resourcesPath: '/test/resources' }))
     await import('./main.js')
     await import('./preload.js')
   })
 
   afterAll(() => {
     vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
     for (const result of vi.mocked(openDb).mock.results) {
       if (result.type === 'return') result.value.close()
     }
@@ -129,6 +138,30 @@ describe('main process startup and preload contract', () => {
       expect(openDb).not.toHaveBeenCalled()
     } finally {
       electron.runHandlers = false
+    }
+  })
+
+  it('reads packaged paper files and opens SQLite under userData rather than the launch directory', async () => {
+    const profile = mkdtempSync(join(tmpdir(), 'vellum-startup-'))
+    try {
+      electron.packaged = true
+      electron.userData = profile
+      electron.runHandlers = true
+      vi.stubEnv('VELLUM_DATA_DIR', '')
+      vi.stubEnv('VELLUM_DATA_ROOT', '')
+      const paperDir = join(profile, 'data', 'papers', 'packaged-paper')
+      mkdirSync(paperDir, { recursive: true })
+      writeFileSync(join(paperDir, 'paper.pdf'), 'packaged PDF bytes')
+
+      const result = await electron.api['readPaperFile']!('packaged-paper') as ArrayBuffer | null
+      expect(result).not.toBeNull()
+      expect(Buffer.from(result!).toString()).toBe('packaged PDF bytes')
+      await expect(electron.api['listPapers']!()).resolves.toEqual([])
+      expect(openDb).toHaveBeenCalledWith({ path: join(profile, 'data', 'app.db'), nativeBinding: undefined })
+    } finally {
+      electron.packaged = false
+      electron.runHandlers = false
+      rmSync(profile, { recursive: true, force: true })
     }
   })
 

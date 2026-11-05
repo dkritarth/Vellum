@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { QuestionCategory, SuggestedQuestionRecord } from '../../core/questions/repo'
 import styles from './SuggestedQuestions.module.css'
 
@@ -33,9 +33,15 @@ export function SuggestedQuestions({
   const [questions, setQuestions] = useState<SuggestedQuestionRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Generation can take many seconds; if the user switches paper/backend
+  // meanwhile, the late response belongs to the old target and is dropped.
+  const currentTarget = useRef(`${backend}:${slug}`)
+  currentTarget.current = `${backend}:${slug}`
 
   const loadQuestions = useCallback(
     async (forceRegenerate = false) => {
+      const target = `${backend}:${slug}`
+      const isCurrent = (): boolean => currentTarget.current === target
       setLoading(true)
       setError(null)
       try {
@@ -43,17 +49,18 @@ export function SuggestedQuestions({
           ? window.vellum.questionsRegenerate
           : window.vellum.questionsGet
         const data = await fetcher(slug, backend)
-        setQuestions(data)
+        if (isCurrent()) setQuestions(data)
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : String(err))
+        if (isCurrent()) setError(err instanceof Error ? err.message : String(err))
       } finally {
-        setLoading(false)
+        if (isCurrent()) setLoading(false)
       }
     },
     [slug, backend],
   )
 
   useEffect(() => {
+    setQuestions([])
     void loadQuestions(false)
   }, [loadQuestions])
 

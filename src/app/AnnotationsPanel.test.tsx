@@ -100,4 +100,37 @@ describe('AnnotationsPanel', () => {
     expect(highlightsList).toHaveBeenCalledWith('p2')
     expect(screen.getByText(/no highlights yet/i)).toBeInTheDocument()
   })
+
+  it('ignores a slow highlight list for the previous paper after the slug changes', async () => {
+    let resolveP1: (rows: typeof HIGHLIGHTS) => void = () => undefined
+    highlightsList.mockImplementation((slug: string) =>
+      slug === 'p1'
+        ? new Promise((resolve) => {
+            resolveP1 = resolve
+          })
+        : Promise.resolve([{ ...HIGHLIGHTS[0], id: 'h9', paperSlug: 'p2', quote: 'p2 highlight' }]),
+    )
+    const { rerender } = render(<AnnotationsPanel slug="p1" />)
+    rerender(<AnnotationsPanel slug="p2" />)
+    expect(await screen.findByText('p2 highlight')).toBeInTheDocument()
+
+    await act(async () => {
+      resolveP1(HIGHLIGHTS)
+    })
+
+    expect(screen.queryByText('first highlight')).not.toBeInTheDocument()
+    expect(screen.getByText('p2 highlight')).toBeInTheDocument()
+  })
+
+  it('clears the previous paper highlights while the next paper loads', async () => {
+    highlightsList.mockImplementation((slug: string) =>
+      slug === 'p1' ? Promise.resolve(HIGHLIGHTS) : new Promise(() => undefined),
+    )
+    const { rerender } = render(<AnnotationsPanel slug="p1" />)
+    expect(await screen.findByText('first highlight')).toBeInTheDocument()
+
+    rerender(<AnnotationsPanel slug="p2" />)
+
+    expect(screen.queryByText('first highlight')).not.toBeInTheDocument()
+  })
 })

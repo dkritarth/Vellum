@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { DetailsPanel } from './DetailsPanel'
 
@@ -73,4 +73,40 @@ it('handles authorOrcids shorter than authors (defensive index access)', async (
   render(<DetailsPanel slug="p1" />)
   expect(await screen.findByRole('link', { name: 'ORCID profile for Jane Doe' })).toBeInTheDocument()
   expect(screen.getByText('John Smith')).toBeInTheDocument()
+})
+
+it('ignores a slow details response for the previous paper after the slug changes', async () => {
+  let resolveP1: (value: unknown) => void = () => undefined
+  const getPaper = vi.fn((slug: string) =>
+    slug === 'p1'
+      ? new Promise((resolve) => {
+          resolveP1 = resolve
+        })
+      : Promise.resolve({ title: 'Paper Two', authors: [], addedAt: 't' }),
+  )
+  Object.defineProperty(window, 'vellum', { configurable: true, value: { getPaper } })
+  const { rerender } = render(<DetailsPanel slug="p1" />)
+  rerender(<DetailsPanel slug="p2" />)
+  expect(await screen.findByText('Paper Two')).toBeInTheDocument()
+
+  await act(async () => {
+    resolveP1({ title: 'Paper One', authors: [], addedAt: 't' })
+  })
+
+  expect(screen.queryByText('Paper One')).not.toBeInTheDocument()
+  expect(screen.getByText('Paper Two')).toBeInTheDocument()
+})
+
+it('does not show the previous paper details while the next paper loads', async () => {
+  const getPaper = vi.fn((slug: string) =>
+    slug === 'p1' ? Promise.resolve({ title: 'Paper One', authors: [], addedAt: 't' }) : new Promise(() => undefined),
+  )
+  Object.defineProperty(window, 'vellum', { configurable: true, value: { getPaper } })
+  const { rerender } = render(<DetailsPanel slug="p1" />)
+  expect(await screen.findByText('Paper One')).toBeInTheDocument()
+
+  rerender(<DetailsPanel slug="p2" />)
+
+  expect(screen.queryByText('Paper One')).not.toBeInTheDocument()
+  expect(screen.getByText('Loading paper details…')).toBeInTheDocument()
 })

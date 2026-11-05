@@ -127,12 +127,14 @@ export function listCollections(db: Database): CollectionRecord[] {
   }))
 }
 
-/** Fetch all collections structured as a tree with paper counts. */
+/** Fetch all collections structured as a tree with direct active-paper counts. */
 export function getCollectionsTree(db: Database): CollectionTreeItem[] {
   const collections = listCollections(db)
   const countsRows = db.prepare(`
     SELECT collection_id, COUNT(paper_slug) as count
     FROM paper_collections
+    JOIN papers ON papers.slug = paper_collections.paper_slug
+    WHERE papers.trashed_at IS NULL
     GROUP BY collection_id
   `).all() as { collection_id: number; count: number }[]
 

@@ -1,0 +1,20 @@
+{
+  "channel": "vellum:collections-tree",
+  "whileFailing": {
+    "first": {
+      "count": 1,
+      "text": [
+        "Could not load collections: simulated database is locked"
+      ]
+    },
+    "after3s": {
+      "count": 1,
+      "sameNode": true,
+      "staleTreeVisible": true
+    }
+  },
+  "afterRestore": {
+    "alerts": 0,
+    "treeVisible": true
+  }
+}

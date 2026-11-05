@@ -10,9 +10,10 @@
 //
 // Session reuse: `claude-code-acp`'s session/new cold start is ~16s (see
 // core/acp/stdio-client.ts). Re-spawning per turn would tax every follow-up
-// question, so one AcpSession is cached per paper slug and reused across
-// turns until "new chat" (or the paper's tab closes — callers may call
-// `disposeAll()` on app shutdown). "New chat" always gets a genuinely fresh
+// question, so one AcpSession is cached per paper/backend for the selected
+// durable chat. Switching chats evicts the old agent conversation and recaps
+// the selected chat's history. Callers may call
+// `disposeAll()` on app shutdown. "New chat" always gets a genuinely fresh
 // agent conversation: the cached ACP session is disposed, not just the SQL
 // row swapped.
 
@@ -135,9 +136,10 @@ export interface AskStartParams {
 }
 
 export class ChatManager {
-  // Cache agent conversations by both paper and backend. A Claude session
-  // must never be reused after user switches this chat to Codex.
-  private readonly acpSessions = new Map<AcpBackend, Map<string, AcpSession>>()
+  // Paper identity, durable chat identity, and ACP conversation are distinct.
+  // Reuse requires the same backend, paper, and durable chat; a new ACP
+  // conversation receives only that chat's persisted history.
+  private readonly acpSessions = new Map<AcpBackend, Map<string, { chatSessionId: number; session: AcpSession }>>()
 
   // ACP conversations are cached per paper. Lock before any async work,
   // including session creation, and keep ownership outside the renderer.
@@ -231,7 +233,7 @@ export class ChatManager {
     let acpSession: AcpSession
     let freshlySpawned: boolean
     try {
-      ;({ session: acpSession, freshlySpawned } = await this.getOrCreateAcpSession(params.paperSlug, backend))
+      ;({ session: acpSession, freshlySpawned } = await this.getOrCreateAcpSession(params.paperSlug, backend, params.chatSessionId))
     } catch (err) {
       onEvent({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
       return
@@ -339,13 +341,16 @@ export class ChatManager {
   private async getOrCreateAcpSession(
     paperSlug: string,
     backend: AcpBackend,
+    chatSessionId: number,
   ): Promise<{ session: AcpSession; freshlySpawned: boolean }> {
-    const sessions = this.acpSessions.get(backend)
-    const cached = sessions?.get(paperSlug)
-    if (cached) return { session: cached, freshlySpawned: false }
+    const cached = this.acpSessions.get(backend)?.get(paperSlug)
+    if (cached?.chatSessionId === chatSessionId) return { session: cached.session, freshlySpawned: false }
+    if (cached) await this.disposeSession(paperSlug, backend)
     const session = await this.client.newSession(backend)
-    if (sessions) sessions.set(paperSlug, session)
-    else this.acpSessions.set(backend, new Map([[paperSlug, session]]))
+    const sessions = this.acpSessions.get(backend)
+    const entry = { chatSessionId, session }
+    if (sessions) sessions.set(paperSlug, entry)
+    else this.acpSessions.set(backend, new Map([[paperSlug, entry]]))
     return { session, freshlySpawned: true }
   }
 
@@ -355,10 +360,10 @@ export class ChatManager {
 
   private async disposeSession(paperSlug: string, backend: AcpBackend): Promise<void> {
     const sessions = this.acpSessions.get(backend)
-    const session = sessions?.get(paperSlug)
-    if (!session) return
+    const entry = sessions?.get(paperSlug)
+    if (!entry) return
     sessions?.delete(paperSlug)
     if (sessions?.size === 0) this.acpSessions.delete(backend)
-    await session.dispose().catch(() => undefined)
+    await entry.session.dispose().catch(() => undefined)
   }
 }

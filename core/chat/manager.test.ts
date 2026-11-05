@@ -219,6 +219,124 @@ describe('ChatManager', () => {
     expect(secondRequest).toContain('q2')
   })
 
+  it.each(['claude', 'codex'] as const)('isolates %s agent memory and recaps only the selected chat across A/B/A/B navigation', async (backend) => {
+    const client = new FakeClient([textUpdate('answer'), doneUpdate])
+    const manager = new ChatManager(client)
+    const a = manager.openChat({ db, paperSlug: slug, backend }).session
+    const turn = (chatSessionId: number, text: string) => manager.runTurn(
+      { db, paperSlug: slug, mdPath, chatSessionId, text, backend }, () => {},
+    )
+    await turn(a.id, 'A original')
+    const b = await manager.newChat({ db, paperSlug: slug, backend })
+    await turn(b.id, 'B original')
+    const reopenedA = manager.openChat({ db, paperSlug: slug, chatSessionId: a.id })
+    await turn(reopenedA.session.id, 'A followup')
+    const reopenedB = manager.openChat({ db, paperSlug: slug, chatSessionId: b.id })
+    await turn(reopenedB.session.id, 'B followup')
+
+    expect(client.sessions).toHaveLength(4)
+    expect(client.sessions.map((session) => session.disposed)).toEqual([true, true, true, false])
+    const aPrompt = client.sessions[2].requests[0].text
+    expect(aPrompt).toContain('User: A original')
+    expect(aPrompt).toContain('Assistant: answer')
+    expect(aPrompt).not.toContain('B original')
+    const bPrompt = client.sessions[3].requests[0].text
+    expect(bPrompt).toContain('User: B original')
+    expect(bPrompt).toContain('Assistant: answer')
+    expect(bPrompt).not.toContain('A original')
+    expect(bPrompt).not.toContain('A followup')
+    expect(manager.openChat({ db, paperSlug: slug, chatSessionId: a.id }).messages.map((m) => m.content))
+      .toEqual(['A original', 'answer', 'A followup', 'answer'])
+    expect(manager.openChat({ db, paperSlug: slug, chatSessionId: b.id }).messages.map((m) => m.content))
+      .toEqual(['B original', 'answer', 'B followup', 'answer'])
+
+    await turn(b.id, 'B again')
+    expect(client.sessions).toHaveLength(4)
+    expect(client.sessions[3].requests[1].text).not.toContain('Prior conversation')
+    await manager.disposeAll()
+    expect(client.sessions.every((session) => session.disposed)).toBe(true)
+  })
+
+  it('evicts the other chat before a failed spawn and retries with the selected history', async () => {
+    const sessions: FakeSession[] = []
+    let attempts = 0
+    const client = new FakeClient([], async () => {
+      attempts += 1
+      if (attempts === 3) {
+        throw new Error('switch spawn failed')
+      }
+      const session = new FakeSession([textUpdate('answer'), doneUpdate])
+      sessions.push(session)
+      return session
+    })
+    const manager = new ChatManager(client)
+    const a = manager.openChat({ db, paperSlug: slug }).session
+    const turn = (chatSessionId: number, text: string, onEvent = (_event: { kind: string }) => {}) => manager.runTurn(
+      { db, paperSlug: slug, mdPath, chatSessionId, text }, onEvent,
+    )
+    await turn(a.id, 'A original')
+    const b = await manager.newChat({ db, paperSlug: slug })
+    await turn(b.id, 'B original')
+    manager.openChat({ db, paperSlug: slug, chatSessionId: a.id })
+    const events: string[] = []
+    await turn(a.id, 'A failed', (event) => events.push(event.kind))
+    expect(events).toEqual(['error'])
+    expect(sessions[1].disposed).toBe(true)
+    expect(manager.openChat({ db, paperSlug: slug }).activeTurn).toBeNull()
+    await turn(a.id, 'A retry')
+    expect(attempts).toBe(4)
+    expect(sessions[1].requests).toHaveLength(1)
+    expect(sessions[2].requests[0].text).toContain('User: A original')
+    expect(sessions[2].requests[0].text).toContain('User: A failed')
+    expect(sessions[2].requests[0].text).not.toContain('B original')
+    await manager.disposeAll()
+  })
+
+  it('keeps backend conversations separate and newChat disposes both', async () => {
+    const client = new FakeClient([doneUpdate])
+    const manager = new ChatManager(client)
+    const { session } = manager.openChat({ db, paperSlug: slug })
+    for (const backend of ['claude', 'codex', 'claude'] as const) {
+      await manager.runTurn({ db, paperSlug: slug, mdPath, chatSessionId: session.id, text: backend, backend }, () => {})
+    }
+    expect(client.backends).toEqual(['claude', 'codex'])
+    expect(client.sessions.map((s) => s.requests.length)).toEqual([2, 1])
+    expect(client.sessions[1].requests[0].text).toContain('User: claude')
+    expect(client.sessions[0].requests[1].text).not.toContain('Prior conversation')
+    await manager.newChat({ db, paperSlug: slug })
+    expect(client.sessions.every((s) => s.disposed)).toBe(true)
+  })
+
+  it('holds the paper lock while switching disposes the previous conversation', async () => {
+    let release!: () => void
+    let disposing!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const started = new Promise<void>((resolve) => { disposing = resolve })
+    let attempts = 0
+    const client: AcpClient = { async newSession() {
+      attempts += 1
+      const session = new FakeSession([doneUpdate])
+      if (attempts === 2) session.dispose = async () => { disposing(); await gate; session.disposed = true }
+      return session
+    } }
+    const manager = new ChatManager(client)
+    const a = manager.openChat({ db, paperSlug: slug }).session
+    const turn = (chatSessionId: number) => manager.runTurn(
+      { db, paperSlug: slug, mdPath, chatSessionId, text: 'question' }, () => {},
+    )
+    await turn(a.id)
+    const b = await manager.newChat({ db, paperSlug: slug })
+    await turn(b.id)
+    const switching = turn(a.id)
+    await started
+    try {
+      expect(() => turn(b.id)).toThrow(/already.*active/i)
+      await expect(manager.newChat({ db, paperSlug: slug })).rejects.toThrow(/already.*active/i)
+      expect(attempts).toBe(2)
+      expect(manager.openChat({ db, paperSlug: slug, chatSessionId: b.id }).messages).toHaveLength(2)
+    } finally { release(); await switching; await manager.disposeAll() }
+  })
+
   it('reloads prior history on openChat without starting a new ACP session', async () => {
     const client = new FakeClient([textUpdate('answer'), doneUpdate])
     const manager = new ChatManager(client)

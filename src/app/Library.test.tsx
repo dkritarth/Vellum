@@ -164,4 +164,39 @@ describe('Library', () => {
       expect(screen.queryByText('Attention Is All You Need')).not.toBeInTheDocument()
     })
   })
+
+  it('shows a visible error and keeps the card when moving to Trash fails', async () => {
+    listPapers.mockResolvedValue([makePaper()])
+    const paperTrash = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new Error("Error invoking remote method 'vellum:paper-trash': Error: database is locked"),
+      )
+      .mockResolvedValue(null)
+    const collectionsForPaper = vi.fn().mockResolvedValue([])
+    Object.defineProperty(window, 'vellum', {
+      configurable: true,
+      value: { listPapers, collectionsForPaper, paperTrash },
+    })
+
+    const onTrash = vi.fn()
+    render(<Library onOpenPaper={vi.fn()} onTrashPaper={onTrash} />)
+
+    const trashBtn = await screen.findByRole('button', { name: 'Move Attention Is All You Need to trash' })
+    fireEvent.click(trashBtn)
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/could not move "Attention Is All You Need" to trash/i)
+    expect(alert).toHaveTextContent(/to trash: database is locked/i)
+    expect(alert).not.toHaveTextContent(/invoking remote method/)
+    expect(screen.getByText('Attention Is All You Need')).toBeInTheDocument()
+    expect(onTrash).not.toHaveBeenCalled()
+
+    // A successful retry clears the error.
+    fireEvent.click(trashBtn)
+    await waitFor(() => {
+      expect(onTrash).toHaveBeenCalledWith('arxiv-1706.03762')
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
+  })
 })

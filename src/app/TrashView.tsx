@@ -32,6 +32,18 @@ export function TrashView({ onBackToLibrary, onPaperRestored }: TrashViewProps):
     void loadTrash()
   }, [])
 
+  // Escape cancels the purge confirmation, like the Cancel button (which is
+  // disabled while a purge is running).
+  const confirmOpen = confirmPurgeTarget !== null
+  useEffect(() => {
+    if (!confirmOpen || purging) return
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setConfirmPurgeTarget(null)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [confirmOpen, purging])
+
   const handleRestore = async (paper: PaperRecord): Promise<void> => {
     try {
       setError(null)

@@ -94,6 +94,32 @@ describe('TrashView [L2-04]', () => {
     expect(paperPurge).not.toHaveBeenCalled()
   })
 
+  it('closes the purge confirmation when Escape is pressed', async () => {
+    render(<TrashView />)
+
+    const purgeBtn = await screen.findByRole('button', { name: 'Delete Attention Is All You Need permanently' })
+    fireEvent.click(purgeBtn)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    fireEvent.keyDown(purgeBtn, { key: 'Escape' })
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(paperPurge).not.toHaveBeenCalled()
+  })
+
+  it('keeps the purge confirmation open on Escape while the purge is running', async () => {
+    paperPurge.mockReturnValue(new Promise(() => undefined))
+    render(<TrashView />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete Attention Is All You Need permanently' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm purge' }))
+    expect(await screen.findByText('Deleting…')).toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
   it('permanently purges paper when confirmed in modal', async () => {
     render(<TrashView />)
 

@@ -66,6 +66,9 @@ function buildGroundingPreamble(mdPath: string): string {
   return [
     `You are discussing the paper at ${mdPath}. Read it with your file tools before answering.`,
     'Ground every answer in the paper itself: cite the section it comes from and quote short passages where relevant, rather than answering from general knowledge alone.',
+    'Cite each quote or number to the section where that exact text appears; the abstract is its own location.',
+    'If the paper states different values in different places (e.g. abstract vs. results), report each value with its location instead of picking one.',
+    'If the paper does not contain the answer, say so.',
   ].join('\n')
 }
 

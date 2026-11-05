@@ -113,6 +113,24 @@ describe('ChatManager', () => {
     expect(promptText).toContain('What is the core contribution?')
   })
 
+  it('the prompt text requires exact-location attribution and surfacing in-paper discrepancies (#102)', async () => {
+    const client = new FakeClient([doneUpdate])
+    const manager = new ChatManager(client)
+    const { session } = manager.openChat({ db, paperSlug: slug })
+
+    await manager.runTurn({ db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'What BLEU did it get?' }, () => {})
+
+    const promptText = (client.sessions[0]?.requests[0]?.text ?? '').toLowerCase()
+    // Each quote/number cited to where that exact text appears; abstract is its own location.
+    expect(promptText).toContain('where that exact text appears')
+    expect(promptText).toContain('abstract is its own location')
+    // Conflicting values in different places are all reported with locations.
+    expect(promptText).toContain('different values in different places')
+    expect(promptText).toContain('report each value with its location')
+    // Absent answers are admitted rather than filled from general knowledge.
+    expect(promptText).toContain('does not contain the answer, say so')
+  })
+
   it('recaps prior history into a freshly (re)spawned ACP session so a resumed chat has context', async () => {
     // First turn establishes history, then the session cache is dropped
     // (simulating an app restart) without touching the DB.

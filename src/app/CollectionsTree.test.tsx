@@ -150,6 +150,31 @@ describe('CollectionsTree [L2-01]', () => {
     expect(alert).toHaveTextContent(/Collection 1 not found/)
   })
 
+  it('shows one persistent load error while polling fails and clears it on the next successful load', async () => {
+    window.vellum.collectionsTree = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Error invoking remote method 'collections:tree': Error: database is locked"))
+      .mockRejectedValueOnce(new Error("Error invoking remote method 'collections:tree': Error: database is locked"))
+      .mockResolvedValue(mockTree) as any
+    render(<CollectionsTree selectedCollectionId={null} onSelectCollection={vi.fn()} />)
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/could not load collections/i)
+    expect(alert).toHaveTextContent('database is locked')
+    expect(alert).not.toHaveTextContent('Error invoking remote method')
+    // A failed load must not masquerade as an empty library.
+    expect(screen.queryByText(/no collections yet/i)).not.toBeInTheDocument()
+
+    // Second failing poll: still exactly one message, same DOM node (no re-mounted banner).
+    await waitFor(() => expect(window.vellum.collectionsTree).toHaveBeenCalledTimes(2), { timeout: 2500 })
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(screen.getByRole('alert')).toBe(alert)
+
+    // Next successful poll clears the message and shows the tree.
+    expect(await screen.findByText('Computer Science', {}, { timeout: 2500 })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('shows a visible error and keeps selection when deleting fails, then clears it on success', async () => {
     window.vellum.collectionsDelete = vi
       .fn()

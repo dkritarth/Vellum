@@ -18,15 +18,19 @@ export function CollectionsTree({
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editingName, setEditingName] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
+  // Polled every second: setting the same string again is a React no-op, so a
+  // persistent failure renders one stable message rather than a new one per tick.
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   async function refreshTree(): Promise<void> {
     try {
       if (window.vellum?.collectionsTree) {
         const data = await window.vellum.collectionsTree()
         setTree(data)
+        setLoadError(null)
       }
-    } catch {
-      // Fallback or quiet on error
+    } catch (err) {
+      setLoadError(`Could not load collections: ${errorMessage(err)}`)
     } finally {
       setLoading(false)
     }
@@ -296,10 +300,19 @@ export function CollectionsTree({
         </div>
       )}
 
+      {loadError && (
+        <div className={styles.actionError} role="alert">
+          <span>{loadError}</span>
+        </div>
+      )}
+
       {loading ? (
         <div className={styles.emptyTree}>Loading collections...</div>
       ) : tree.length === 0 && creatingParentId !== 'root' ? (
-        <div className={styles.emptyTree}>No collections yet. Click + to add one.</div>
+        // A failed load is not an empty library; the load error above explains it.
+        loadError ? null : (
+          <div className={styles.emptyTree}>No collections yet. Click + to add one.</div>
+        )
       ) : (
         <div className={styles.tree}>{renderTreeNodes(tree)}</div>
       )}

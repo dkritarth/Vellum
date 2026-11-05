@@ -156,6 +156,12 @@ export interface ChatSessionSummary {
   lastActiveAt: string
 }
 
+/** Escape SQLite LIKE metacharacters (`%`, `_`) plus the escape char itself
+ * so search text matches literally. Paired with `ESCAPE '\'` in the query. */
+function escapeLikeTerm(term: string): string {
+  return term.replace(/[\\%_]/g, (ch) => `\\${ch}`)
+}
+
 export interface ListChatSessionsOptions {
   search?: string
   limit?: number
@@ -201,12 +207,12 @@ export function listChatSessions(
   const params: unknown[] = []
 
   if (search && search.trim().length > 0) {
-    const pattern = `%${search.trim().toLowerCase()}%`
+    const pattern = `%${escapeLikeTerm(search.trim().toLowerCase())}%`
     conditions.push(`(
-      LOWER(COALESCE(cs.title, '')) LIKE ? OR
-      LOWER(COALESCE(p.title, '')) LIKE ? OR
-      LOWER(cs.paper_slug) LIKE ? OR
-      cs.id IN (SELECT session_id FROM chat_messages WHERE LOWER(content) LIKE ?)
+      LOWER(COALESCE(cs.title, '')) LIKE ? ESCAPE '\\' OR
+      LOWER(COALESCE(p.title, '')) LIKE ? ESCAPE '\\' OR
+      LOWER(cs.paper_slug) LIKE ? ESCAPE '\\' OR
+      cs.id IN (SELECT session_id FROM chat_messages WHERE LOWER(content) LIKE ? ESCAPE '\\')
     )`)
     params.push(pattern, pattern, pattern, pattern)
   }

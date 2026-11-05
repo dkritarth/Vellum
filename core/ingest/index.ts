@@ -14,8 +14,8 @@
 // (see index.test.ts — fake AcpClient + stubbed global fetch + a temp-file
 // SQLite DB via core/store/db.ts's openDb({ path })).
 //
-// Idempotency: location hashes distinguish PDF sources; source-identity.ts
-// safely reuses byte-matched legacy slugs without renaming research keys.
+// Idempotency: source hashes distinguish PDF locations and DOI names. Legacy
+// reconciliation uses PDF bytes or stored DOI names without renaming research keys.
 // Re-ingest updates files and metadata through the same paper slug.
 
 import { mkdir, writeFile } from 'node:fs/promises'
@@ -25,7 +25,7 @@ import type { Database } from 'better-sqlite3'
 
 import type { AcpBackend, AcpClient } from '../acp/client.js'
 import type { PaperRecord } from '../library/repo.js'
-import { upsertPaper } from '../library/repo.js'
+import { getPaper, upsertPaper } from '../library/repo.js'
 import { classifyInput } from './classify.js'
 import type { ClassifiedInput, InputKind } from './classify.js'
 import { convertPdfToMarkdown } from './convert.js'
@@ -79,6 +79,38 @@ const DEFAULT_DATA_DIR = 'data'
 
 export { classifyInput }
 
+// DOI metadata establishes identity even when publisher PDF bytes change.
+// Reuse #96's binding transaction, but never its byte-only legacy fallback:
+// distinct DOIs can legitimately serve identical PDFs.
+function resolveIngestSource(
+  input: ClassifiedInput,
+  pdfBytes: Uint8Array,
+  options: { db: Database; dataDir: string },
+): IngestPaths & { slug: string } {
+  if (input.kind !== 'doi') return resolvePaperSource(input, pdfBytes, options)
+  return options.db.transaction(() => {
+    // Keep binding lookup enabled; limit fallback to the new hash slug itself.
+    const withoutLegacyFallback = { ...input, legacySlug: input.slug }
+    const current = resolvePaperSource(withoutLegacyFallback, pdfBytes, options)
+    if (getPaper(options.db, current.slug)) return current
+    const legacy = input.legacySlug && getPaper(options.db, input.legacySlug)
+    if (!legacy || !legacy.doi || !legacy.pdfPath || !legacy.mdPath) return current
+    let sameDoi = false
+    try {
+      const stored = classifyInput(legacy.doi)
+      sameDoi = stored.kind === 'doi' && stored.value === input.value
+    } catch {
+      // Unrecognized legacy provenance cannot authorize overwriting research.
+    }
+    if (!sameDoi) return current
+    const claimed = options.db.prepare('SELECT source_id FROM paper_sources WHERE paper_slug = ?')
+      .get(legacy.slug)
+    if (claimed) return current
+    recordPaperSource(options.db, input, legacy.slug)
+    return resolvePaperSource(withoutLegacyFallback, pdfBytes, options)
+  }).immediate()
+}
+
 /**
  * Ingest a paper end-to-end: classify -> fetch -> convert -> extract -> write
  * files + DB row. See module comment for the idempotency guarantee.
@@ -93,7 +125,7 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
   // fetched.pdfBytes stays intact for the paper.pdf write below.
   const markdown = await convertPdfToMarkdown(fetched.pdfBytes.slice())
 
-  const { slug, pdfPath, mdPath } = resolvePaperSource(classified, fetched.pdfBytes, {
+  const { slug, pdfPath, mdPath } = resolveIngestSource(classified, fetched.pdfBytes, {
     db: options.db, dataDir,
   })
   await Promise.all([

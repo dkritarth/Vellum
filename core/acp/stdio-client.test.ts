@@ -80,6 +80,27 @@ rl.on('line', (line) => {
       setTimeout(sendChunk, 30)
       return
     }
+    // 'echo-stream' streams three chunks tagged with this prompt's own text,
+    // spaced 30ms apart, so overlapping turns are distinguishable on the wire.
+    if (mode === 'echo-stream') {
+      const tag = msg.params.prompt[0].text
+      let i = 0
+      const sendChunk = () => {
+        i++
+        send({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: msg.params.sessionId,
+            update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: tag + '-' + i } },
+          },
+        })
+        if (i < 3) setTimeout(sendChunk, 30)
+        else send({ jsonrpc: '2.0', id: msg.id, result: { stopReason: 'end_turn' } })
+      }
+      setTimeout(sendChunk, 30)
+      return
+    }
     if (mode === 'prompt-error') {
       send({ jsonrpc: '2.0', id: msg.id, error: { code: -32000, message: 'boom' } })
       return
@@ -261,6 +282,61 @@ describe('StdioAcpClient', () => {
       await session.dispose()
     }
   })
+
+  it('keeps overlapping prompt() calls on one session from stealing each other\'s updates', async () => {
+    // A second Ask on the same paper can start while the first is still
+    // streaming (e.g. the Ask panel remounts and re-enables its input). Each
+    // turn must receive only its own updates and its own terminal `done`.
+    const client = new StdioAcpClient(spawnFakeAgent('echo-stream'))
+    const session = await client.newSession('codex')
+    try {
+      const first = collect(session.prompt({ text: 'first' }))
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      const second = collect(session.prompt({ text: 'second' }))
+      const texts = (updates: AcpUpdate[]): string[] =>
+        updates.filter((u) => u.kind === 'text').map((u) => (u.data as { text: string }).text)
+
+      const [firstUpdates, secondUpdates] = await Promise.all([first, second])
+
+      expect(texts(firstUpdates)).toEqual(['first-1', 'first-2', 'first-3'])
+      expect(firstUpdates.at(-1)).toEqual({ kind: 'done', data: { stopReason: 'end_turn' } })
+      expect(texts(secondUpdates)).toEqual(['second-1', 'second-2', 'second-3'])
+      expect(secondUpdates.at(-1)).toEqual({ kind: 'done', data: { stopReason: 'end_turn' } })
+    } finally {
+      await session.dispose()
+    }
+  })
+
+  it('does not let a queued prompt\'s idle timer run while an earlier turn is still streaming', async () => {
+    // Idle budget 60ms; each turn streams for ~90ms with 30ms gaps. A second
+    // turn waiting behind the first must not start its idle clock (and kill
+    // the adapter) before it has actually been sent.
+    const client = new StdioAcpClient(spawnFakeAgent('echo-stream'), { turnMs: 60 })
+    const session = await client.newSession('codex')
+    try {
+      const [firstUpdates, secondUpdates] = await Promise.all([
+        collect(session.prompt({ text: 'first' })),
+        collect(session.prompt({ text: 'second' })),
+      ])
+      expect(firstUpdates.at(-1)).toEqual({ kind: 'done', data: { stopReason: 'end_turn' } })
+      expect(secondUpdates.at(-1)).toEqual({ kind: 'done', data: { stopReason: 'end_turn' } })
+    } finally {
+      await session.dispose()
+    }
+  })
+
+  it('releases a prompt queued behind a stalled turn when the session is disposed', async () => {
+    const client = new StdioAcpClient(spawnFakeAgent('stall'), { turnMs: 30_000 })
+    const session = await client.newSession('codex')
+    const first = collect(session.prompt({ text: 'first' }))
+    const second = collect(session.prompt({ text: 'second' }))
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    await session.dispose()
+
+    expect(await second).toEqual([{ kind: 'error', data: { message: 'session disposed' } }])
+    await first
+  }, 10_000)
 
   it('fails newSession() via the handshake timeout when the adapter never answers initialize', async () => {
     let child: AdapterChildProcess | undefined

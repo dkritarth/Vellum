@@ -100,23 +100,23 @@ function parseArxivAtom(xml: string, arxivId: string): RawMetadata {
   }
 
   const authors = [...entry.matchAll(/<author>\s*<name>([\s\S]*?)<\/name>/g)].map((m) =>
-    normalizeWhitespace(m[1]),
+    decodeXmlText(m[1]),
   )
 
   const published = extractTag(entry, 'published')
   const year = published ? Number.parseInt(published.slice(0, 4), 10) : undefined
 
   const venueMatch = entry.match(/<arxiv:journal_ref>([\s\S]*?)<\/arxiv:journal_ref>/)
-  const venue = venueMatch ? normalizeWhitespace(venueMatch[1]) : undefined
+  const venue = venueMatch ? decodeXmlText(venueMatch[1]) : undefined
 
   const abstract = extractTag(entry, 'summary')
 
   return {
-    title: normalizeWhitespace(title),
+    title: decodeXmlText(title),
     authors,
     year: year !== undefined && Number.isFinite(year) ? year : undefined,
     venue,
-    abstract: abstract ? normalizeWhitespace(abstract) : undefined,
+    abstract: abstract ? decodeXmlText(abstract) : undefined,
   }
 }
 
@@ -127,6 +127,31 @@ function extractTag(xml: string, tag: string): string | undefined {
 
 function normalizeWhitespace(s: string): string {
   return s.replace(/\s+/g, ' ').trim()
+}
+
+// Decode extracted field text in one pass so escaped markup stays text and
+// replacement ampersands cannot trigger a second round of entity expansion.
+function decodeXmlText(s: string): string {
+  const decoded = s.replace(/&(amp|lt|gt|apos|quot|#\d+|#x[\da-fA-F]+);/g, (reference, entity: string) => {
+    switch (entity) {
+      case 'amp': return '&'
+      case 'lt': return '<'
+      case 'gt': return '>'
+      case 'apos': return "'"
+      case 'quot': return '"'
+    }
+    const codePoint = entity.startsWith('#x')
+      ? Number.parseInt(entity.slice(2), 16)
+      : Number.parseInt(entity.slice(1), 10)
+    // XML 1.0 Char production, including legal but discouraged characters:
+    // https://www.w3.org/TR/REC-xml/#NT-Char (CharRef: #NT-CharRef).
+    const valid = codePoint === 0x9 || codePoint === 0xA || codePoint === 0xD ||
+      (codePoint >= 0x20 && codePoint <= 0xD7FF) ||
+      (codePoint >= 0xE000 && codePoint <= 0xFFFD) ||
+      (codePoint >= 0x10000 && codePoint <= 0x10FFFF)
+    return valid ? String.fromCodePoint(codePoint) : reference
+  })
+  return normalizeWhitespace(decoded)
 }
 
 async function fetchArxivPdf(arxivId: string, options?: FetchPdfOptions): Promise<Uint8Array> {

@@ -269,6 +269,111 @@ describe('ingest', () => {
     }
   })
 
+  it('keeps colliding DOI files and research separate through equivalent re-ingest and restart', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-doi-collision-'))
+    const dbPath = join(tmpDir, 'app.db')
+    let db = openDb({ path: dbPath })
+    const alphaBytes = readFileSync(FIXTURE_PDF)
+    const betaBytes = Buffer.concat([alphaBytes, Buffer.from('\n% Second DOI source\n')])
+    const clientFor = (title: string) => new FakeClient([textUpdate(JSON.stringify({
+      sections: [], metadata: { title, authors: [title + ' author'] },
+    })), doneUpdate])
+    try {
+      stubCrossrefFetch(alphaBytes)
+      const alpha = await ingest('10.1234/foo/bar', { db, dataDir: tmpDir, client: clientFor('Alpha DOI') })
+      upsertNote(db, alpha.slug, 'Alpha DOI research')
+      const alphaChat = createChatSession(db, { paperSlug: alpha.slug, backend: 'codex' })
+      addChatMessage(db, { sessionId: alphaChat.id, role: 'user', content: 'Alpha DOI question' })
+      const alphaMarkdown = readFileSync(alpha.paths.mdPath)
+      stubCrossrefFetch(betaBytes)
+      const beta = await ingest('10.1234/foo-bar', { db, dataDir: tmpDir, client: clientFor('Beta DOI') })
+      expect(beta.slug).not.toBe(alpha.slug)
+      upsertNote(db, beta.slug, 'Beta DOI research')
+      const betaChat = createChatSession(db, { paperSlug: beta.slug, backend: 'codex' })
+      addChatMessage(db, { sessionId: betaChat.id, role: 'user', content: 'Beta DOI question' })
+      expect(readFileSync(alpha.paths.pdfPath)).toEqual(alphaBytes)
+      expect(readFileSync(alpha.paths.mdPath)).toEqual(alphaMarkdown)
+      expect(readFileSync(beta.paths.pdfPath)).toEqual(betaBytes)
+      db.close()
+      db = openDb({ path: dbPath })
+      const repeated = await ingest('https://doi.org/10.1234/FOO-BAR', {
+        db, dataDir: tmpDir, client: clientFor('Beta DOI refreshed'),
+      })
+      expect(repeated.slug).toBe(beta.slug)
+      expect(repeated.paths).toEqual(beta.paths)
+      expect(listPapers(db)).toHaveLength(2)
+      expect(getPaper(db, alpha.slug)?.title).toBe('Alpha DOI')
+      expect(getPaper(db, beta.slug)?.title).toBe('Beta DOI refreshed')
+      expect(getPaper(db, beta.slug)?.doi).toBe('10.1234/foo-bar')
+      expect(getNote(db, alpha.slug)?.body).toBe('Alpha DOI research')
+      expect(getNote(db, beta.slug)?.body).toBe('Beta DOI research')
+      expect(getChatMessages(db, alphaChat.id).map(message => message.content)).toEqual(['Alpha DOI question'])
+      expect(getChatMessages(db, betaChat.id).map(message => message.content)).toEqual(['Beta DOI question'])
+      expect(readFileSync(alpha.paths.pdfPath)).toEqual(alphaBytes)
+      expect(readFileSync(alpha.paths.mdPath)).toEqual(alphaMarkdown)
+    } finally {
+      db.close()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it.each([
+    { storedDoi: '10.1234/FOO/BAR', matches: true },
+    { storedDoi: 'https://dx.doi.org/10.1234/FOO%2FBAR', matches: true },
+    { storedDoi: '10.1234/foo-bar', matches: false },
+    { storedDoi: undefined, matches: false },
+  ])('reconciles legacy DOI $storedDoi by identity while preserving research across restart', async ({ storedDoi, matches }) => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-doi-legacy-'))
+    const slug = 'doi-10.1234-foo-bar'
+    const paperDir = join(tmpDir, 'papers', slug)
+    mkdirSync(paperDir, { recursive: true })
+    const pdfPath = join(paperDir, 'paper.pdf')
+    const mdPath = join(paperDir, 'paper.md')
+    const oldBytes = readFileSync(FIXTURE_PDF)
+    writeFileSync(pdfPath, oldBytes)
+    writeFileSync(mdPath, '# Legacy DOI paper')
+    const dbPath = join(tmpDir, 'app.db')
+    const oldDb = new Database(dbPath)
+    runMigrations(oldDb, MIGRATIONS.filter(migration => migration.version <= 8))
+    upsertPaper(oldDb, { slug, title: 'Legacy DOI', authors: [], doi: storedDoi,
+      pdfPath, mdPath, addedAt: '2025-01-01T00:00:00Z' })
+    upsertNote(oldDb, slug, 'Legacy DOI research')
+    oldDb.close()
+    let db = openDb({ path: dbPath })
+    // Matching DOI may return updated bytes; conflicting DOI may serve identical
+    // bytes. Neither content comparison nor the old slug establishes DOI identity.
+    const incoming = matches ? Buffer.concat([oldBytes, Buffer.from('\n% Updated DOI PDF\n')]) : oldBytes
+    stubCrossrefFetch(incoming)
+    const client = new FakeClient([textUpdate(AGENT_JSON), doneUpdate])
+    try {
+      const chat = createChatSession(db, { paperSlug: slug, backend: 'codex' })
+      addChatMessage(db, { sessionId: chat.id, role: 'user', content: 'Legacy DOI question' })
+      const first = await ingest('10.1234/foo/bar', { db, dataDir: tmpDir, client })
+      if (matches) {
+        expect(first.slug).toBe(slug)
+        expect(first.paths).toEqual({ pdfPath, mdPath })
+        expect(readFileSync(pdfPath)).toEqual(incoming)
+      } else {
+        expect(first.slug).not.toBe(slug)
+        expect(getPaper(db, slug)?.title).toBe('Legacy DOI')
+        expect(readFileSync(pdfPath)).toEqual(oldBytes)
+        expect(readFileSync(mdPath, 'utf8')).toBe('# Legacy DOI paper')
+        expect(getNote(db, first.slug)).toBeUndefined()
+        expect(getLatestChatSession(db, first.slug)).toBeUndefined()
+      }
+      db.close()
+      db = openDb({ path: dbPath })
+      const repeated = await ingest('http://dx.doi.org/10.1234/FOO%2FBAR', { db, dataDir: tmpDir, client })
+      expect(repeated.slug).toBe(first.slug)
+      expect(listPapers(db)).toHaveLength(matches ? 1 : 2)
+      expect(getNote(db, slug)?.body).toBe('Legacy DOI research')
+      expect(getChatMessages(db, chat.id).map(message => message.content)).toEqual(['Legacy DOI question'])
+    } finally {
+      db.close()
+      vi.unstubAllGlobals()
+    }
+  })
+
   // Shared Crossref fixture for the authorOrcids alignment tests below.
   const CROSSREF_ORCID_BODY = JSON.stringify({
     message: {

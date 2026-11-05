@@ -43,11 +43,11 @@ function slugify(raw: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
-// Source identity is location, not PDF content: changing bytes at the same
-// location remains a re-ingest. Retain query parameters; fragments are not sent
-// to the server. Keep the full digest and cap the display prefix for safe paths.
-function pdfInput(kind: 'pdf_url' | 'local_pdf', name: string, value: string): ClassifiedInput {
-  const legacySlug = `${kind === 'pdf_url' ? 'pdf' : 'local'}-${slugify(name)}`
+// Identity uses the DOI name or PDF location, never PDF content. Changing
+// bytes remains a re-ingest. PDF URLs retain queries and omit fragments.
+// Keep the full digest and cap the display prefix for safe paths.
+function sourceInput(kind: 'doi' | 'pdf_url' | 'local_pdf', name: string, value: string): ClassifiedInput {
+  const legacySlug = `${kind === 'pdf_url' ? 'pdf' : kind === 'doi' ? 'doi' : 'local'}-${slugify(name)}`
   const digest = createHash('sha256').update(kind + ':' + value).digest('hex')
   return { kind, value, slug: `${legacySlug.slice(0, 80)}-${digest}`, legacySlug }
 }
@@ -68,12 +68,12 @@ export function classifyInput(raw: string): ClassifiedInput {
   }
 
   const doiUrlMatch = trimmed.match(DOI_URL_RE)
-  if (doiUrlMatch) {
-    const doi = decodeURIComponent(doiUrlMatch[2])
-    return { kind: 'doi', slug: `doi-${slugify(doi)}`, value: doi }
-  }
-  if (DOI_BARE_RE.test(trimmed)) {
-    return { kind: 'doi', slug: `doi-${slugify(trimmed)}`, value: trimmed }
+  const doiName = doiUrlMatch ? decodeURIComponent(doiUrlMatch[2]) : trimmed
+  if (DOI_BARE_RE.test(doiName)) {
+    // DOI case folding applies to ASCII letters; URL escaping is transport-only.
+    // https://www.crossref.org/documentation/member-setup/constructing-your-dois/
+    const doi = doiName.replace(/[A-Z]/g, char => char.toLowerCase())
+    return sourceInput('doi', doi, doi)
   }
 
   if (/^https?:\/\//i.test(trimmed)) {
@@ -82,7 +82,7 @@ export function classifyInput(raw: string): ClassifiedInput {
       const base = parsed.pathname.split('/').filter(Boolean).pop() ?? parsed.pathname
       const name = base.replace(/\.pdf$/i, '')
       parsed.hash = ''
-      return pdfInput('pdf_url', name, parsed.href)
+      return sourceInput('pdf_url', name, parsed.href)
     }
     throw new Error(`classifyInput: unrecognized URL (not arXiv, DOI, or .pdf): ${trimmed}`)
   }
@@ -97,7 +97,7 @@ export function classifyInput(raw: string): ClassifiedInput {
     const path = resolve(trimmed)
     const base = basename(path)
     const name = base.replace(/\.pdf$/i, '')
-    return pdfInput('local_pdf', name, path)
+    return sourceInput('local_pdf', name, path)
   }
 
   throw new Error(`classifyInput: unrecognized input: ${trimmed}`)

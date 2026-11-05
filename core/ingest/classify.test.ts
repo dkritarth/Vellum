@@ -64,21 +64,21 @@ describe('classifyInput', () => {
       name: 'bare DOI',
       input: () => '10.1038/s41586-021-03819-2',
       kind: 'doi',
-      slug: 'doi-10.1038-s41586-021-03819-2',
+      slug: /^doi-10\.1038-s41586-021-03819-2-[a-f0-9]{64}$/,
       value: '10.1038/s41586-021-03819-2',
     },
     {
       name: 'doi.org URL',
       input: () => 'https://doi.org/10.1038/s41586-021-03819-2',
       kind: 'doi',
-      slug: 'doi-10.1038-s41586-021-03819-2',
+      slug: /^doi-10\.1038-s41586-021-03819-2-[a-f0-9]{64}$/,
       value: '10.1038/s41586-021-03819-2',
     },
     {
       name: 'dx.doi.org URL',
       input: () => 'https://dx.doi.org/10.1145/3292500.3330701',
       kind: 'doi',
-      slug: 'doi-10.1145-3292500.3330701',
+      slug: /^doi-10\.1145-3292500\.3330701-[a-f0-9]{64}$/,
       value: '10.1145/3292500.3330701',
     },
     {
@@ -102,6 +102,19 @@ describe('classifyInput', () => {
     else expect(result.slug).toMatch(slug)
     if (value !== undefined) {
       expect(result.value).toBe(value)
+    }
+  })
+
+  it('keeps colliding DOI punctuation distinct with bounded stable identities', () => {
+    const slash = classifyInput('10.1234/foo/bar')
+    const hyphen = classifyInput('10.1234/foo-bar')
+    expect(slash.slug).not.toBe(hyphen.slug)
+    expect(slash.legacySlug).toBe('doi-10.1234-foo-bar')
+    expect(hyphen.legacySlug).toBe(slash.legacySlug)
+    expect(classifyInput('10.1234/' + 'a'.repeat(1000)).slug.length).toBeLessThanOrEqual(145)
+    for (const equivalent of ['10.1234/FOO/BAR', 'https://doi.org/10.1234/foo/bar',
+      'http://dx.doi.org/10.1234/FOO%2FBAR']) {
+      expect(classifyInput(equivalent)).toEqual(slash)
     }
   })
 

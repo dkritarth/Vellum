@@ -103,7 +103,7 @@ update kinds, and terminal stop reason. Adapter diagnostics remain on stderr.
 If a service rollout selects a model newer than the installed adapter runtime,
 set `VELLUM_CODEX_MODEL` to a model supported by that runtime while upgrading
 the adapter. The value goes directly to the first-party adapter as
-`-c model=<value>` without a shell or alternate authentication path:
+`-c model="<value>"` (JSON-quoted) without a shell or alternate authentication path:
 
 ```bash
 VELLUM_CODEX_MODEL=gpt-5.5 npm run smoke:acp -- codex

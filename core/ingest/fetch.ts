@@ -54,7 +54,8 @@ export interface FetchedSource {
 }
 
 export interface FetchPdfOptions {
-  /** Maximum time in milliseconds before aborting the request. Defaults to 30,000ms. */
+  /** Maximum time in milliseconds before aborting the request. Defaults to
+   * 30,000ms. Each arXiv/Crossref metadata request gets the same budget. */
   timeoutMs?: number
   /** Maximum bytes allowed for the PDF. Defaults to 52,428,800 (50 MB). */
   maxBytes?: number
@@ -74,14 +75,35 @@ const ARXIV_API = 'https://export.arxiv.org/api/query'
 const ARXIV_PDF_BASE = 'https://export.arxiv.org/pdf'
 const CROSSREF_API = 'https://api.crossref.org/works'
 
-async function fetchArxivMetadata(arxivId: string): Promise<RawMetadata> {
+// Metadata hosts are fixed (arXiv, Crossref), so they skip the SSRF check, but
+// a server that accepts the connection and never answers would otherwise hang
+// ingest indefinitely. The signal covers both headers and body.
+async function withTimeout<T>(
+  label: string,
+  timeoutMs: number,
+  run: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const signal = AbortSignal.timeout(timeoutMs)
+  try {
+    return await run(signal)
+  } catch (err: unknown) {
+    if (signal.aborted) {
+      throw new Error(`${label} request timed out after ${timeoutMs}ms`)
+    }
+    throw err
+  }
+}
+
+async function fetchArxivMetadata(arxivId: string, timeoutMs: number): Promise<RawMetadata> {
   const idNoVersion = arxivId.replace(/v\d+$/, '')
   const url = `${ARXIV_API}?id_list=${encodeURIComponent(idNoVersion)}`
-  const res = await fetch(url)
-  if (!res.ok) {
-    throw new Error(`arXiv API request failed: ${res.status} ${res.statusText}`)
-  }
-  const xml = await res.text()
+  const xml = await withTimeout('arXiv API', timeoutMs, async (signal) => {
+    const res = await fetch(url, { signal })
+    if (!res.ok) {
+      throw new Error(`arXiv API request failed: ${res.status} ${res.statusText}`)
+    }
+    return res.text()
+  })
   return parseArxivAtom(xml, arxivId)
 }
 
@@ -156,12 +178,14 @@ function normalizeOrcid(value: unknown): string | null {
   return /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/.test(stripped) ? stripped : null
 }
 
-async function fetchCrossrefMetadata(doi: string): Promise<RawMetadata> {
-  const res = await fetch(`${CROSSREF_API}/${encodeURIComponent(doi)}`)
-  if (!res.ok) {
-    throw new Error(`Crossref API request failed: ${res.status} ${res.statusText}`)
-  }
-  const body = (await res.json()) as CrossrefWork
+async function fetchCrossrefMetadata(doi: string, timeoutMs: number): Promise<RawMetadata> {
+  const body = await withTimeout('Crossref API', timeoutMs, async (signal) => {
+    const res = await fetch(`${CROSSREF_API}/${encodeURIComponent(doi)}`, { signal })
+    if (!res.ok) {
+      throw new Error(`Crossref API request failed: ${res.status} ${res.statusText}`)
+    }
+    return (await res.json()) as CrossrefWork
+  })
   const work = body.message
 
   const title = work.title?.[0]
@@ -315,16 +339,17 @@ export async function fetchSource(
   input: ClassifiedInput,
   options?: FetchPdfOptions,
 ): Promise<FetchedSource> {
+  const metadataTimeoutMs = options?.timeoutMs ?? DEFAULT_PDF_TIMEOUT_MS
   switch (input.kind) {
     case 'arxiv': {
       const [pdfBytes, metadata] = await Promise.all([
         fetchArxivPdf(input.value, options),
-        fetchArxivMetadata(input.value),
+        fetchArxivMetadata(input.value, metadataTimeoutMs),
       ])
       return { pdfBytes, metadata }
     }
     case 'doi': {
-      const metadata = await fetchCrossrefMetadata(input.value)
+      const metadata = await fetchCrossrefMetadata(input.value, metadataTimeoutMs)
       const pdfBytes = await fetchPdfFromUrl(`https://doi.org/${input.value}`, 'DOI PDF', options)
       return { pdfBytes, metadata }
     }

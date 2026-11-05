@@ -197,6 +197,38 @@ describe('fetchSource', () => {
     const input: ClassifiedInput = { kind: 'doi', slug: 'doi-x', value: '10.1/doesnotexist' }
     await expect(fetchSource(input)).rejects.toThrow(/Crossref/)
   })
+
+  // A metadata server that accepts the connection but never answers must not
+  // hang ingest forever: metadata requests honor the same timeout as the PDF.
+  function hangUntilAborted(_url: string, init?: RequestInit): Promise<Response> {
+    return new Promise((_resolve, reject) => {
+      const signal = init?.signal
+      if (!signal) return // no signal: hang forever (the bug)
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+    })
+  }
+
+  it('times out a hung Crossref metadata request', { timeout: 2000 }, async () => {
+    fetchMock.mockImplementation(hangUntilAborted)
+    const input: ClassifiedInput = { kind: 'doi', slug: 'doi-hang', value: '10.1/hang' }
+    await expect(fetchSource(input, { timeoutMs: 50 })).rejects.toThrow(/Crossref.*timed out after 50ms/)
+  })
+
+  it('times out a hung arXiv metadata request', { timeout: 2000 }, async () => {
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url.startsWith('https://export.arxiv.org/pdf/')) {
+        return Promise.resolve(new Response(new Uint8Array([1, 2, 3]), { status: 200 }))
+      }
+      return hangUntilAborted(url, init)
+    })
+    const input: ClassifiedInput = { kind: 'arxiv', slug: 'arxiv-2401.00001', value: '2401.00001' }
+    await expect(
+      fetchSource(input, {
+        timeoutMs: 50,
+        lookup: async () => [{ address: '93.184.216.34', family: 4 }],
+      }),
+    ).rejects.toThrow(/arXiv API.*timed out after 50ms/)
+  })
 })
 
 describe('fetchPdfFromUrl security and resource limits', () => {

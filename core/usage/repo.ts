@@ -90,6 +90,9 @@ function rowToRecord(row: UsageRow): UsageRecord {
 /**
  * Persist or update telemetry for a prompt turn.
  * Uses ON CONFLICT(session_id, turn_index) to prevent double-counting retries.
+ * NULL session_id never conflicts (SQLite treats NULLs as distinct in UNIQUE),
+ * so the written row is read back via RETURNING rather than re-selected by
+ * (session_id, turn_index), which could return an older sessionless row.
  * Privacy rule: strictly stores numeric telemetry and metadata; zero prompt content.
  */
 export function recordTurnUsage(
@@ -121,9 +124,10 @@ export function recordTurnUsage(
       cost_currency = excluded.cost_currency,
       has_metrics = excluded.has_metrics,
       recorded_at = excluded.recorded_at
+    RETURNING *
   `)
 
-  stmt.run({
+  const row = stmt.get({
     sessionId: record.sessionId ?? null,
     backend: record.backend,
     model: record.model ?? null,
@@ -140,13 +144,7 @@ export function recordTurnUsage(
     costCurrency: record.costCurrency ?? 'USD',
     hasMetrics: record.hasMetrics ? 1 : 0,
     recordedAt: record.recordedAt,
-  })
-
-  const row = db
-    .prepare(
-      'SELECT * FROM usage_records WHERE session_id IS ? AND turn_index = ?',
-    )
-    .get(record.sessionId ?? null, record.turnIndex) as UsageRow | undefined
+  }) as UsageRow | undefined
 
   if (!row) {
     throw new Error('Failed to retrieve recorded usage row')

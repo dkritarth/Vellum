@@ -23,6 +23,16 @@ export function isValidSlug(slug: unknown): slug is string {
  */
 export function assertValidSlug(slug: unknown): asserts slug is string {
   if (!isValidSlug(slug)) {
-    throw new Error(`Invalid slug format: ${slug}`)
+    throw new Error(`Invalid slug format: ${describeValue(slug)}`)
+  }
+}
+
+// Input is `unknown`, so building the message must not itself throw
+// (template literals throw on Symbols and null-prototype objects).
+function describeValue(value: unknown): string {
+  try {
+    return String(value)
+  } catch {
+    return Object.prototype.toString.call(value)
   }
 }

@@ -17,8 +17,15 @@ interface PaperDetails {
 export function DetailsPanel({ slug }: { slug?: string }): JSX.Element {
   const [paper, setPaper] = useState<PaperDetails | null>(null)
   useEffect(() => {
-    if (!slug) { setPaper(null); return }
-    window.vellum.getPaper(slug).then((result) => setPaper(result)).catch(() => setPaper(null))
+    setPaper(null)
+    if (!slug) return
+    // Drop responses for a paper the user has already switched away from.
+    let current = true
+    window.vellum
+      .getPaper(slug)
+      .then((result) => { if (current) setPaper(result) })
+      .catch(() => { if (current) setPaper(null) })
+    return () => { current = false }
   }, [slug])
   if (!slug) return <p className={styles.placeholder}>No paper open — metadata will show here.</p>
   if (!paper) return <p className={styles.placeholder}>Loading paper details…</p>

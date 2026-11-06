@@ -1,0 +1,35 @@
+
+ RUN  v2.1.9 /home/dandapat/.t3/worktrees/Vellum/t3-2fbce516
+
+stdout | src/app/App.annotation-delete.test.tsx > removes the rendered Reader overlay when its annotation is deleted
+stored rows 0 rendered overlays 1
+
+ ❯ src/app/App.annotation-delete.test.tsx (2 tests | 1 failed) 371ms
+   × removes the rendered Reader overlay when its annotation is deleted 261ms
+     → expected <div …(2)></div> to have a length of +0 but got 1
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/app/App.annotation-delete.test.tsx > removes the rendered Reader overlay when its annotation is deleted
+AssertionError: expected <div …(2)></div> to have a length of +0 but got 1
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ src/app/App.annotation-delete.test.tsx:117:64
+    115|  expect(records).toHaveLength(0)
+    116|  console.log('stored rows',records.length,'rendered overlays',document…
+    117|  expect(document.querySelectorAll('[class*="highlightRect"]')).toHaveL…
+       |                                                                ^
+    118| })
+    119|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  14:55:21
+   Duration  1.65s (transform 390ms, setup 0ms, collect 613ms, tests 371ms, environment 353ms, prepare 83ms)

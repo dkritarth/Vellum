@@ -417,6 +417,8 @@ interface ReaderProps {
    * re-jumping to the same target (clicked twice in a row) re-trigger the
    * effect even though `page`/`highlightId` didn't change. */
   jumpTarget?: { page: number; highlightId: string; nonce: number } | null
+  /** Active paper invalidation count after a persisted highlight change. */
+  highlightsRevision?: number
   /** Successful persisted creation, scoped to the originating paper. Never sent on failure. */
   onHighlightCreated?: (paperSlug: string) => void
   /** [R1-05] Callback when user clicks 'Add to chat' on selected text */
@@ -435,7 +437,7 @@ interface ActiveSelection {
   anchor: { start: number; end: number }
 }
 
-export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain, onHighlightCreated }: ReaderProps): JSX.Element {
+export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain, onHighlightCreated, highlightsRevision = 0 }: ReaderProps): JSX.Element {
   const [activeSelection, setActiveSelection] = useState<ActiveSelection | null>(null)
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [numPages, setNumPages] = useState(0)
@@ -450,6 +452,10 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
   const [searchIndex, setSearchIndex] = useState(0)
   const [searching, setSearching] = useState(false)
   const [highlights, setHighlights] = useState<HighlightRecord[]>([])
+  // Each refresh owns its result. Local creations also retire outstanding reads.
+  const highlightRequest = useRef(0)
+  const currentSlug = useRef(slug)
+  currentSlug.current = slug
   const [textLayerVersion, setTextLayerVersion] = useState(0)
   const [overlays, setOverlays] = useState<OverlayRect[]>([])
   const [flashId, setFlashId] = useState<string | null>(null)
@@ -531,19 +537,26 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
       }
     })()
 
-    void window.vellum
-      .highlightsList(slug)
-      .then((records) => {
-        if (!cancelled) setHighlights(records)
-      })
-      .catch(() => {
-        if (!cancelled) setHighlights([])
-      })
-
     return () => {
       cancelled = true
     }
   }, [slug])
+
+  useEffect(() => {
+    const version = ++highlightRequest.current
+    if (!slug) return
+    const isCurrent = () => currentSlug.current === slug && highlightRequest.current === version
+    void window.vellum
+      .highlightsList(slug)
+      .then((records) => {
+        if (isCurrent()) setHighlights(records)
+      })
+      .catch(() => {
+        if (isCurrent()) setHighlights([])
+      })
+
+    return () => { highlightRequest.current += 1 }
+  }, [slug, highlightsRevision])
 
   // Jump seam: drive the reader to a highlight's page and flash it briefly.
   // Fires on every `jumpTarget` change (the caller bumps `nonce` so clicking
@@ -713,7 +726,10 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
         .highlightsCreate({ slug, page, color, quote, anchor: JSON.stringify(anchor) })
         .then((record) => {
           onHighlightCreated?.(record.paperSlug)
-          setHighlights((current) => [...current, record])
+          if (currentSlug.current === record.paperSlug) {
+            highlightRequest.current += 1
+            setHighlights((current) => [...current, record])
+          }
           selection.removeAllRanges()
           setActiveSelection(null)
         })
@@ -739,7 +755,10 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
       .highlightsCreate({ slug, page, color, quote, anchor: JSON.stringify(anchor) })
       .then((record) => {
         onHighlightCreated?.(record.paperSlug)
-        setHighlights((current) => [...current, record])
+        if (currentSlug.current === record.paperSlug) {
+          highlightRequest.current += 1
+          setHighlights((current) => [...current, record])
+        }
         window.getSelection()?.removeAllRanges()
         setActiveSelection(null)
       })

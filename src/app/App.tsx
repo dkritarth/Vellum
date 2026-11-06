@@ -129,7 +129,7 @@ export function App(): JSX.Element {
     setJumpTarget({ page: highlight.page, highlightId: highlight.id, nonce: Date.now() })
   }
 
-  function handleHighlightCreated(paperSlug: string): void {
+  function handleHighlightsChanged(paperSlug: string): void {
     setHighlightRevisions((current) => ({ ...current, [paperSlug]: (current[paperSlug] ?? 0) + 1 }))
   }
 
@@ -190,7 +190,8 @@ export function App(): JSX.Element {
                 slug={activeTabId ?? undefined}
                 highlightTool={{ active: highlightActive, color: highlightColor }}
                 jumpTarget={jumpTarget}
-                onHighlightCreated={handleHighlightCreated}
+                onHighlightCreated={handleHighlightsChanged}
+                highlightsRevision={activeTabId ? highlightRevisions[activeTabId] ?? 0 : 0}
                 onAddToChat={handleAddToChat}
                 onExplain={handleExplain}
               />
@@ -202,6 +203,7 @@ export function App(): JSX.Element {
           activeTab={rightPanelTab}
           onTabChange={setRightPanelTab}
           onJumpToHighlight={jumpToHighlight}
+          onHighlightDeleted={handleHighlightsChanged}
           highlightsRevision={activeTabId ? highlightRevisions[activeTabId] ?? 0 : 0}
           injectedPrompt={injectedPrompt}
           targetSessionId={selectedChatSessionId}

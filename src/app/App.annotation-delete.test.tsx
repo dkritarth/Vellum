@@ -204,8 +204,8 @@ it.each(['success', 'failure'])('ignores obsolete refresh %s after subsequent de
   await act(async () => {})
   const oldRecords = [...records]
   list.mockImplementation(read)
-  // Old list stays visible while refresh waits. Delete remaining saved record.
-  fireEvent.click(within(annotations()).getAllByRole('button', { name: /Delete highlight/ })[1])
+  // Persisted deletion is removed immediately while refresh waits. Delete remaining saved record.
+  fireEvent.click(within(annotations()).getAllByRole('button', { name: /Delete highlight/ })[0])
   await within(annotations()).findByText(/No highlights yet/)
   await waitFor(() => expect(document.querySelectorAll('[class*="highlightRect"]')).toHaveLength(0))
   await act(async () => { for (const request of pending) {
@@ -260,4 +260,27 @@ it('keeps current overlays when an outgoing creation completes', async () => {
   expect(document.querySelector('[class*="highlightRect"]')).toHaveStyle({ background: 'blue' })
   fireEvent.click(screen.getByRole('tab', { name: 'Research Paper A' }))
   await waitFor(() => expect(document.querySelector('[class*="highlightRect"]')).toHaveStyle({ background: 'pink' }))
+})
+
+it('keeps failed deletion in storage/list/Reader until explicit retry succeeds', async () => {
+  render(<App />)
+  await openPaper()
+  await openAnnotations()
+  await saveHighlight()
+  await saveHighlight('green')
+  const saved = [...records]
+  const original = window.vellum.highlightsDelete
+  const remove = vi.fn().mockRejectedValueOnce(new Error('injected delete failure')).mockImplementation(original)
+  window.vellum.highlightsDelete = remove
+  fireEvent.click(within(annotations()).getAllByRole('button', { name: /Delete highlight:/ })[0])
+  await within(annotations()).findByRole('alert')
+  expect(records).toEqual(saved)
+  expect(document.querySelectorAll('[class*="highlightRect"]')).toHaveLength(2)
+  expect(within(annotations()).getAllByRole('button', { name: /Delete highlight:/ })).toHaveLength(2)
+  fireEvent.click(within(annotations()).getByRole('button', { name: /Retry deleting highlight:/ }))
+  await waitFor(() => expect(document.querySelectorAll('[class*="highlightRect"]')).toHaveLength(1))
+  expect(remove.mock.calls).toEqual([[saved[0].id], [saved[0].id]])
+  expect(records).toEqual([saved[1]])
+  expect(document.querySelector('[class*="highlightRect"]')).toHaveStyle({ background: 'green' })
+  expect(within(annotations()).queryByRole('alert')).not.toBeInTheDocument()
 })

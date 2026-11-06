@@ -53,6 +53,7 @@ interface AskPanelProps {
 
 export function AskPanel({ slug, injectedPrompt, targetSessionId, deletedSessionIds }: AskPanelProps): JSX.Element {
   const [deletionRevision, setDeletionRevision] = useState(0)
+  const [loadRevision, setLoadRevision] = useState(0)
   // Durable IDs are never reused. Keep tombstones across Ask tab remounts.
   const deletedIds = useRef(deletedSessionIds)
   deletedIds.current = deletedSessionIds
@@ -194,7 +195,7 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId, deletedSession
       queuedUpdates.current = []
       awaitingRequest.current = false
     }
-  }, [slug, targetSessionId, deletionRevision, replayUpdates])
+  }, [slug, targetSessionId, deletionRevision, loadRevision, replayUpdates])
 
   const sendTurn = useCallback(async (prompt?: string) => {
     const text = (prompt ?? input).trim()
@@ -284,9 +285,16 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId, deletedSession
 
       <div className={styles.thread} aria-live="polite">
         {loadError ? (
-          <p className={styles.error} role="alert">
-            Could not load chat: {loadError}
-          </p>
+          <>
+            <p className={styles.error} role="alert">
+              Could not load chat: {loadError}
+            </p>
+            <button type="button" className={styles.newChatButton} onClick={() => setLoadRevision((revision) => revision + 1)}>
+              Retry
+            </button>
+          </>
+        ) : sessionId === null ? (
+          <p className={styles.placeholder} role="status">Loading chat…</p>
         ) : messages.length === 0 ? (
           <p className={styles.placeholder}>Ask a question about this paper.</p>
         ) : (

@@ -356,6 +356,32 @@ describe('chat navigation ownership', () => {
     expect(window.vellum.askOpen).toHaveBeenLastCalledWith({ slug: 'paper-a', sessionId: 1 })
   })
 
+  it.each(['missing', 'rejected'] as const)('can dismiss current %s error by keyboard without losing the displayed draft, then retry', async (outcome) => {
+    const { user, chat } = await setup()
+    await user.click(chat(2))
+    await user.type(screen.getByLabelText('Ask a question'), 'Preserved draft')
+    const pending = deferred()
+    vi.mocked(window.vellum.getPaper).mockReturnValueOnce(pending.promise)
+    await user.click(chat(1))
+    await act(async () => outcome === 'missing' ? pending.resolve(null) : pending.reject(new Error('current failure')))
+
+    const dismiss = screen.getByRole('button', { name: 'Dismiss chat navigation error' })
+    // Follow the actual focus order from the failed chat selection.
+    for (let i = 0; i < 40 && document.activeElement !== dismiss; i++) await user.tab()
+    expect(dismiss).toHaveFocus()
+    await user.keyboard('{Enter}')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(chat(2)).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Paper B' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByLabelText('Ask a question')).toHaveValue('Preserved draft')
+    expect(window.vellum.askOpen).toHaveBeenCalledTimes(1)
+
+    await user.click(chat(1))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(chat(1)).toHaveAttribute('aria-selected', 'true')
+    expect(window.vellum.askOpen).toHaveBeenLastCalledWith({ slug: 'paper-a', sessionId: 1 })
+  })
+
   it.each(['success', 'missing', 'rejected'] as const)('does not resurrect deleted pending target on %s', async (outcome) => {
     const { user, chat } = await setup()
     await user.click(chat(2))

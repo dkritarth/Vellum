@@ -96,7 +96,7 @@ beforeEach(() => {
   textLayerRenderMock.mockReset()
   textLayerCancelMock.mockReset()
   getDocumentMock.mockReset()
-  getDocumentMock.mockReturnValue({ promise: Promise.resolve(fakePdfDoc()) })
+  getDocumentMock.mockReturnValue({ destroy: vi.fn(async () => {}), promise: Promise.resolve(fakePdfDoc()) })
 
   // jsdom implements Element.getBoundingClientRect (zero rect) but doesn't
   // implement Range.prototype.getClientRects at all — Reader's highlight
@@ -147,7 +147,7 @@ describe('Reader superseded rendering', () => {
     const tasks: Array<ReturnType<typeof deferred<void>> & { cancel: () => void }> = []
     let canvasBusy = false
     let overlaps = 0
-    getDocumentMock.mockReturnValue({ promise: Promise.resolve({
+    getDocumentMock.mockReturnValue({ destroy: vi.fn(async () => {}), promise: Promise.resolve({
       numPages: 2,
       getOutline: async () => null,
       getPage: async (page: number) => ({
@@ -215,7 +215,7 @@ describe('Reader superseded rendering', () => {
     const pendingText = deferred<void>()
     textLayerRenderMock.mockReturnValueOnce(pendingText.promise)
     textLayerCancelMock.mockImplementationOnce(() => pendingText.reject(new AbortException('TextLayer task cancelled.')))
-    getDocumentMock.mockReturnValue({ promise: Promise.resolve({
+    getDocumentMock.mockReturnValue({ destroy: vi.fn(async () => {}), promise: Promise.resolve({
       numPages: 1,
       getOutline: async () => null,
       getPage: async () => ({ ...fakePage(PAGE_TEXT[0]), render: () => ({ promise: Promise.resolve(), cancel: cancelCanvas }) }),
@@ -237,7 +237,7 @@ describe('Reader superseded rendering', () => {
       const draw = vi.fn()
         .mockImplementationOnce(() => ({ promise: Promise.reject(failure), cancel: vi.fn() }))
         .mockImplementation(() => ({ promise: Promise.resolve(), cancel: vi.fn() }))
-      getDocumentMock.mockReturnValue({ promise: Promise.resolve({
+      getDocumentMock.mockReturnValue({ destroy: vi.fn(async () => {}), promise: Promise.resolve({
         numPages: 2,
         getOutline: async () => null,
         getPage: async () => ({ ...fakePage(PAGE_TEXT[0]), render: draw }),
@@ -261,7 +261,7 @@ describe('Reader superseded rendering', () => {
     const draw = vi.fn()
       .mockReturnValueOnce({ promise: pending.promise, cancel: vi.fn() })
       .mockImplementation(() => ({ promise: Promise.resolve(), cancel: vi.fn() }))
-    getDocumentMock.mockReturnValue({ promise: Promise.resolve({
+    getDocumentMock.mockReturnValue({ destroy: vi.fn(async () => {}), promise: Promise.resolve({
       numPages: 2,
       getOutline: async () => null,
       getPage: async (page: number) => ({ ...fakePage(PAGE_TEXT[page - 1]), render: draw }),
@@ -754,7 +754,7 @@ async function findCitationMarker(container: HTMLElement, number: number): Promi
 
 describe('Reader inline citation click-through [P2-03]', () => {
   it('renders a resolved [n] marker as a clickable button and jumps to its reference page on click', async () => {
-    getDocumentMock.mockReturnValue({ promise: Promise.resolve(citationPdfDoc()) })
+    getDocumentMock.mockReturnValue({ destroy: vi.fn(async () => {}), promise: Promise.resolve(citationPdfDoc()) })
     const user = userEvent.setup()
 
     const { container } = render(<Reader slug="my-paper" />)
@@ -769,7 +769,7 @@ describe('Reader inline citation click-through [P2-03]', () => {
   })
 
   it('shows the reference text in a tooltip on hover', async () => {
-    getDocumentMock.mockReturnValue({ promise: Promise.resolve(citationPdfDoc()) })
+    getDocumentMock.mockReturnValue({ destroy: vi.fn(async () => {}), promise: Promise.resolve(citationPdfDoc()) })
 
     const { container } = render(<Reader slug="my-paper" />)
     await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2'))
@@ -782,7 +782,7 @@ describe('Reader inline citation click-through [P2-03]', () => {
   })
 
   it('leaves [n] markers as plain text when no references section is found (feature stays inert, no crash)', async () => {
-    getDocumentMock.mockReturnValue({ promise: Promise.resolve(noReferencesPdfDoc()) })
+    getDocumentMock.mockReturnValue({ destroy: vi.fn(async () => {}), promise: Promise.resolve(noReferencesPdfDoc()) })
 
     const { container } = render(<Reader slug="my-paper" />)
     await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 1'))
@@ -803,7 +803,7 @@ describe('Reader highlight overlay + citation marker interaction [P2-02 x P2-03]
     // button) nodes — `rangeFromAnchor`'s character-offset walk over the
     // container's text nodes must still land on the same characters
     // afterwards, since total text content is unchanged, just re-split.
-    getDocumentMock.mockReturnValue({ promise: Promise.resolve(citationPdfDoc()) })
+    getDocumentMock.mockReturnValue({ destroy: vi.fn(async () => {}), promise: Promise.resolve(citationPdfDoc()) })
     const highlight = {
       id: 'h1',
       paperSlug: 'my-paper',
@@ -894,7 +894,7 @@ describe('Reader paper ownership', () => {
     expect(await screen.findByRole('button', { name: 'Add to chat' })).toBeVisible()
 
     window.vellum.readPaperFile = vi.fn().mockReturnValue(read.promise)
-    getDocumentMock.mockReturnValue({ promise: documentReady.promise })
+    getDocumentMock.mockReturnValue({ destroy: vi.fn(async () => {}), promise: documentReady.promise })
     let firstCommit: { outgoing: boolean; text: string; actions: number } | undefined
     function ObserveCommit() {
       useLayoutEffect(() => {
@@ -973,6 +973,7 @@ describe('Reader stale paper completions', () => {
         return slug === 'a' ? bytesA : bytesB
       })
       getDocumentMock.mockImplementation(({ data }: { data: ArrayBuffer }) => ({
+        destroy: vi.fn(async () => {}),
         promise: (async () => {
           if (data === bytesA && stage === 'document') { reached(); await pending.promise }
           return data === bytesA ? aDoc : fakePdfDoc()
@@ -1002,4 +1003,168 @@ describe('Reader stale paper completions', () => {
       if (stage === 'text') expect(textLayerCancelMock).toHaveBeenCalled()
     },
   )
+})
+
+describe('Reader document disposal', () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+  })
+
+  it.each(['replace', 'unmount'] as const)('aborts a pending load on %s and consumes load and destroy rejections', async (action) => {
+    const pending = deferred<unknown>()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const destroy = vi.fn(async () => {
+      pending.reject(new Error('Loading aborted'))
+      throw new Error('Worker teardown rejected')
+    })
+    getDocumentMock.mockReturnValueOnce({ promise: pending.promise, destroy })
+    const { container, rerender, unmount } = render(<Reader slug="a" />)
+    await waitFor(() => expect(getDocumentMock).toHaveBeenCalledOnce())
+    expect(screen.getByText('Loading…')).toBeVisible()
+    if (action === 'replace') {
+      rerender(<Reader slug="b" />)
+      await waitFor(() => expect(getTextLayer(container)).toHaveTextContent(PAGE_TEXT[0]))
+      expect(screen.queryByText('Could not open this PDF.')).toBeNull()
+    }
+    await act(async () => unmount())
+    expect(destroy).toHaveBeenCalledOnce()
+    expect(errors).not.toHaveBeenCalled()
+    // Vitest also fails this test if either rejected promise is unhandled.
+  })
+
+  it('retains a useful current load error, disposes its failed task, and recovers on another paper', async () => {
+    const failure = new Error('Invalid PDF structure')
+    const destroy = vi.fn(async () => {})
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    getDocumentMock.mockImplementationOnce(() => ({ promise: Promise.reject(failure), destroy }))
+    const { container, rerender, unmount } = render(<Reader slug="broken" />)
+    expect(await screen.findByText('Could not open this PDF.')).toBeVisible()
+    expect(errors).toHaveBeenCalledWith('[Reader] Failed to load PDF:', failure)
+    expect(destroy).not.toHaveBeenCalled()
+    rerender(<Reader slug="good" />)
+    await waitFor(() => expect(getTextLayer(container)).toHaveTextContent(PAGE_TEXT[0]))
+    expect(destroy).toHaveBeenCalledOnce()
+    expect(screen.queryByText('Could not open this PDF.')).toBeNull()
+    unmount()
+    expect(destroy).toHaveBeenCalledOnce()
+  })
+
+  it('consumes document teardown rejection during an active search', async () => {
+    const pending = deferred<never>()
+    const reached = vi.fn()
+    let holdSearch = false
+    const pdf = {
+      numPages: 1,
+      getOutline: async () => null,
+      getPage: async () => ({ ...fakePage('Searchable A'), getTextContent: () => {
+        if (holdSearch) { reached(); return pending.promise }
+        return Promise.resolve({ items: [{ str: 'Searchable A' }] })
+      } }),
+    }
+    const destroy = vi.fn(async () => { pending.reject(new Error('Search transport destroyed')) })
+    getDocumentMock.mockReturnValueOnce({ promise: Promise.resolve(pdf), destroy })
+    const { container, rerender, unmount } = render(<Reader slug="a" />)
+    await waitFor(() => expect(getTextLayer(container)).toHaveTextContent('Searchable A'))
+    holdSearch = true
+    fireEvent.change(screen.getByLabelText('Search in document'), { target: { value: 'Searchable' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(reached).toHaveBeenCalled())
+    rerender(<Reader slug="b" />)
+    await waitFor(() => expect(getTextLayer(container)).toHaveTextContent(PAGE_TEXT[0]))
+    expect(destroy).toHaveBeenCalledOnce()
+    expect(screen.getByRole('button', { name: 'Search' })).toBeEnabled()
+    expect(screen.queryByLabelText('Search matches')).toBeNull()
+    unmount()
+    // An unhandled rejection from the submitted search fails this test run.
+  })
+
+  it('creates no loading task after an abandoned file read resolves', async () => {
+    const read = deferred<ArrayBuffer>()
+    window.vellum.readPaperFile = vi.fn().mockReturnValueOnce(read.promise).mockResolvedValue(new ArrayBuffer(8))
+    const { container, rerender, unmount } = render(<Reader slug="a" />)
+    expect(getDocumentMock).not.toHaveBeenCalled()
+    rerender(<Reader slug="b" />)
+    await waitFor(() => expect(getTextLayer(container)).toHaveTextContent(PAGE_TEXT[0]))
+    await act(async () => read.resolve(new ArrayBuffer(8)))
+    expect(getDocumentMock).toHaveBeenCalledOnce()
+    unmount()
+  })
+
+  it('disposes every owner across rapid switches, including loads that resolve after replacement', async () => {
+    const owners: Array<{ promise: Promise<unknown>; destroy: ReturnType<typeof vi.fn>; resolve: (value: unknown) => void }> = []
+    getDocumentMock.mockImplementation(() => {
+      const pending = deferred<unknown>()
+      const owner = { ...pending, destroy: vi.fn(async () => {}) }
+      owners.push(owner)
+      return owner
+    })
+    const { container, rerender, unmount } = render(<Reader slug="a" />)
+    for (const [index, slug] of ['b', 'a', 'b'].entries()) {
+      await waitFor(() => expect(owners).toHaveLength(index + 1))
+      rerender(<Reader slug={slug} />)
+    }
+    await waitFor(() => expect(owners).toHaveLength(4))
+    await act(async () => owners[3].resolve(fakePdfDoc()))
+    await waitFor(() => expect(getTextLayer(container)).toHaveTextContent(PAGE_TEXT[0]))
+    const currentCanvas = container.querySelector('canvas')
+    await act(async () => {
+      for (const owner of owners.slice(0, 3)) owner.resolve({ ...(fakePdfDoc() as object), getOutline: async () => [{ title: 'Stale A', dest: null, items: [] }] })
+    })
+    expect(container.querySelector('canvas')).toBe(currentCanvas)
+    expect(getTextLayer(container)).toHaveTextContent(PAGE_TEXT[0])
+    expect(screen.queryByText('Stale A')).toBeNull()
+    for (const owner of owners.slice(0, 3)) expect(owner.destroy).toHaveBeenCalledOnce()
+    expect(owners[3].destroy).not.toHaveBeenCalled()
+    unmount()
+    for (const owner of owners) expect(owner.destroy).toHaveBeenCalledOnce()
+  })
+
+  it.each(['outline', 'text'] as const)('keeps teardown-induced %s failures out of current-paper errors and logs', async (stage) => {
+    const pending = deferred<never>()
+    const reached = vi.fn()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const pdf = {
+      numPages: 1,
+      getOutline: () => {
+        if (stage === 'outline') { reached(); return pending.promise }
+        return Promise.resolve(null)
+      },
+      getPage: async () => ({ ...fakePage('Old A'), getTextContent: () => {
+        reached()
+        return pending.promise
+      } }),
+    }
+    const destroy = vi.fn(async () => { pending.reject(new Error('Transport destroyed')) })
+    getDocumentMock.mockReturnValueOnce({ promise: Promise.resolve(pdf), destroy })
+    const { container, rerender, unmount } = render(<Reader slug="a" />)
+    await waitFor(() => expect(reached).toHaveBeenCalled())
+    rerender(<Reader slug="b" />)
+    await waitFor(() => expect(getTextLayer(container)).toHaveTextContent(PAGE_TEXT[0]))
+    expect(errors).not.toHaveBeenCalled()
+    expect(destroy).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByText('Could not open this PDF.')).toBeNull()
+    unmount()
+  })
+
+  it('releases each ready document owner once on replacement and unmount', async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+    const destroyA = vi.fn(async () => {})
+    const destroyB = vi.fn(async () => {})
+    const proxyDestroy = vi.fn(async () => {})
+    getDocumentMock
+      .mockReturnValueOnce({ promise: Promise.resolve({ ...(fakePdfDoc() as object), destroy: proxyDestroy }), destroy: destroyA })
+      .mockReturnValueOnce({ promise: Promise.resolve(fakePdfDoc()), destroy: destroyB })
+    const { container, rerender, unmount } = render(<Reader slug="a" />)
+    await waitFor(() => expect(getTextLayer(container)).toHaveTextContent(PAGE_TEXT[0]))
+    rerender(<Reader slug="b" />)
+    await waitFor(() => expect(getTextLayer(container)).toHaveTextContent(PAGE_TEXT[0]))
+    expect(destroyA).toHaveBeenCalledOnce()
+    expect(destroyB).not.toHaveBeenCalled()
+    unmount()
+    expect(destroyB).toHaveBeenCalledOnce()
+    expect(destroyA).toHaveBeenCalledOnce()
+    // Loading task owns proxy/worker disposal; Reader must not double-destroy.
+    expect(proxyDestroy).not.toHaveBeenCalled()
+  })
 })

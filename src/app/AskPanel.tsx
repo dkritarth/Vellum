@@ -73,7 +73,8 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId, deletedSession
   const awaitingRequest = useRef(false)
   const queuedUpdates = useRef<AskUpdatePayload[]>([])
   const lastSequence = useRef(0)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const composing = useRef(false)
   const lastHandledNonce = useRef<number | null>(null)
 
   // Restore main-process ownership on open. Queue updates during IPC calls
@@ -320,14 +321,24 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId, deletedSession
           void sendTurn()
         }}
       >
-        <input
+        <textarea
           ref={inputRef}
-          type="text"
+          rows={3}
           className={styles.textInput}
           placeholder="Ask a question about this paper…"
           aria-label="Ask a question"
           value={input}
           onChange={(event) => setInput(event.target.value)}
+          onCompositionStart={() => { composing.current = true }}
+          onCompositionEnd={() => { composing.current = false }}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || event.shiftKey) return
+            // Composition may end before its commit keydown in some engines;
+            // keyCode 229 still identifies that IME event.
+            if (composing.current || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
+            event.preventDefault()
+            if (!disabled && !event.repeat) event.currentTarget.form?.requestSubmit()
+          }}
           disabled={disabled}
         />
         <button type="submit" className={styles.sendButton} disabled={disabled || !input.trim()}>

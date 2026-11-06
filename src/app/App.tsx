@@ -1,7 +1,7 @@
 import { TrashView } from './TrashView.js'
 import { UsageView } from './UsageView.js'
 import type { ChatSessionSummary } from '../../core/chat/repo'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { IngestModal } from './IngestModal'
 import { Library } from './Library'
 import { Reader } from './Reader'
@@ -53,26 +53,44 @@ export function App(): JSX.Element {
   const [deletedSessionIds, setDeletedSessionIds] = useState<readonly number[]>([])
   const [chatBanner, setChatBanner] = useState<string | null>(null)
 
+  // App owns navigation. A lookup may commit only while its request is current.
+  const chatNavigation = useRef<{ sessionId: number } | null>(null)
+
   async function handleSelectChatSession(session: ChatSessionSummary): Promise<void> {
-    setSelectedChatSessionId(session.id)
+    if (deletedSessionIds.includes(session.id)) return
+    const request = { sessionId: session.id }
+    chatNavigation.current = request
     try {
       const paper = await window.vellum.getPaper(session.paperSlug)
+      if (chatNavigation.current !== request) return
       if (paper) {
         setChatBanner(null)
         openPaper({ slug: paper.slug, title: paper.title })
+        setSelectedChatSessionId(session.id)
         setRightPanelTab('Ask')
       } else {
         setChatBanner(`Chat "${session.title}" references paper "${session.paperSlug}" which was not found in your library.`)
       }
     } catch {
+      if (chatNavigation.current !== request) return
       setChatBanner(`Could not load paper for chat "${session.title}".`)
     }
+  }
+
+  function navigateView(next: typeof view): void {
+    chatNavigation.current = null
+    setView(next)
+  }
+
+  function handleSessionDeleted(id: number): void {
+    if (chatNavigation.current?.sessionId === id) chatNavigation.current = null
+    setDeletedSessionIds((ids) => [...ids, id])
   }
 
   function handleSelectCollection(id: number | null, name: string | null): void {
     setSelectedCollectionId(id)
     setSelectedCollectionName(name)
-    setView('library')
+    navigateView('library')
   }
 
   function handleAddToChat(quote: string, page: number): void {
@@ -103,20 +121,22 @@ export function App(): JSX.Element {
 
   function openPaper(paper: { slug: string; title: string }): void {
     setTabs((current) => (current.some((tab) => tab.id === paper.slug) ? current : [...current, { id: paper.slug, title: paper.title }]))
+    if (paper.slug !== activeTabId) setSelectedChatSessionId(null)
     setActiveTabId(paper.slug)
-    setView('reader')
+    navigateView('reader')
   }
 
   function selectTab(id: string): void {
+    if (id !== activeTabId) setSelectedChatSessionId(null)
     setActiveTabId(id)
-    setView('reader')
+    navigateView('reader')
   }
 
   function handleNavChange(item: NavItem): void {
     if (item === 'Create') {
       setIsIngestOpen(true)
     } else {
-      setView(item === 'Library' ? 'library' : 'reader')
+      navigateView(item === 'Library' ? 'library' : 'reader')
     }
   }
 
@@ -138,9 +158,9 @@ export function App(): JSX.Element {
           onSelectCollection={handleSelectCollection}
           selectedSessionId={selectedChatSessionId}
           onSelectSession={handleSelectChatSession}
-          onSessionDeleted={(id) => setDeletedSessionIds((ids) => [...ids, id])}
-          onSelectTrash={() => setView('trash')}
-          onSelectUsage={() => setView('usage')}
+          onSessionDeleted={handleSessionDeleted}
+          onSelectTrash={() => navigateView('trash')}
+          onSelectUsage={() => navigateView('usage')}
         />
         <main className={styles.centerPane} aria-label="Paper view">
           {chatBanner && (
@@ -151,11 +171,11 @@ export function App(): JSX.Element {
           )}
           {view === 'trash' ? (
             <TrashView
-              onBackToLibrary={() => setView('library')}
+              onBackToLibrary={() => navigateView('library')}
             />
           ) : view === 'usage' ? (
             <UsageView
-              onBackToLibrary={() => setView('library')}
+              onBackToLibrary={() => navigateView('library')}
             />
           ) : view === 'library' ? (
             <Library
@@ -165,6 +185,7 @@ export function App(): JSX.Element {
               onClearCollectionFilter={() => {
                 setSelectedCollectionId(null)
                 setSelectedCollectionName(null)
+                navigateView('library')
               }}
               onTrashPaper={(slug) => {
                 setTabs((current) => current.filter((tab) => tab.id !== slug))

@@ -137,6 +137,90 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
+describe('Reader search ownership', () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+  })
+
+  async function setupSearch() {
+    const pending = deferred<{ items: Array<{ str: string }> }>()
+    let held: typeof pending | null = null
+    getDocumentMock.mockReturnValue({ destroy: vi.fn(async () => {}), promise: Promise.resolve({
+      numPages: 2,
+      getOutline: async () => null,
+      getPage: async (page: number) => ({ ...fakePage(page === 2 ? 'Alpha Beta' : 'Introduction'),
+        getTextContent: () => {
+          const request = held
+          held = null
+          return request ? request.promise : Promise.resolve({ items: [{ str: page === 2 ? 'Alpha Beta' : 'Introduction' }] })
+        },
+      }),
+    }) })
+    render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2'))
+    await act(async () => {})
+    return { pending, hold: (request = pending) => { held = request } }
+  }
+
+  it('shows an accessible current-search error and recovers on retry', async () => {
+    const search = await setupSearch()
+    search.hold()
+    fireEvent.change(screen.getByLabelText('Search in document'), { target: { value: 'alpha' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await act(async () => { search.pending.reject(new Error('Search text unavailable')) })
+    expect(screen.getByRole('alert')).toHaveTextContent('Search text unavailable')
+    expect(screen.getByRole('alert')).toHaveTextContent('Try Search again')
+    expect(screen.queryByLabelText('Search matches')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(screen.getByLabelText('Search matches')).toHaveTextContent('1 / 1'))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Page')).toHaveTextContent('2 of 2')
+  })
+
+  it.each(['success', 'failure'])('ignores obsolete %s while a newly submitted search stays pending', async (outcome) => {
+    const search = await setupSearch()
+    search.hold()
+    fireEvent.change(screen.getByLabelText('Search in document'), { target: { value: 'alpha' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await act(async () => {})
+    fireEvent.change(screen.getByLabelText('Search in document'), { target: { value: 'beta' } })
+    expect(screen.getByRole('button', { name: 'Search' })).toBeEnabled()
+    expect(screen.queryByLabelText('Search matches')).not.toBeInTheDocument()
+    const newer = deferred<{ items: Array<{ str: string }> }>()
+    search.hold(newer)
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await act(async () => {})
+    await act(async () => {
+      if (outcome === 'success') search.pending.resolve({ items: [{ str: 'Alpha' }] })
+      else search.pending.reject(new Error('Obsolete failure'))
+    })
+    expect(screen.getByRole('button', { name: 'Search' })).toBeDisabled()
+    expect(screen.getByRole('status')).toHaveTextContent('Searching')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Search matches')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2')
+    await act(async () => { newer.resolve({ items: [{ str: 'Introduction' }] }) })
+    expect(screen.getByLabelText('Search matches')).toHaveTextContent('1 / 1')
+    expect(screen.getByLabelText('Page')).toHaveTextContent('2 of 2')
+    fireEvent.change(screen.getByLabelText('Search in document'), { target: { value: 'unsubmitted' } })
+    expect(screen.queryByLabelText('Search matches')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Next match' })).not.toBeInTheDocument()
+  })
+
+  it('invalidates a pending search when input is cleared without jumping pages', async () => {
+    const search = await setupSearch()
+    search.hold()
+    fireEvent.change(screen.getByLabelText('Search in document'), { target: { value: 'alpha' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    expect(screen.getByRole('button', { name: 'Search' })).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Search in document'), { target: { value: '' } })
+    await act(async () => { search.pending.resolve({ items: [{ str: 'Alpha' }] }) })
+    expect(screen.queryByLabelText('Search matches')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Next match' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2')
+  })
+})
+
 describe('Reader superseded rendering', () => {
   beforeEach(() => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)

@@ -1,0 +1,449 @@
+
+> vellum@0.1.0 test
+> vitest run src/app/Reader.test.tsx -t Reader search ownership
+
+
+ RUN  v2.1.9 /home/dandapat/.t3/worktrees/Vellum/t3-2897987b
+
+ ❯ src/app/Reader.test.tsx (65 tests | 4 failed | 61 skipped) 644ms
+   × Reader search ownership > shows an accessible current-search error and recovers on retry 412ms
+     → Unable to find an accessible element with the role "alert"
+
+Here are the accessible roles:
+
+  button:
+
+  Name "Outline":
+  <button
+    aria-pressed="false"
+    type="button"
+  />
+
+  Name "‹":
+  <button
+    disabled=""
+    type="button"
+  />
+
+  Name "›":
+  <button
+    type="button"
+  />
+
+  Name "−":
+  <button
+    type="button"
+  />
+
+  Name "+":
+  <button
+    type="button"
+  />
+
+  Name "Search":
+  <button
+    type="submit"
+  />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "Search in document":
+  <input
+    aria-label="Search in document"
+    placeholder="Search…"
+    type="search"
+    value="alpha"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <div
+      class="_reader_022a3f"
+    >
+      <div
+        class="_toolbar_022a3f"
+      >
+        <button
+          aria-pressed="false"
+          type="button"
+        >
+          Outline
+        </button>
+        <div
+          class="_pageNav_022a3f"
+        >
+          <button
+            disabled=""
+            type="button"
+          >
+            ‹
+          </button>
+          <span
+            aria-label="Page"
+          >
+            1
+             of
+            2
+          </span>
+          <button
+            type="button"
+          >
+            ›
+          </button>
+        </div>
+        <div
+          class="_zoom_022a3f"
+        >
+          <button
+            type="button"
+          >
+            −
+          </button>
+          <span
+            aria-label="Zoom"
+          >
+            100
+            %
+          </span>
+          <button
+            type="button"
+          >
+            +
+          </button>
+        </div>
+        <form
+          class="_search_022a3f"
+        >
+          <input
+            aria-label="Search in document"
+            placeholder="Search…"
+            type="search"
+            value="alpha"
+          />
+          <button
+            type="submit"
+          >
+            Search
+          </button>
+          <span
+            aria-label="Search matches"
+          >
+            0 / 0
+          </span>
+        </form>
+      </div>
+      <div
+        class="_body_022a3f"
+      >
+        <div
+          class="_pageViewport_022a3f"
+        >
+          <div
+            class="_pageLayer_022a3f"
+          >
+            <canvas
+              class="_canvas_022a3f"
+              height="100"
+              width="100"
+            />
+            <div
+              class="_textLayer_022a3f"
+              style="--total-scale-factor: NaN;"
+            >
+              <span>
+                Introduction
+              </span>
+            </div>
+            <div
+              aria-hidden="true"
+              class="_highlightOverlay_022a3f"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+   × Reader search ownership > ignores obsolete success while a newly submitted search stays pending 83ms
+     → expect(element).toBeEnabled()
+
+Received element is not enabled:
+  <button
+  disabled=""
+  type="submit"
+/>
+   × Reader search ownership > ignores obsolete failure while a newly submitted search stays pending 62ms
+     → expect(element).toBeEnabled()
+
+Received element is not enabled:
+  <button
+  disabled=""
+  type="submit"
+/>
+   × Reader search ownership > invalidates a pending search when input is cleared without jumping pages 84ms
+     → expect(element).not.toBeInTheDocument()
+
+expected document not to contain element, found <span
+  aria-label="Search matches"
+>
+  1
+   /
+  2
+</span> instead
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/app/Reader.test.tsx > Reader search ownership > shows an accessible current-search error and recovers on retry
+TestingLibraryElementError: Unable to find an accessible element with the role "alert"
+
+Here are the accessible roles:
+
+  button:
+
+  Name "Outline":
+  <button
+    aria-pressed="false"
+    type="button"
+  />
+
+  Name "‹":
+  <button
+    disabled=""
+    type="button"
+  />
+
+  Name "›":
+  <button
+    type="button"
+  />
+
+  Name "−":
+  <button
+    type="button"
+  />
+
+  Name "+":
+  <button
+    type="button"
+  />
+
+  Name "Search":
+  <button
+    type="submit"
+  />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "Search in document":
+  <input
+    aria-label="Search in document"
+    placeholder="Search…"
+    type="search"
+    value="alpha"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <div
+      class="_reader_022a3f"
+    >
+      <div
+        class="_toolbar_022a3f"
+      >
+        <button
+          aria-pressed="false"
+          type="button"
+        >
+          Outline
+        </button>
+        <div
+          class="_pageNav_022a3f"
+        >
+          <button
+            disabled=""
+            type="button"
+          >
+            ‹
+          </button>
+          <span
+            aria-label="Page"
+          >
+            1
+             of
+            2
+          </span>
+          <button
+            type="button"
+          >
+            ›
+          </button>
+        </div>
+        <div
+          class="_zoom_022a3f"
+        >
+          <button
+            type="button"
+          >
+            −
+          </button>
+          <span
+            aria-label="Zoom"
+          >
+            100
+            %
+          </span>
+          <button
+            type="button"
+          >
+            +
+          </button>
+        </div>
+        <form
+          class="_search_022a3f"
+        >
+          <input
+            aria-label="Search in document"
+            placeholder="Search…"
+            type="search"
+            value="alpha"
+          />
+          <button
+            type="submit"
+          >
+            Search
+          </button>
+          <span
+            aria-label="Search matches"
+          >
+            0 / 0
+          </span>
+        </form>
+      </div>
+      <div
+        class="_body_022a3f"
+      >
+        <div
+          class="_pageViewport_022a3f"
+        >
+          <div
+            class="_pageLayer_022a3f"
+          >
+            <canvas
+              class="_canvas_022a3f"
+              height="100"
+              width="100"
+            />
+            <div
+              class="_textLayer_022a3f"
+              style="--total-scale-factor: NaN;"
+            >
+              <span>
+                Introduction
+              </span>
+            </div>
+            <div
+              aria-hidden="true"
+              class="_highlightOverlay_022a3f"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/app/Reader.test.tsx:171:19
+    169|     fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    170|     await act(async () => { search.pending.reject(new Error('Search te…
+    171|     expect(screen.getByRole('alert')).toHaveTextContent('Search text u…
+       |                   ^
+    172|     expect(screen.getByRole('alert')).toHaveTextContent('Try Search ag…
+    173|     expect(screen.queryByLabelText('Search matches')).not.toBeInTheDoc…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/app/Reader.test.tsx > Reader search ownership > ignores obsolete success while a newly submitted search stays pending
+ FAIL  src/app/Reader.test.tsx > Reader search ownership > ignores obsolete failure while a newly submitted search stays pending
+Error: expect(element).toBeEnabled()
+
+Received element is not enabled:
+  <button
+  disabled=""
+  type="submit"
+/>
+ ❯ src/app/Reader.test.tsx:187:60
+    185|     await act(async () => {})
+    186|     fireEvent.change(screen.getByLabelText('Search in document'), { ta…
+    187|     expect(screen.getByRole('button', { name: 'Search' })).toBeEnabled…
+       |                                                            ^
+    188|     expect(screen.queryByLabelText('Search matches')).not.toBeInTheDoc…
+    189|     const newer = deferred<{ items: Array<{ str: string }> }>()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/app/Reader.test.tsx > Reader search ownership > invalidates a pending search when input is cleared without jumping pages
+Error: expect(element).not.toBeInTheDocument()
+
+expected document not to contain element, found <span
+  aria-label="Search matches"
+>
+  1
+   /
+  2
+</span> instead
+ ❯ src/app/Reader.test.tsx:218:59
+    216|     fireEvent.change(screen.getByLabelText('Search in document'), { ta…
+    217|     await act(async () => { search.pending.resolve({ items: [{ str: 'A…
+    218|     expect(screen.queryByLabelText('Search matches')).not.toBeInTheDoc…
+       |                                                           ^
+    219|     expect(screen.queryByRole('button', { name: 'Next match' })).not.t…
+    220|     expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+Error: Search text unavailable
+ ❯ src/app/Reader.test.tsx:170:51
+    168|     fireEvent.change(screen.getByLabelText('Search in document'), { ta…
+    169|     fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    170|     await act(async () => { search.pending.reject(new Error('Search te…
+       |                                                   ^
+    171|     expect(screen.getByRole('alert')).toHaveTextContent('Search text u…
+    172|     expect(screen.getByRole('alert')).toHaveTextContent('Try Search ag…
+ ❯ node_modules/@testing-library/react/dist/act-compat.js:47:24
+ ❯ act node_modules/react/cjs/react.development.js:2512:16
+ ❯ Proxy.<anonymous> node_modules/@testing-library/react/dist/act-compat.js:46:25
+ ❯ src/app/Reader.test.tsx:170:11
+ ❯ node_modules/@vitest/runner/dist/index.js:533:5
+ ❯ runTest node_modules/@vitest/runner/dist/index.js:1056:11
+ ❯ runSuite node_modules/@vitest/runner/dist/index.js:1205:15
+ ❯ runSuite node_modules/@vitest/runner/dist/index.js:1205:15
+ ❯ runFiles node_modules/@vitest/runner/dist/index.js:1262:5
+
+This error originated in "src/app/Reader.test.tsx" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "shows an accessible current-search error and recovers on retry". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 61 skipped (65)
+     Errors  1 error
+   Start at  09:39:19
+   Duration  2.61s (transform 654ms, setup 0ms, collect 939ms, tests 644ms, environment 572ms, prepare 118ms)

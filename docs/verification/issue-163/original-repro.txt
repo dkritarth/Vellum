@@ -1,0 +1,35 @@
+
+ RUN  v2.1.9 /tmp/vellum-notes-load-repro
+
+stdout | repro.test.tsx > does not silently replace an unread saved note after a failed load
+failed load UI Clear note editor null
+
+stdout | repro.test.tsx > does not silently replace an unread saved note after a failed load
+persisted after typing New note, because editor looked empty
+
+ ❯ repro.test.tsx (1 test | 1 failed) 105ms
+   × does not silently replace an unread saved note after a failed load 103ms
+     → expected 'New note, because editor looked empty' to be 'Existing research note with important…' // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  repro.test.tsx > does not silently replace an unread saved note after a failed load
+AssertionError: expected 'New note, because editor looked empty' to be 'Existing research note with important…' // Object.is equality
+
+Expected: "Existing research note with important evidence"
+Received: "New note, because editor looked empty"
+
+ ❯ repro.test.tsx:16:17
+     14|  await act(async()=>{await vi.advanceTimersByTimeAsync(500)})
+     15|  console.log('persisted after typing',stored)
+     16|  expect(stored).toBe('Existing research note with important evidence')
+       |                 ^
+     17|  expect(screen.getByRole('alert')).toHaveTextContent(/load|read/i)
+     18| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  09:46:22
+   Duration  1.00s (transform 100ms, setup 0ms, collect 205ms, tests 105ms, environment 378ms, prepare 79ms)

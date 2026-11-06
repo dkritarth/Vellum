@@ -1,0 +1,31 @@
+[830341:1106/151355.058854:ERROR:object_proxy.cc(576)] Failed to call method: org.freedesktop.DBus.StartServiceByName: object_path= /org/freedesktop/DBus: org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the network connection was broken.
+Error occurred in handler for 'vellum:highlights-list': Error: issue-179 controlled delayed list failure
+    at state.release (eval at evaluate (:311:30), <anonymous>:17:22)
+    at eval (eval at evaluate (:311:30), <anonymous>:1:37)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+Error occurred in handler for 'vellum:highlights-list': Error: issue-179 controlled list failure
+    at eval (eval at evaluate (:311:30), <anonymous>:14:41)
+    at WebContents.<anonymous> (node:electron/js2c/browser_init:2:86178)
+    at WebContents.emit (node:events:518:28)
+Error occurred in handler for 'vellum:highlights-list': Error: issue-179 controlled delayed list failure
+    at state.release (eval at evaluate (:311:30), <anonymous>:17:22)
+    at eval (eval at evaluate (:311:30), <anonymous>:1:37)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+Error occurred in handler for 'vellum:highlights-delete': Error: issue-179 controlled delete failure
+    at eval (eval at evaluate (:311:30), <anonymous>:14:41)
+    at WebContents.<anonymous> (node:electron/js2c/browser_init:2:86178)
+    at WebContents.emit (node:events:518:28)
+Error occurred in handler for 'vellum:highlights-delete': Error: issue-179 controlled delayed delete failure
+    at state.release (eval at evaluate (:311:30), <anonymous>:17:22)
+    at eval (eval at evaluate (:311:30), <anonymous>:1:37)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+Error occurred in handler for 'vellum:highlights-delete': Error: issue-179 controlled delayed delete failure
+    at state.release (eval at evaluate (:311:30), <anonymous>:17:22)
+    at eval (eval at evaluate (:311:30), <anonymous>:1:37)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+Debugger ending on ws://127.0.0.1:42343/79c2e4e2-e84a-4a2c-a34f-b4ccb54ede61
+For help, see: https://nodejs.org/en/docs/inspector

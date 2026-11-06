@@ -19,7 +19,7 @@
 // cards), so `slug` is optional and undefined by default — the empty state
 // below is what App.tsx shows today.
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
-import { AbortException, GlobalWorkerOptions, RenderingCancelledException, TextLayer, getDocument, type PDFDocumentProxy, type RenderTask } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import { AbortException, GlobalWorkerOptions, RenderingCancelledException, TextLayer, getDocument, type PDFDocumentLoadingTask, type PDFDocumentProxy, type RenderTask } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import workerSrc from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url'
 import type { HighlightColor } from './ReaderToolbar'
 import type { HighlightRecord } from '../../core/highlights/repo'
@@ -468,12 +468,17 @@ function PaperReader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain, 
   const [citationFlash, setCitationFlash] = useState<number | null>(null)
   const [hoveredCitation, setHoveredCitation] = useState<{ text: string; left: number; top: number } | null>(null)
 
+  // Document teardown can reject page/search work as well as the load itself.
+  // Keep paper disposal distinct from same-document page/zoom cancellation.
+  const paperDisposedRef = useRef(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const textLayerRef = useRef<HTMLDivElement>(null)
 
   // Load the document whenever the open paper changes.
   useEffect(() => {
     let cancelled = false
+    let loadingTask: PDFDocumentLoadingTask | null = null
+    paperDisposedRef.current = false
 
     setDoc(null)
     setNumPages(0)
@@ -499,14 +504,17 @@ function PaperReader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain, 
           setError('No PDF found for this paper.')
           return
         }
-        const pdf = await getDocument({ data: bytes }).promise
+        loadingTask = getDocument({ data: bytes })
+        const pdf = await loadingTask.promise
         if (cancelled) return
         setDoc(pdf)
         setNumPages(pdf.numPages)
 
         const rawOutline = (await pdf.getOutline()) as RawOutlineNode[] | null
         if (cancelled) return
-        setOutline(rawOutline ? await resolveOutline(pdf, rawOutline) : [])
+        const resolvedOutline = rawOutline ? await resolveOutline(pdf, rawOutline) : []
+        if (cancelled) return
+        setOutline(resolvedOutline)
 
         // [P2-03] One pass over every page's text to build the reference
         // index — done once per doc load (not on every page/zoom change).
@@ -521,6 +529,7 @@ function PaperReader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain, 
         if (cancelled) return
         setReferenceIndex(buildReferenceIndex(pagesText))
       } catch (err: unknown) {
+        if (cancelled) return
         console.error("[Reader] Failed to load PDF:", err);
         if (err && typeof err === "object") {
           const e = err as Record<string, unknown>;
@@ -547,6 +556,13 @@ function PaperReader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain, 
 
     return () => {
       cancelled = true
+      paperDisposedRef.current = true
+      // The loading task owns its document transport and worker, even when
+      // loading fails or is still pending. Do not also destroy the proxy.
+      void loadingTask?.destroy().catch(() => {
+        // Teardown is best-effort after this paper has left the reader.
+        // Consume rejection without reporting an error for the current paper.
+      })
     }
   }, [slug])
 
@@ -624,6 +640,7 @@ function PaperReader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain, 
         setPageReady(true)
       }
     })().catch((err: unknown) => {
+      if (paperDisposedRef.current) return
       if (
         (cancellationStage === 'canvas' && err instanceof RenderingCancelledException) ||
         (cancellationStage === 'text' && err instanceof AbortException && err.message === 'TextLayer task cancelled.')
@@ -849,11 +866,14 @@ function PaperReader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain, 
     setSearching(true)
     try {
       const results = await searchDocument(doc, query)
+      if (paperDisposedRef.current) return
       setSearchResults(results)
       setSearchIndex(0)
       if (results.length > 0) goToPage(results[0].pageNumber)
+    } catch (err: unknown) {
+      if (!paperDisposedRef.current) throw err
     } finally {
-      setSearching(false)
+      if (!paperDisposedRef.current) setSearching(false)
     }
   }
 

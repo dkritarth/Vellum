@@ -47,9 +47,8 @@ const ADAPTERS: Record<AcpBackend, { command: string }> = {
   codex: { command: 'codex-acp' },
 }
 
-/** Optional compatibility override for Codex service/CLI rollout skew. The
- * adapter owns config parsing; JSON string encoding is valid TOML and keeps
- * the model value in one argv entry without invoking a shell. */
+/** Legacy adapter compatibility. Current codex-acp reads CODEX_CONFIG instead;
+ * JSON string encoding keeps the legacy TOML value in one argv entry. */
 export function buildAdapterArgs(
   backend: AcpBackend,
   sourceEnv: NodeJS.ProcessEnv = process.env,
@@ -74,11 +73,30 @@ export type SpawnAdapter = (backend: AcpBackend) => AdapterChildProcess
  * Electron process never sets it. Stripping both from the adapter's env
  * makes the client robust to running nested, with no behavior change for
  * the normal (non-nested) case. Everything else the adapter needs for auth
- * (PATH, HOME, the CLI's own creds/config env) passes through untouched.
- * Exported standalone so the stripping is unit-testable without a
- * subprocess. */
-export function buildAdapterEnv(sourceEnv: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+ * (PATH, HOME, the CLI's own creds/config env) passes through. For Codex only,
+ * a nonblank VELLUM_CODEX_MODEL replaces CODEX_CONFIG.model in the copied env.
+ * Exported standalone for tests at the child-environment boundary. */
+export function buildAdapterEnv(
+  sourceEnv: NodeJS.ProcessEnv = process.env,
+  backend?: AcpBackend,
+): NodeJS.ProcessEnv {
   const { CLAUDECODE, CLAUDE_CODE_SSE_PORT, ...rest } = sourceEnv
+  const model = sourceEnv.VELLUM_CODEX_MODEL?.trim()
+  if (backend === 'codex' && model) {
+    let config: unknown = {}
+    if (sourceEnv.CODEX_CONFIG !== undefined) {
+      try {
+        config = JSON.parse(sourceEnv.CODEX_CONFIG)
+      } catch {
+        // Parser diagnostics may contain config secrets. Never attach the cause.
+        throw new Error('Cannot apply VELLUM_CODEX_MODEL: CODEX_CONFIG must be a JSON object')
+      }
+    }
+    if (config === null || typeof config !== 'object' || Array.isArray(config)) {
+      throw new Error('Cannot apply VELLUM_CODEX_MODEL: CODEX_CONFIG must be a JSON object')
+    }
+    rest.CODEX_CONFIG = JSON.stringify({ ...config, model })
+  }
   return rest
 }
 
@@ -86,7 +104,7 @@ const defaultSpawnAdapter: SpawnAdapter = (backend) => {
   const { command } = ADAPTERS[backend]
   return spawn(command, buildAdapterArgs(backend), {
     stdio: ['pipe', 'pipe', 'inherit'],
-    env: buildAdapterEnv(),
+    env: buildAdapterEnv(process.env, backend),
     detached: process.platform !== 'win32',
   }) as AdapterChildProcess
 }

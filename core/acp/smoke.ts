@@ -10,9 +10,9 @@
 //   npm run smoke:acp -- claude       # just claude-code-acp
 //   npm run smoke:acp -- codex        # just codex-acp
 //
-// This script deliberately does NOT run as part of `npm test` / CI — the
-// mocked unit tests in stdio-client.test.ts cover the transport logic
-// without requiring a live, signed-in adapter.
+// Live execution deliberately does NOT run as part of `npm test` / CI.
+// Tests import main with an injected AcpClient; importing this module never
+// starts a session. Transport tests live in stdio-client.test.ts.
 //
 // Nested-session note: `claude-code-acp` refuses to launch when the
 // CLAUDECODE env var is set (i.e. when this smoke runs from inside a Claude
@@ -33,15 +33,16 @@
 // adapter still fails loud with a timeout error instead of hanging this
 // script forever; no external alarm/kill needed.
 
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { StdioAcpClient } from './stdio-client.js'
-import type { AcpBackend } from './client.js'
+import type { AcpBackend, AcpClient } from './client.js'
 
 const PROMPT = 'Reply with exactly the word "pong" and nothing else.'
 
-async function smoke(backend: AcpBackend): Promise<void> {
+async function smoke(backend: AcpBackend, client: AcpClient): Promise<void> {
   console.log(`\n=== ${backend} (${backend === 'claude' ? 'claude-code-acp' : 'codex-acp'}) ===`)
   console.log(`startedAt=${new Date().toISOString()}`)
-  const client = new StdioAcpClient()
   let session
   try {
     session = await client.newSession(backend)
@@ -55,16 +56,23 @@ async function smoke(backend: AcpBackend): Promise<void> {
   }
 
   try {
-    let sawDone = false
+    let successfulDone = false
+    let answer = ''
     const updateKinds: string[] = []
     for await (const update of session.prompt({ text: PROMPT })) {
       updateKinds.push(update.kind)
       if (update.kind === 'text' && typeof update.data === 'object' && update.data !== null) {
         const text = 'text' in update.data ? update.data.text : undefined
-        if (typeof text === 'string') console.log(`text=${JSON.stringify(text)}`)
+        if (typeof text === 'string') {
+          answer += text
+          console.log(`text=${JSON.stringify(text)}`)
+        }
       }
-      if (update.kind === 'done') console.log(`done=${JSON.stringify(update.data)}`)
-      if (update.kind === 'done') sawDone = true
+      if (update.kind === 'done') {
+        console.log(`done=${JSON.stringify(update.data)}`)
+        successfulDone = typeof update.data === 'object' && update.data !== null
+          && 'stopReason' in update.data && update.data.stopReason === 'end_turn'
+      }
       if (update.kind === 'error') {
         console.log(`error=${JSON.stringify(update.data)}`)
         console.log(`UNVERIFIED — adapter reported an error mid-turn.`)
@@ -73,23 +81,33 @@ async function smoke(backend: AcpBackend): Promise<void> {
       }
     }
     console.log(`updateKinds=${updateKinds.join(',')}`)
-    console.log(sawDone ? 'VERIFIED — stream ended in a done update.' : 'UNVERIFIED — stream ended without done.')
-    if (!sawDone) process.exitCode = 1
+    const verified = successfulDone && answer.trim() === 'pong'
+    console.log(verified
+      ? 'VERIFIED — received exactly pong with successful completion.'
+      : 'UNVERIFIED — expected exactly pong and successful completion.')
+    if (!verified) process.exitCode = 1
+  } catch (err) {
+    console.log(`UNVERIFIED — prompt/stream failed: ${err instanceof Error ? err.message : String(err)}`)
+    process.exitCode = 1
   } finally {
     await session.dispose()
     console.log(`endedAt=${new Date().toISOString()}`)
   }
 }
 
-async function main(): Promise<void> {
-  const requested = process.argv.slice(2) as AcpBackend[]
+export async function main(
+  requested: AcpBackend[] = process.argv.slice(2) as AcpBackend[],
+  client: AcpClient = new StdioAcpClient(),
+): Promise<void> {
   const backends: AcpBackend[] = requested.length > 0 ? requested : ['claude', 'codex']
   for (const backend of backends) {
-    await smoke(backend)
+    await smoke(backend, client)
   }
 }
 
-main().catch((err) => {
-  console.error(err)
-  process.exitCode = 1
-})
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  main().catch((err) => {
+    console.error(err)
+    process.exitCode = 1
+  })
+}

@@ -33,6 +33,8 @@ interface RightPanelProps {
   /** [P2-02] Drives the Reader to a clicked annotation's page. Undefined =
    * jump seam not wired (e.g. tests rendering RightPanel standalone). */
   onJumpToHighlight?: (highlight: HighlightRecord) => void
+  /** Changes after a successful Reader creation for `slug`; refreshes an open list. */
+  highlightsRevision?: number
   /** [R1-05] Injected prompt from PDF text selection actions */
   injectedPrompt?: InjectedPrompt | null
   /** [L2-02] Target chat session to open in AskPanel */
@@ -45,6 +47,7 @@ export function RightPanel({
   onTabChange,
   slug,
   onJumpToHighlight,
+  highlightsRevision,
   injectedPrompt,
   targetSessionId,
 }: RightPanelProps): JSX.Element {
@@ -77,7 +80,7 @@ export function RightPanel({
       </div>
 
       <div className={styles.tabPanel} role="tabpanel">
-        {renderTabContent(activeTab, slug, onJumpToHighlight, injectedPrompt, targetSessionId)}
+        {renderTabContent(activeTab, slug, onJumpToHighlight, injectedPrompt, targetSessionId, highlightsRevision)}
       </div>
     </aside>
   )
@@ -89,6 +92,7 @@ function renderTabContent(
   onJumpToHighlight: ((highlight: HighlightRecord) => void) | undefined,
   injectedPrompt: InjectedPrompt | null | undefined,
   targetSessionId?: number | null,
+  highlightsRevision?: number,
 ): JSX.Element {
   switch (tab) {
     case 'Ask':
@@ -104,6 +108,6 @@ function renderTabContent(
     case 'Details':
       return <DetailsPanel slug={slug} />
     case 'Annotations':
-      return <AnnotationsPanel slug={slug} onJump={onJumpToHighlight} />
+      return <AnnotationsPanel slug={slug} onJump={onJumpToHighlight} highlightsRevision={highlightsRevision} />
   }
 }

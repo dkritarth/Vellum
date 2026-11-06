@@ -10,12 +10,14 @@ import styles from './AnnotationsPanel.module.css'
 interface AnnotationsPanelProps {
   /** Slug of the currently open paper, if any. Undefined = no paper open. */
   slug?: string
+  /** Monotonic invalidation count for `slug`, advanced only after a saved creation. */
+  highlightsRevision?: number
   /** Drives the Reader to a highlight's page (and flashes it) — wired by
    * App, since Reader and this panel are siblings under it. */
   onJump?: (highlight: HighlightRecord) => void
 }
 
-export function AnnotationsPanel({ slug, onJump }: AnnotationsPanelProps): JSX.Element {
+export function AnnotationsPanel({ slug, onJump, highlightsRevision = 0 }: AnnotationsPanelProps): JSX.Element {
   const [highlights, setHighlights] = useState<HighlightRecord[]>([])
   const [loading, setLoading] = useState(false)
   // Slug the panel currently shows; a list response for any other paper is
@@ -23,29 +25,38 @@ export function AnnotationsPanel({ slug, onJump }: AnnotationsPanelProps): JSX.E
   const currentSlug = useRef(slug)
   currentSlug.current = slug
 
+  const requestVersion = useRef(0)
+
   const load = useCallback((paperSlug: string) => {
+    if (currentSlug.current !== paperSlug) return
+    const version = ++requestVersion.current
+    const isCurrent = () => currentSlug.current === paperSlug && requestVersion.current === version
     setLoading(true)
     window.vellum
       .highlightsList(paperSlug)
       .then((records) => {
-        if (currentSlug.current === paperSlug) setHighlights(records)
+        if (isCurrent()) setHighlights(records)
       })
       .catch(() => {
-        if (currentSlug.current === paperSlug) setHighlights([])
+        if (isCurrent()) setHighlights([])
       })
       .finally(() => {
-        if (currentSlug.current === paperSlug) setLoading(false)
+        if (isCurrent()) setLoading(false)
       })
   }, [])
 
   useEffect(() => {
     setHighlights([])
+  }, [slug])
+
+  useEffect(() => {
     if (!slug) {
       setLoading(false)
       return
     }
     load(slug)
-  }, [slug, load])
+    return () => { requestVersion.current += 1 }
+  }, [slug, highlightsRevision, load])
 
   const deleteHighlight = useCallback(
     (id: string) => {

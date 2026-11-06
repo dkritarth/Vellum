@@ -134,3 +134,59 @@ describe('AnnotationsPanel', () => {
     expect(screen.queryByText('first highlight')).not.toBeInTheDocument()
   })
 })
+
+// Refreshes can overlap an initial read or another creation's read for the
+// same paper. Slug equality alone cannot distinguish those requests.
+describe('creation refresh ordering', () => {
+  it.each(['success', 'error'] as const)('ignores obsolete same-paper list %s after a newer refresh', async (outcome) => {
+    let resolveOld!: (rows: typeof HIGHLIGHTS) => void
+    let rejectOld!: (reason: Error) => void
+    highlightsList.mockImplementationOnce(() => new Promise((resolve, reject) => {
+      resolveOld = resolve
+      rejectOld = reject
+    })).mockResolvedValue(HIGHLIGHTS)
+    const { rerender } = render(<AnnotationsPanel slug="p1" highlightsRevision={0} />)
+    rerender(<AnnotationsPanel slug="p1" highlightsRevision={1} />)
+    const row = await screen.findByRole('button', { name: 'first highlight Page 2' })
+    row.focus()
+
+    await act(async () => {
+      if (outcome === 'success') resolveOld([])
+      else rejectOld(new Error('obsolete read failed'))
+    })
+
+    expect(row).toBeInTheDocument()
+    expect(row).toHaveFocus()
+    expect(screen.queryByText(/no highlights yet/i)).not.toBeInTheDocument()
+  })
+
+  it('does not finish current loading when an obsolete request settles', async () => {
+    let resolveOld!: (rows: typeof HIGHLIGHTS) => void
+    let resolveNew!: (rows: typeof HIGHLIGHTS) => void
+    highlightsList.mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveNew = resolve }))
+    const { rerender } = render(<AnnotationsPanel slug="p1" highlightsRevision={0} />)
+    rerender(<AnnotationsPanel slug="p1" highlightsRevision={1} />)
+    await act(async () => { resolveOld([]) })
+    expect(screen.queryByText(/no highlights yet/i)).not.toBeInTheDocument()
+    await act(async () => { resolveNew(HIGHLIGHTS) })
+    expect(screen.getByText('first highlight')).toBeVisible()
+  })
+
+  it('preserves row focus during refresh and ignores reads from an earlier visit to the same paper', async () => {
+    let resolveOld!: (rows: typeof HIGHLIGHTS) => void
+    highlightsList.mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve }))
+      .mockResolvedValue(HIGHLIGHTS)
+    const { rerender } = render(<AnnotationsPanel slug="p1" />)
+    rerender(<AnnotationsPanel slug="p2" />)
+    await flushPromises()
+    rerender(<AnnotationsPanel slug="p1" />)
+    const row = await screen.findByRole('button', { name: 'first highlight Page 2' })
+    row.focus()
+    rerender(<AnnotationsPanel slug="p1" highlightsRevision={1} />)
+    await flushPromises()
+    expect(row).toHaveFocus()
+    await act(async () => { resolveOld([]) })
+    expect(row).toBeInTheDocument()
+  })
+})

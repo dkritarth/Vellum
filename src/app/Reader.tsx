@@ -417,6 +417,8 @@ interface ReaderProps {
    * re-jumping to the same target (clicked twice in a row) re-trigger the
    * effect even though `page`/`highlightId` didn't change. */
   jumpTarget?: { page: number; highlightId: string; nonce: number } | null
+  /** Successful persisted creation, scoped to the originating paper. Never sent on failure. */
+  onHighlightCreated?: (paperSlug: string) => void
   /** [R1-05] Callback when user clicks 'Add to chat' on selected text */
   onAddToChat?: (quote: string, page: number) => void
   /** [R1-05] Callback when user clicks 'Explain' on selected text */
@@ -433,7 +435,7 @@ interface ActiveSelection {
   anchor: { start: number; end: number }
 }
 
-export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain }: ReaderProps): JSX.Element {
+export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain, onHighlightCreated }: ReaderProps): JSX.Element {
   const [activeSelection, setActiveSelection] = useState<ActiveSelection | null>(null)
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [numPages, setNumPages] = useState(0)
@@ -710,6 +712,7 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
       void window.vellum
         .highlightsCreate({ slug, page, color, quote, anchor: JSON.stringify(anchor) })
         .then((record) => {
+          onHighlightCreated?.(record.paperSlug)
           setHighlights((current) => [...current, record])
           selection.removeAllRanges()
           setActiveSelection(null)
@@ -735,6 +738,7 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
     void window.vellum
       .highlightsCreate({ slug, page, color, quote, anchor: JSON.stringify(anchor) })
       .then((record) => {
+        onHighlightCreated?.(record.paperSlug)
         setHighlights((current) => [...current, record])
         window.getSelection()?.removeAllRanges()
         setActiveSelection(null)

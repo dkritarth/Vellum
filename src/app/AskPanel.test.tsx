@@ -423,3 +423,95 @@ describe('AskPanel', () => {
     })
   })
 })
+
+describe('deletion ownership', () => {
+  it('preserves a newer displayed chat when the original target is deleted', async () => {
+    const user = userEvent.setup()
+    const view = render(<AskPanel slug="p1" targetSessionId={1} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'New chat' })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: 'New chat' }))
+    await waitFor(() => expect(screen.getByLabelText('Ask a question')).toBeEnabled())
+    await user.type(screen.getByLabelText('Ask a question'), 'Newer draft')
+    view.rerender(<AskPanel slug="p1" targetSessionId={1} deletedSessionIds={[1]} />)
+    expect(screen.getByLabelText('Ask a question')).toHaveValue('Newer draft')
+    expect(askOpen).toHaveBeenCalledTimes(1)
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    expect(askStart).toHaveBeenLastCalledWith({ chatSessionId: 2, slug: 'p1', text: 'Newer draft' })
+  })
+
+  it('discards a deleted snapshot that resolves after deletion, then ignores its late turn events', async () => {
+    let resolveOpen!: (value: unknown) => void
+    askOpen.mockReturnValueOnce(new Promise(resolve => { resolveOpen = resolve }))
+    const view = render(<AskPanel slug="p1" targetSessionId={1} />)
+    view.rerender(<AskPanel slug="p1" targetSessionId={1} deletedSessionIds={[1]} />)
+    askOpen.mockResolvedValue({ session: { id: 2, backend: 'codex' }, messages: [] })
+    await act(async () => resolveOpen({ session: { id: 1, backend: 'codex' }, messages: [{ id: 1, role: 'assistant', content: 'Deleted snapshot' }], activeTurn: { requestId: 'old', chatSessionId: 1 } }))
+    await waitFor(() => expect(screen.getByLabelText('Ask a question')).toBeEnabled())
+    await act(async () => emit({ requestId: 'old', event: { kind: 'done', message: { id: 4, role: 'assistant', content: 'Deleted final' } } }))
+    expect(screen.queryByText(/Deleted/)).not.toBeInTheDocument()
+    expect(askOpen).toHaveBeenLastCalledWith('p1')
+  })
+
+  it.each(['resolve', 'reject'] as const)('ignores a deleted chat start acknowledgement (%s) after reopening and paper switch', async (outcome) => {
+    let resolveStart!: (value: unknown) => void
+    let rejectStart!: (error: Error) => void
+    askStart.mockReturnValueOnce(new Promise((resolve, reject) => { resolveStart = resolve; rejectStart = reject }))
+    const user = userEvent.setup()
+    const view = render(<AskPanel slug="p1" />)
+    await waitFor(() => expect(screen.getByLabelText('Ask a question')).toBeEnabled())
+    await user.type(screen.getByLabelText('Ask a question'), 'Deleted question')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    let resolveReplacement!: (value: unknown) => void
+    askOpen.mockReturnValueOnce(new Promise(resolve => { resolveReplacement = resolve }))
+    view.rerender(<AskPanel slug="p1" deletedSessionIds={[1]} />)
+    await waitFor(() => expect(askOpen).toHaveBeenCalledTimes(2))
+    askOpen.mockResolvedValue({ session: { id: 3, backend: 'codex' }, messages: [{ id: 30, role: 'assistant', content: 'Other paper' }] })
+    view.rerender(<AskPanel slug="p2" deletedSessionIds={[1]} />)
+    await screen.findByText('Other paper')
+    await act(async () => {
+      resolveReplacement({ session: { id: 2, backend: 'codex' }, messages: [{ id: 20, role: 'assistant', content: 'Late replacement' }] })
+      if (outcome === 'resolve') resolveStart({ requestId: 'deleted-turn' })
+      else rejectStart(new Error('Deleted start failure'))
+      emit({ requestId: 'deleted-turn', event: { kind: 'done', message: { id: 10, role: 'assistant', content: 'Deleted reply' } } })
+    })
+    expect(screen.getByText('Other paper')).toBeInTheDocument()
+    expect(screen.queryByText(/Deleted|Late replacement/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('deleted session recovery', () => {
+  it('does not restore a deleted explicit target when Ask remounts', async () => {
+    askOpen.mockResolvedValue({ session: { id: 2, backend: 'codex' }, messages: [] })
+    render(<AskPanel slug="p1" targetSessionId={1} deletedSessionIds={[1]} />)
+    await waitFor(() => expect(screen.getByLabelText('Ask a question')).toBeEnabled())
+    expect(askOpen).toHaveBeenCalledWith('p1')
+  })
+
+  it('preserves the destination draft when an outgoing deletion finishes after a paper switch', async () => {
+    const user = userEvent.setup()
+    const view = render(<AskPanel slug="p1" />)
+    await waitFor(() => expect(screen.getByLabelText('Ask a question')).toBeEnabled())
+    askOpen.mockResolvedValue({ session: { id: 2, backend: 'codex' }, messages: [{ id: 2, role: 'assistant', content: 'Destination history' }] })
+    view.rerender(<AskPanel slug="p2" />)
+    await screen.findByText('Destination history')
+    await user.type(screen.getByLabelText('Ask a question'), 'Destination draft')
+    view.rerender(<AskPanel slug="p2" deletedSessionIds={[1]} />)
+    expect(screen.getByLabelText('Ask a question')).toHaveValue('Destination draft')
+    expect(screen.getByText('Destination history')).toBeInTheDocument()
+    expect(askOpen).toHaveBeenCalledTimes(2)
+  })
+
+  it('ignores completion for the deleted active chat while unlocking its replacement', async () => {
+    askOpen.mockResolvedValueOnce({ session: { id: 1, backend: 'codex' }, messages: [], activeTurn: { requestId: 'old', chatSessionId: 1, text: 'Deleted partial' } })
+    const view = render(<AskPanel slug="p1" />)
+    await screen.findByText('Deleted partial')
+    askOpen.mockResolvedValue({ session: { id: 2, backend: 'codex' }, messages: [], activeTurn: { requestId: 'old', chatSessionId: 1, text: 'Deleted partial' } })
+    view.rerender(<AskPanel slug="p1" deletedSessionIds={[1]} />)
+    await waitFor(() => expect(askOpen).toHaveBeenCalledTimes(2))
+    expect(screen.queryByText('Deleted partial')).not.toBeInTheDocument()
+    await act(async () => emit({ requestId: 'old', event: { kind: 'done', message: { id: 10, role: 'assistant', content: 'Deleted final' } } }))
+    expect(screen.queryByText('Deleted final')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Ask a question')).toBeEnabled()
+  })
+})

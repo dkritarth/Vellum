@@ -3,6 +3,7 @@ import type { ChatSessionSummary } from '../../core/chat/repo'
 import styles from './ChatsList.module.css'
 
 interface ChatsListProps {
+  onSessionDeleted?: (id: number) => void
   selectedSessionId: number | null
   onSelectSession: (session: ChatSessionSummary) => void
 }
@@ -25,7 +26,7 @@ function formatRelativeTime(dateStr: string): string {
   }
 }
 
-export function ChatsList({ selectedSessionId, onSelectSession }: ChatsListProps): JSX.Element {
+export function ChatsList({ selectedSessionId, onSelectSession, onSessionDeleted }: ChatsListProps): JSX.Element {
   const [sessions, setSessions] = useState<ChatSessionSummary[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -57,6 +58,7 @@ export function ChatsList({ selectedSessionId, onSelectSession }: ChatsListProps
     if (!confirmed) return
     try {
       await window.vellum.chatDeleteSession(session.id)
+      onSessionDeleted?.(session.id)
       await fetchSessions()
     } catch (err) {
       console.error('Failed to delete chat session:', err)

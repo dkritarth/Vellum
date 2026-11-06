@@ -32,6 +32,7 @@ interface SidebarProps {
   onNavChange?: (item: NavItem) => void
   selectedCollectionId?: number | null
   onSelectCollection?: (id: number | null, name: string | null) => void
+  onSessionDeleted?: (id: number) => void
   selectedSessionId?: number | null
   onSelectSession?: (session: ChatSessionSummary) => void
   /** [L2-04] Callback when Trash is selected */
@@ -46,6 +47,7 @@ export function Sidebar({
   onSelectCollection,
   selectedSessionId = null,
   onSelectSession,
+  onSessionDeleted,
   onSelectTrash,
   onSelectUsage,
 }: SidebarProps = {}): JSX.Element {
@@ -108,6 +110,7 @@ export function Sidebar({
           />
         ) : (
           <ChatsList
+            onSessionDeleted={onSessionDeleted}
             selectedSessionId={selectedSessionId}
             onSelectSession={(session) => {
               onSelectSession?.(session)

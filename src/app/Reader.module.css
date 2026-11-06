@@ -26,6 +26,7 @@
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
@@ -58,18 +59,24 @@
 .pageNav,
 .zoom {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
 }
 
 .search {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   margin-left: auto;
+  max-width: 100%;
 }
 
 .search input {
+  flex: 1 1 auto;
+  min-width: 8rem;
   background: var(--vellum-bg, #101010);
   border: 1px solid var(--vellum-border, #2a2a2a);
   border-radius: 6px;

@@ -1,0 +1,3627 @@
+[
+  {
+    "label": "1000-no-error",
+    "viewport": {
+      "width": 1000,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 41,
+      "right": 679,
+      "bottom": 156,
+      "width": 442,
+      "height": 115
+    },
+    "reader": {
+      "x": 237,
+      "y": 41,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 836
+    },
+    "body": {
+      "x": 237,
+      "y": 156,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 721
+    },
+    "alert": null,
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 679,
+      "y": 41,
+      "right": 1000,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 442,
+    "mainClientWidth": 442,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 85,
+        "right": 309.234375,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 85,
+        "right": 343.6875,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 90.5,
+        "right": 384.171875,
+        "bottom": 104.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 85,
+        "right": 412.625,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 85,
+        "right": 450.421875,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 90.5,
+        "right": 490.734375,
+        "bottom": 104.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 85,
+        "right": 522.53125,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 427.765625,
+        "y": 122.5,
+        "right": 600.765625,
+        "bottom": 146.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 606.765625,
+        "y": 122,
+        "right": 667,
+        "bottom": 147,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "1000-no-error-matches",
+    "viewport": {
+      "width": 1000,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 41,
+      "right": 679,
+      "bottom": 156,
+      "width": 442,
+      "height": 115
+    },
+    "reader": {
+      "x": 237,
+      "y": 41,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 836
+    },
+    "body": {
+      "x": 237,
+      "y": 156,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 721
+    },
+    "alert": null,
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 679,
+      "y": 41,
+      "right": 1000,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 442,
+    "mainClientWidth": 442,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 85,
+        "right": 309.234375,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 85,
+        "right": 343.6875,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 90.5,
+        "right": 384.171875,
+        "bottom": 104.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 85,
+        "right": 412.625,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 85,
+        "right": 450.421875,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 90.5,
+        "right": 490.734375,
+        "bottom": 104.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 85,
+        "right": 522.53125,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 337.90625,
+        "y": 122.5,
+        "right": 510.90625,
+        "bottom": 146.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 516.90625,
+        "y": 122,
+        "right": 577.140625,
+        "bottom": 147,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search matches",
+        "x": 583.140625,
+        "y": 127.5,
+        "right": 610.09375,
+        "bottom": 141.5,
+        "width": 26.953125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "Previous match",
+        "x": 616.09375,
+        "y": 122,
+        "right": 638.546875,
+        "bottom": 147,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Next match",
+        "x": 644.546875,
+        "y": 122,
+        "right": 667,
+        "bottom": 147,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "1000-no-error-no-matches",
+    "viewport": {
+      "width": 1000,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 41,
+      "right": 679,
+      "bottom": 156,
+      "width": 442,
+      "height": 115
+    },
+    "reader": {
+      "x": 237,
+      "y": 41,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 836
+    },
+    "body": {
+      "x": 237,
+      "y": 156,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 721
+    },
+    "alert": null,
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 679,
+      "y": 41,
+      "right": 1000,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 442,
+    "mainClientWidth": 442,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 85,
+        "right": 309.234375,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 85,
+        "right": 343.6875,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 90.5,
+        "right": 384.171875,
+        "bottom": 104.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 85,
+        "right": 412.625,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 85,
+        "right": 450.421875,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 90.5,
+        "right": 490.734375,
+        "bottom": 104.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 85,
+        "right": 522.53125,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 394.8125,
+        "y": 122.5,
+        "right": 567.8125,
+        "bottom": 146.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 573.8125,
+        "y": 122,
+        "right": 634.046875,
+        "bottom": 147,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search matches",
+        "x": 640.046875,
+        "y": 127.5,
+        "right": 667,
+        "bottom": 141.5,
+        "width": 26.953125,
+        "height": 14,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "1000-error",
+    "viewport": {
+      "width": 1000,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 81,
+      "right": 679,
+      "bottom": 196,
+      "width": 442,
+      "height": 115
+    },
+    "reader": {
+      "x": 237,
+      "y": 81,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 796
+    },
+    "body": {
+      "x": 237,
+      "y": 196,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 681
+    },
+    "alert": {
+      "x": 237,
+      "y": 41,
+      "right": 679,
+      "bottom": 81,
+      "width": 442,
+      "height": 40
+    },
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 679,
+      "y": 41,
+      "right": 1000,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 442,
+    "mainClientWidth": 442,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 125,
+        "right": 309.234375,
+        "bottom": 150,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 125,
+        "right": 343.6875,
+        "bottom": 150,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 130.5,
+        "right": 384.171875,
+        "bottom": 144.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 125,
+        "right": 412.625,
+        "bottom": 150,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 125,
+        "right": 450.421875,
+        "bottom": 150,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 130.5,
+        "right": 490.734375,
+        "bottom": 144.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 125,
+        "right": 522.53125,
+        "bottom": 150,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 427.765625,
+        "y": 162.5,
+        "right": 600.765625,
+        "bottom": 186.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 606.765625,
+        "y": 162,
+        "right": 667,
+        "bottom": 187,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "1000-error-matches",
+    "viewport": {
+      "width": 1000,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 81,
+      "right": 679,
+      "bottom": 196,
+      "width": 442,
+      "height": 115
+    },
+    "reader": {
+      "x": 237,
+      "y": 81,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 796
+    },
+    "body": {
+      "x": 237,
+      "y": 196,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 681
+    },
+    "alert": {
+      "x": 237,
+      "y": 41,
+      "right": 679,
+      "bottom": 81,
+      "width": 442,
+      "height": 40
+    },
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 679,
+      "y": 41,
+      "right": 1000,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 442,
+    "mainClientWidth": 442,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 125,
+        "right": 309.234375,
+        "bottom": 150,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 125,
+        "right": 343.6875,
+        "bottom": 150,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 130.5,
+        "right": 384.171875,
+        "bottom": 144.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 125,
+        "right": 412.625,
+        "bottom": 150,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 125,
+        "right": 450.421875,
+        "bottom": 150,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 130.5,
+        "right": 490.734375,
+        "bottom": 144.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 125,
+        "right": 522.53125,
+        "bottom": 150,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 337.90625,
+        "y": 162.5,
+        "right": 510.90625,
+        "bottom": 186.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 516.90625,
+        "y": 162,
+        "right": 577.140625,
+        "bottom": 187,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search matches",
+        "x": 583.140625,
+        "y": 167.5,
+        "right": 610.09375,
+        "bottom": 181.5,
+        "width": 26.953125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "Previous match",
+        "x": 616.09375,
+        "y": 162,
+        "right": 638.546875,
+        "bottom": 187,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Next match",
+        "x": 644.546875,
+        "y": 162,
+        "right": 667,
+        "bottom": 187,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "1000-error-no-matches",
+    "viewport": {
+      "width": 1000,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 81,
+      "right": 679,
+      "bottom": 196,
+      "width": 442,
+      "height": 115
+    },
+    "reader": {
+      "x": 237,
+      "y": 81,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 796
+    },
+    "body": {
+      "x": 237,
+      "y": 196,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 681
+    },
+    "alert": {
+      "x": 237,
+      "y": 41,
+      "right": 679,
+      "bottom": 81,
+      "width": 442,
+      "height": 40
+    },
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 679,
+      "y": 41,
+      "right": 1000,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 442,
+    "mainClientWidth": 442,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 125,
+        "right": 309.234375,
+        "bottom": 150,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 125,
+        "right": 343.6875,
+        "bottom": 150,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 130.5,
+        "right": 384.171875,
+        "bottom": 144.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 125,
+        "right": 412.625,
+        "bottom": 150,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 125,
+        "right": 450.421875,
+        "bottom": 150,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 130.5,
+        "right": 490.734375,
+        "bottom": 144.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 125,
+        "right": 522.53125,
+        "bottom": 150,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 394.8125,
+        "y": 162.5,
+        "right": 567.8125,
+        "bottom": 186.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 573.8125,
+        "y": 162,
+        "right": 634.046875,
+        "bottom": 187,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search matches",
+        "x": 640.046875,
+        "y": 167.5,
+        "right": 667,
+        "bottom": 181.5,
+        "width": 26.953125,
+        "height": 14,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "1000-dismissed",
+    "viewport": {
+      "width": 1000,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 41,
+      "right": 679,
+      "bottom": 156,
+      "width": 442,
+      "height": 115
+    },
+    "reader": {
+      "x": 237,
+      "y": 41,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 836
+    },
+    "body": {
+      "x": 237,
+      "y": 156,
+      "right": 679,
+      "bottom": 877,
+      "width": 442,
+      "height": 721
+    },
+    "alert": null,
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 679,
+      "y": 41,
+      "right": 1000,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 442,
+    "mainClientWidth": 442,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 85,
+        "right": 309.234375,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 85,
+        "right": 343.6875,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 90.5,
+        "right": 384.171875,
+        "bottom": 104.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 85,
+        "right": 412.625,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 85,
+        "right": 450.421875,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 90.5,
+        "right": 490.734375,
+        "bottom": 104.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 85,
+        "right": 522.53125,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 427.765625,
+        "y": 122.5,
+        "right": 600.765625,
+        "bottom": 146.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 606.765625,
+        "y": 122,
+        "right": 667,
+        "bottom": 147,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "1200-no-error",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 41,
+      "right": 879,
+      "bottom": 119,
+      "width": 642,
+      "height": 78
+    },
+    "reader": {
+      "x": 237,
+      "y": 41,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 836
+    },
+    "body": {
+      "x": 237,
+      "y": 119,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 758
+    },
+    "alert": null,
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 879,
+      "y": 41,
+      "right": 1200,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 642,
+    "mainClientWidth": 642,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 85,
+        "right": 309.234375,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 85,
+        "right": 343.6875,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 90.5,
+        "right": 384.171875,
+        "bottom": 104.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 85,
+        "right": 412.625,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 85,
+        "right": 450.421875,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 90.5,
+        "right": 490.734375,
+        "bottom": 104.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 85,
+        "right": 522.53125,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 627.765625,
+        "y": 85.5,
+        "right": 800.765625,
+        "bottom": 109.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 806.765625,
+        "y": 85,
+        "right": 867,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "1200-no-error-matches",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 41,
+      "right": 879,
+      "bottom": 119,
+      "width": 642,
+      "height": 78
+    },
+    "reader": {
+      "x": 237,
+      "y": 41,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 836
+    },
+    "body": {
+      "x": 237,
+      "y": 119,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 758
+    },
+    "alert": null,
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 879,
+      "y": 41,
+      "right": 1200,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 642,
+    "mainClientWidth": 642,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 85,
+        "right": 309.234375,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 85,
+        "right": 343.6875,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 90.5,
+        "right": 384.171875,
+        "bottom": 104.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 85,
+        "right": 412.625,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 85,
+        "right": 450.421875,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 90.5,
+        "right": 490.734375,
+        "bottom": 104.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 85,
+        "right": 522.53125,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 537.90625,
+        "y": 85.5,
+        "right": 710.90625,
+        "bottom": 109.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 716.90625,
+        "y": 85,
+        "right": 777.140625,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search matches",
+        "x": 783.140625,
+        "y": 90.5,
+        "right": 810.09375,
+        "bottom": 104.5,
+        "width": 26.953125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "Previous match",
+        "x": 816.09375,
+        "y": 85,
+        "right": 838.546875,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Next match",
+        "x": 844.546875,
+        "y": 85,
+        "right": 867,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "1200-no-error-no-matches",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 41,
+      "right": 879,
+      "bottom": 119,
+      "width": 642,
+      "height": 78
+    },
+    "reader": {
+      "x": 237,
+      "y": 41,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 836
+    },
+    "body": {
+      "x": 237,
+      "y": 119,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 758
+    },
+    "alert": null,
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 879,
+      "y": 41,
+      "right": 1200,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 642,
+    "mainClientWidth": 642,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 85,
+        "right": 309.234375,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 85,
+        "right": 343.6875,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 90.5,
+        "right": 384.171875,
+        "bottom": 104.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 85,
+        "right": 412.625,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 85,
+        "right": 450.421875,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 90.5,
+        "right": 490.734375,
+        "bottom": 104.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 85,
+        "right": 522.53125,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 594.8125,
+        "y": 85.5,
+        "right": 767.8125,
+        "bottom": 109.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 773.8125,
+        "y": 85,
+        "right": 834.046875,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search matches",
+        "x": 840.046875,
+        "y": 90.5,
+        "right": 867,
+        "bottom": 104.5,
+        "width": 26.953125,
+        "height": 14,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "1200-error",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 76,
+      "right": 879,
+      "bottom": 154,
+      "width": 642,
+      "height": 78
+    },
+    "reader": {
+      "x": 237,
+      "y": 76,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 801
+    },
+    "body": {
+      "x": 237,
+      "y": 154,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 723
+    },
+    "alert": {
+      "x": 237,
+      "y": 41,
+      "right": 879,
+      "bottom": 76,
+      "width": 642,
+      "height": 35
+    },
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 879,
+      "y": 41,
+      "right": 1200,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 642,
+    "mainClientWidth": 642,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 120,
+        "right": 309.234375,
+        "bottom": 145,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 120,
+        "right": 343.6875,
+        "bottom": 145,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 125.5,
+        "right": 384.171875,
+        "bottom": 139.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 120,
+        "right": 412.625,
+        "bottom": 145,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 120,
+        "right": 450.421875,
+        "bottom": 145,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 125.5,
+        "right": 490.734375,
+        "bottom": 139.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 120,
+        "right": 522.53125,
+        "bottom": 145,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 627.765625,
+        "y": 120.5,
+        "right": 800.765625,
+        "bottom": 144.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 806.765625,
+        "y": 120,
+        "right": 867,
+        "bottom": 145,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "1200-error-matches",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 76,
+      "right": 879,
+      "bottom": 154,
+      "width": 642,
+      "height": 78
+    },
+    "reader": {
+      "x": 237,
+      "y": 76,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 801
+    },
+    "body": {
+      "x": 237,
+      "y": 154,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 723
+    },
+    "alert": {
+      "x": 237,
+      "y": 41,
+      "right": 879,
+      "bottom": 76,
+      "width": 642,
+      "height": 35
+    },
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 879,
+      "y": 41,
+      "right": 1200,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 642,
+    "mainClientWidth": 642,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 120,
+        "right": 309.234375,
+        "bottom": 145,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 120,
+        "right": 343.6875,
+        "bottom": 145,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 125.5,
+        "right": 384.171875,
+        "bottom": 139.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 120,
+        "right": 412.625,
+        "bottom": 145,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 120,
+        "right": 450.421875,
+        "bottom": 145,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 125.5,
+        "right": 490.734375,
+        "bottom": 139.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 120,
+        "right": 522.53125,
+        "bottom": 145,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 537.90625,
+        "y": 120.5,
+        "right": 710.90625,
+        "bottom": 144.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 716.90625,
+        "y": 120,
+        "right": 777.140625,
+        "bottom": 145,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search matches",
+        "x": 783.140625,
+        "y": 125.5,
+        "right": 810.09375,
+        "bottom": 139.5,
+        "width": 26.953125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "Previous match",
+        "x": 816.09375,
+        "y": 120,
+        "right": 838.546875,
+        "bottom": 145,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Next match",
+        "x": 844.546875,
+        "y": 120,
+        "right": 867,
+        "bottom": 145,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "1200-error-no-matches",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 76,
+      "right": 879,
+      "bottom": 154,
+      "width": 642,
+      "height": 78
+    },
+    "reader": {
+      "x": 237,
+      "y": 76,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 801
+    },
+    "body": {
+      "x": 237,
+      "y": 154,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 723
+    },
+    "alert": {
+      "x": 237,
+      "y": 41,
+      "right": 879,
+      "bottom": 76,
+      "width": 642,
+      "height": 35
+    },
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 879,
+      "y": 41,
+      "right": 1200,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 642,
+    "mainClientWidth": 642,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 120,
+        "right": 309.234375,
+        "bottom": 145,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 120,
+        "right": 343.6875,
+        "bottom": 145,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 125.5,
+        "right": 384.171875,
+        "bottom": 139.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 120,
+        "right": 412.625,
+        "bottom": 145,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 120,
+        "right": 450.421875,
+        "bottom": 145,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 125.5,
+        "right": 490.734375,
+        "bottom": 139.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 120,
+        "right": 522.53125,
+        "bottom": 145,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 594.8125,
+        "y": 120.5,
+        "right": 767.8125,
+        "bottom": 144.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 773.8125,
+        "y": 120,
+        "right": 834.046875,
+        "bottom": 145,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search matches",
+        "x": 840.046875,
+        "y": 125.5,
+        "right": 867,
+        "bottom": 139.5,
+        "width": 26.953125,
+        "height": 14,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "1200-dismissed",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 41,
+      "right": 879,
+      "bottom": 119,
+      "width": 642,
+      "height": 78
+    },
+    "reader": {
+      "x": 237,
+      "y": 41,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 836
+    },
+    "body": {
+      "x": 237,
+      "y": 119,
+      "right": 879,
+      "bottom": 877,
+      "width": 642,
+      "height": 758
+    },
+    "alert": null,
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 879,
+      "y": 41,
+      "right": 1200,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 642,
+    "mainClientWidth": 642,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 85,
+        "right": 309.234375,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 85,
+        "right": 343.6875,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 90.5,
+        "right": 384.171875,
+        "bottom": 104.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 85,
+        "right": 412.625,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 85,
+        "right": 450.421875,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 90.5,
+        "right": 490.734375,
+        "bottom": 104.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 85,
+        "right": 522.53125,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 627.765625,
+        "y": 85.5,
+        "right": 800.765625,
+        "bottom": 109.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 806.765625,
+        "y": 85,
+        "right": 867,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "1440-no-error",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 119,
+      "width": 882,
+      "height": 78
+    },
+    "reader": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 836
+    },
+    "body": {
+      "x": 237,
+      "y": 119,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 758
+    },
+    "alert": null,
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 1119,
+      "y": 41,
+      "right": 1440,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 882,
+    "mainClientWidth": 882,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 85,
+        "right": 309.234375,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 85,
+        "right": 343.6875,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 90.5,
+        "right": 384.171875,
+        "bottom": 104.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 85,
+        "right": 412.625,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 85,
+        "right": 450.421875,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 90.5,
+        "right": 490.734375,
+        "bottom": 104.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 85,
+        "right": 522.53125,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 867.765625,
+        "y": 85.5,
+        "right": 1040.765625,
+        "bottom": 109.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 1046.765625,
+        "y": 85,
+        "right": 1107,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "1440-no-error-matches",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 119,
+      "width": 882,
+      "height": 78
+    },
+    "reader": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 836
+    },
+    "body": {
+      "x": 237,
+      "y": 119,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 758
+    },
+    "alert": null,
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 1119,
+      "y": 41,
+      "right": 1440,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 882,
+    "mainClientWidth": 882,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 85,
+        "right": 309.234375,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 85,
+        "right": 343.6875,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 90.5,
+        "right": 384.171875,
+        "bottom": 104.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 85,
+        "right": 412.625,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 85,
+        "right": 450.421875,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 90.5,
+        "right": 490.734375,
+        "bottom": 104.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 85,
+        "right": 522.53125,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 777.90625,
+        "y": 85.5,
+        "right": 950.90625,
+        "bottom": 109.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 956.90625,
+        "y": 85,
+        "right": 1017.140625,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search matches",
+        "x": 1023.140625,
+        "y": 90.5,
+        "right": 1050.09375,
+        "bottom": 104.5,
+        "width": 26.953125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "Previous match",
+        "x": 1056.09375,
+        "y": 85,
+        "right": 1078.546875,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Next match",
+        "x": 1084.546875,
+        "y": 85,
+        "right": 1107,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "1440-no-error-no-matches",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 119,
+      "width": 882,
+      "height": 78
+    },
+    "reader": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 836
+    },
+    "body": {
+      "x": 237,
+      "y": 119,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 758
+    },
+    "alert": null,
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 1119,
+      "y": 41,
+      "right": 1440,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 882,
+    "mainClientWidth": 882,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 85,
+        "right": 309.234375,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 85,
+        "right": 343.6875,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 90.5,
+        "right": 384.171875,
+        "bottom": 104.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 85,
+        "right": 412.625,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 85,
+        "right": 450.421875,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 90.5,
+        "right": 490.734375,
+        "bottom": 104.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 85,
+        "right": 522.53125,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 834.8125,
+        "y": 85.5,
+        "right": 1007.8125,
+        "bottom": 109.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 1013.8125,
+        "y": 85,
+        "right": 1074.046875,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search matches",
+        "x": 1080.046875,
+        "y": 90.5,
+        "right": 1107,
+        "bottom": 104.5,
+        "width": 26.953125,
+        "height": 14,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "1440-error",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 76,
+      "right": 1119,
+      "bottom": 154,
+      "width": 882,
+      "height": 78
+    },
+    "reader": {
+      "x": 237,
+      "y": 76,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 801
+    },
+    "body": {
+      "x": 237,
+      "y": 154,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 723
+    },
+    "alert": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 76,
+      "width": 882,
+      "height": 35
+    },
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 1119,
+      "y": 41,
+      "right": 1440,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 882,
+    "mainClientWidth": 882,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 120,
+        "right": 309.234375,
+        "bottom": 145,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 120,
+        "right": 343.6875,
+        "bottom": 145,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 125.5,
+        "right": 384.171875,
+        "bottom": 139.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 120,
+        "right": 412.625,
+        "bottom": 145,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 120,
+        "right": 450.421875,
+        "bottom": 145,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 125.5,
+        "right": 490.734375,
+        "bottom": 139.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 120,
+        "right": 522.53125,
+        "bottom": 145,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 867.765625,
+        "y": 120.5,
+        "right": 1040.765625,
+        "bottom": 144.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 1046.765625,
+        "y": 120,
+        "right": 1107,
+        "bottom": 145,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "1440-error-matches",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 76,
+      "right": 1119,
+      "bottom": 154,
+      "width": 882,
+      "height": 78
+    },
+    "reader": {
+      "x": 237,
+      "y": 76,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 801
+    },
+    "body": {
+      "x": 237,
+      "y": 154,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 723
+    },
+    "alert": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 76,
+      "width": 882,
+      "height": 35
+    },
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 1119,
+      "y": 41,
+      "right": 1440,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 882,
+    "mainClientWidth": 882,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 120,
+        "right": 309.234375,
+        "bottom": 145,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 120,
+        "right": 343.6875,
+        "bottom": 145,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 125.5,
+        "right": 384.171875,
+        "bottom": 139.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 120,
+        "right": 412.625,
+        "bottom": 145,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 120,
+        "right": 450.421875,
+        "bottom": 145,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 125.5,
+        "right": 490.734375,
+        "bottom": 139.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 120,
+        "right": 522.53125,
+        "bottom": 145,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 777.90625,
+        "y": 120.5,
+        "right": 950.90625,
+        "bottom": 144.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 956.90625,
+        "y": 120,
+        "right": 1017.140625,
+        "bottom": 145,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search matches",
+        "x": 1023.140625,
+        "y": 125.5,
+        "right": 1050.09375,
+        "bottom": 139.5,
+        "width": 26.953125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "Previous match",
+        "x": 1056.09375,
+        "y": 120,
+        "right": 1078.546875,
+        "bottom": 145,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Next match",
+        "x": 1084.546875,
+        "y": 120,
+        "right": 1107,
+        "bottom": 145,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "1440-error-no-matches",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 76,
+      "right": 1119,
+      "bottom": 154,
+      "width": 882,
+      "height": 78
+    },
+    "reader": {
+      "x": 237,
+      "y": 76,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 801
+    },
+    "body": {
+      "x": 237,
+      "y": 154,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 723
+    },
+    "alert": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 76,
+      "width": 882,
+      "height": 35
+    },
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 1119,
+      "y": 41,
+      "right": 1440,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 882,
+    "mainClientWidth": 882,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 120,
+        "right": 309.234375,
+        "bottom": 145,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 120,
+        "right": 343.6875,
+        "bottom": 145,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 125.5,
+        "right": 384.171875,
+        "bottom": 139.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 120,
+        "right": 412.625,
+        "bottom": 145,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 120,
+        "right": 450.421875,
+        "bottom": 145,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 125.5,
+        "right": 490.734375,
+        "bottom": 139.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 120,
+        "right": 522.53125,
+        "bottom": 145,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 834.8125,
+        "y": 120.5,
+        "right": 1007.8125,
+        "bottom": 144.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 1013.8125,
+        "y": 120,
+        "right": 1074.046875,
+        "bottom": 145,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search matches",
+        "x": 1080.046875,
+        "y": 125.5,
+        "right": 1107,
+        "bottom": 139.5,
+        "width": 26.953125,
+        "height": 14,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "1440-dismissed",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 836
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 119,
+      "width": 882,
+      "height": 78
+    },
+    "reader": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 836
+    },
+    "body": {
+      "x": 237,
+      "y": 119,
+      "right": 1119,
+      "bottom": 877,
+      "width": 882,
+      "height": 758
+    },
+    "alert": null,
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 877,
+      "width": 237,
+      "height": 836
+    },
+    "ask": {
+      "x": 1119,
+      "y": 41,
+      "right": 1440,
+      "bottom": 877,
+      "width": 321,
+      "height": 836
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 882,
+    "mainClientWidth": 882,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 85,
+        "right": 309.234375,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 85,
+        "right": 343.6875,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 90.5,
+        "right": 384.171875,
+        "bottom": 104.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 85,
+        "right": 412.625,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 85,
+        "right": 450.421875,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 90.5,
+        "right": 490.734375,
+        "bottom": 104.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 85,
+        "right": 522.53125,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 867.765625,
+        "y": 85.5,
+        "right": 1040.765625,
+        "bottom": 109.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 1046.765625,
+        "y": 85,
+        "right": 1107,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "label": "restart",
+    "viewport": {
+      "width": 1440,
+      "height": 873
+    },
+    "main": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 850,
+      "width": 882,
+      "height": 809
+    },
+    "toolbar": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 119,
+      "width": 882,
+      "height": 78
+    },
+    "reader": {
+      "x": 237,
+      "y": 41,
+      "right": 1119,
+      "bottom": 850,
+      "width": 882,
+      "height": 809
+    },
+    "body": {
+      "x": 237,
+      "y": 119,
+      "right": 1119,
+      "bottom": 850,
+      "width": 882,
+      "height": 731
+    },
+    "alert": null,
+    "sidebar": {
+      "x": 0,
+      "y": 41,
+      "right": 237,
+      "bottom": 850,
+      "width": 237,
+      "height": 809
+    },
+    "ask": {
+      "x": 1119,
+      "y": 41,
+      "right": 1440,
+      "bottom": 850,
+      "width": 321,
+      "height": 809
+    },
+    "documentOverflow": false,
+    "mainScrollWidth": 882,
+    "mainClientWidth": 882,
+    "controls": [
+      {
+        "label": "Outline",
+        "x": 249,
+        "y": 85,
+        "right": 309.234375,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "‹",
+        "x": 321.234375,
+        "y": 85,
+        "right": 343.6875,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Page",
+        "x": 349.6875,
+        "y": 90.5,
+        "right": 384.171875,
+        "bottom": 104.5,
+        "width": 34.484375,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "›",
+        "x": 390.171875,
+        "y": 85,
+        "right": 412.625,
+        "bottom": 110,
+        "width": 22.453125,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "−",
+        "x": 424.625,
+        "y": 85,
+        "right": 450.421875,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Zoom",
+        "x": 456.421875,
+        "y": 90.5,
+        "right": 490.734375,
+        "bottom": 104.5,
+        "width": 34.3125,
+        "height": 14,
+        "visible": true
+      },
+      {
+        "label": "+",
+        "x": 496.734375,
+        "y": 85,
+        "right": 522.53125,
+        "bottom": 110,
+        "width": 25.796875,
+        "height": 25,
+        "visible": true
+      },
+      {
+        "label": "Search in document",
+        "x": 867.765625,
+        "y": 85.5,
+        "right": 1040.765625,
+        "bottom": 109.5,
+        "width": 173,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "label": "Search",
+        "x": 1046.765625,
+        "y": 85,
+        "right": 1107,
+        "bottom": 110,
+        "width": 60.234375,
+        "height": 25,
+        "visible": true
+      }
+    ]
+  }
+]

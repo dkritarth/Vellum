@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ChatSessionSummary } from '../../core/chat/repo'
 import styles from './ChatsList.module.css'
 
@@ -34,23 +34,40 @@ export function ChatsList({ selectedSessionId, onSelectSession, onSessionDeleted
   const [focusedIndex, setFocusedIndex] = useState<number>(-1)
   const listRef = useRef<HTMLUListElement>(null)
 
-  const fetchSessions = useCallback(async () => {
-    try {
-      const data = await window.vellum.chatListSessions({ search })
-      setSessions(data)
-      setError(null)
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setLoading(false)
-    }
-  }, [search])
+  const refreshSessions = useRef<(() => Promise<void>) | null>(null)
 
   useEffect(() => {
+    let active = true
+    let latestRequest = 0
+    setLoading(true)
+    setError(null)
+    setSessions([])
+
+    const fetchSessions = async () => {
+      const request = ++latestRequest
+      const isCurrent = () => active && request === latestRequest
+      try {
+        const data = await window.vellum.chatListSessions({ search })
+        if (!isCurrent()) return
+        setSessions(data)
+        setError(null)
+      } catch (err: unknown) {
+        if (!isCurrent()) return
+        setError(err instanceof Error ? err.message : String(err))
+      } finally {
+        if (isCurrent()) setLoading(false)
+      }
+    }
+
+    refreshSessions.current = fetchSessions
     void fetchSessions()
     const interval = setInterval(fetchSessions, 2000)
-    return () => clearInterval(interval)
-  }, [fetchSessions])
+    return () => {
+      active = false
+      refreshSessions.current = null
+      clearInterval(interval)
+    }
+  }, [search])
 
   const handleDelete = async (e: React.MouseEvent, session: ChatSessionSummary) => {
     e.stopPropagation()
@@ -59,7 +76,7 @@ export function ChatsList({ selectedSessionId, onSelectSession, onSessionDeleted
     try {
       await window.vellum.chatDeleteSession(session.id)
       onSessionDeleted?.(session.id)
-      await fetchSessions()
+      await refreshSessions.current?.()
     } catch (err) {
       console.error('Failed to delete chat session:', err)
     }

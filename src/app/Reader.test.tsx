@@ -6,6 +6,7 @@
 // the empty/error states — not pdf.js's rendering pipeline. Real Electron
 // geometry/raster and pointer selection: test/reader-alignment-live.mjs.
 import '@testing-library/jest-dom/vitest'
+import { useLayoutEffect } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -867,4 +868,138 @@ describe('Reader selection actions [R1-05]', () => {
     fireEvent.click(await screen.findByRole('button', { name: action }))
     expect(action === 'Add to chat' ? onAddToChat : onExplain).toHaveBeenCalledWith(quote, page)
   })
+})
+describe('Reader paper ownership', () => {
+  it('removes outgoing content/actions in the incoming commit and waits for its render, not its reference index', async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({} as CanvasRenderingContext2D)
+    const read = deferred<ArrayBuffer>()
+    const documentReady = deferred<unknown>()
+    const pageReady = deferred<FakePage>()
+    const draw = deferred<void>()
+    const references = deferred<FakePage>()
+    const onAddToChat = vi.fn()
+    const onExplain = vi.fn()
+    const { container, rerender } = render(<Reader slug="a" onAddToChat={onAddToChat} onExplain={onExplain} />)
+    await waitFor(() => expect(getTextLayer(container)).toHaveTextContent(PAGE_TEXT[0]))
+    fireEvent.click(screen.getByRole('button', { name: '+' }))
+    await waitFor(() => expect(screen.getByLabelText('Zoom')).toHaveTextContent('125%'))
+    const oldCanvas = container.querySelector('canvas')!
+    const layer = getTextLayer(container)
+    const range = document.createRange()
+    range.setStart(layer.querySelector('span')!.firstChild!, 0)
+    range.setEnd(layer.querySelector('span')!.firstChild!, PAGE_TEXT[0].length)
+    window.getSelection()!.removeAllRanges()
+    window.getSelection()!.addRange(range)
+    fireEvent.mouseUp(layer)
+    expect(await screen.findByRole('button', { name: 'Add to chat' })).toBeVisible()
+
+    window.vellum.readPaperFile = vi.fn().mockReturnValue(read.promise)
+    getDocumentMock.mockReturnValue({ promise: documentReady.promise })
+    let firstCommit: { outgoing: boolean; text: string; actions: number } | undefined
+    function ObserveCommit() {
+      useLayoutEffect(() => {
+        firstCommit = {
+          outgoing: oldCanvas.isConnected,
+          text: getTextLayer(container).textContent ?? '',
+          actions: container.querySelectorAll('[aria-label="Selection actions"]').length,
+        }
+      }, [])
+      return null
+    }
+    rerender(<><Reader slug="b" onAddToChat={onAddToChat} onExplain={onExplain} /><ObserveCommit /></>)
+    expect(firstCommit).toEqual({ outgoing: false, text: '', actions: 0 })
+    const pageLayer = () => container.querySelector('[class*="pageLayer"]')!
+    expect(pageLayer()).not.toBeVisible()
+    expect(screen.getByText('Loading…')).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Add to chat' })).toBeNull()
+    fireEvent.mouseUp(layer)
+    expect(onAddToChat).not.toHaveBeenCalled()
+    expect(onExplain).not.toHaveBeenCalled()
+
+    await act(async () => read.resolve(new ArrayBuffer(8)))
+    expect(pageLayer()).not.toBeVisible()
+    await act(async () => documentReady.resolve({
+      numPages: 2,
+      getOutline: async () => null,
+      getPage: (number: number) => number === 1 ? pageReady.promise : references.promise,
+    }))
+    expect(pageLayer()).not.toBeVisible()
+    await act(async () => pageReady.resolve({ ...fakePage('Current B text'), render: () => ({ promise: draw.promise, cancel: vi.fn() }) }))
+    expect(pageLayer()).not.toBeVisible()
+    expect(screen.getByText('Loading…')).toBeVisible()
+    await act(async () => draw.resolve())
+    await waitFor(() => expect(pageLayer()).toBeVisible())
+    expect(screen.queryByText('Loading…')).toBeNull()
+    expect(getTextLayer(container)).toHaveTextContent('Current B text')
+    expect(screen.getByLabelText('Zoom')).toHaveTextContent('125%')
+    expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2')
+    range.setStart(getTextLayer(container).querySelector('span')!.firstChild!, 0)
+    range.setEnd(getTextLayer(container).querySelector('span')!.firstChild!, 'Current B text'.length)
+    window.getSelection()!.removeAllRanges()
+    window.getSelection()!.addRange(range)
+    fireEvent.mouseUp(getTextLayer(container))
+    fireEvent.click(await screen.findByRole('button', { name: 'Explain' }))
+    expect(onExplain).toHaveBeenCalledWith('Current B text', 1)
+    await act(async () => references.resolve(fakePage('References')))
+  })
+})
+
+describe('Reader stale paper completions', () => {
+  it.each(['read', 'document', 'page', 'canvas', 'text'] as const)(
+    'keeps B visible after rapid A/B/A/B switches and a late A %s completion', async (stage) => {
+      vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({} as CanvasRenderingContext2D)
+      const pending = deferred<void>()
+      const reached = vi.fn()
+      const cancel = vi.fn()
+      const aPage = {
+        ...fakePage('Outgoing A'),
+        render: () => {
+          if (stage === 'canvas') reached()
+          return { promise: stage === 'canvas' ? pending.promise : Promise.resolve(), cancel }
+        },
+      }
+      const aDoc = {
+        numPages: 1,
+        getOutline: async () => null,
+        getPage: async () => {
+          if (stage === 'page') { reached(); await pending.promise }
+          return aPage
+        },
+      }
+      const bytesA = new ArrayBuffer(1)
+      const bytesB = new ArrayBuffer(2)
+      window.vellum.readPaperFile = vi.fn().mockImplementation(async (slug: string) => {
+        if (slug === 'a' && stage === 'read') { reached(); await pending.promise }
+        return slug === 'a' ? bytesA : bytesB
+      })
+      getDocumentMock.mockImplementation(({ data }: { data: ArrayBuffer }) => ({
+        promise: (async () => {
+          if (data === bytesA && stage === 'document') { reached(); await pending.promise }
+          return data === bytesA ? aDoc : fakePdfDoc()
+        })(),
+      }))
+      if (stage === 'text') {
+        textLayerRenderMock.mockImplementationOnce((container: HTMLElement) => {
+          reached()
+          return pending.promise.then(() => { container.textContent = 'Late outgoing A' })
+        })
+      }
+      const { container, rerender } = render(<Reader slug="a" />)
+      await waitFor(() => expect(reached).toHaveBeenCalled())
+      rerender(<Reader slug="b" />)
+      rerender(<Reader slug="a" />)
+      rerender(<Reader slug="b" />)
+      await waitFor(() => expect(getTextLayer(container)).toHaveTextContent(PAGE_TEXT[0]))
+      expect(getTextLayer(container)).toBeVisible()
+      const currentCanvas = container.querySelector('canvas')
+      await act(async () => pending.resolve())
+      expect(container.querySelector('canvas')).toBe(currentCanvas)
+      expect(getTextLayer(container)).toHaveTextContent(PAGE_TEXT[0])
+      expect(getTextLayer(container)).toBeVisible()
+      expect(screen.queryByText('Loading…')).toBeNull()
+      expect(screen.queryByRole('toolbar', { name: 'Selection actions' })).toBeNull()
+      if (stage === 'canvas') expect(cancel).toHaveBeenCalled()
+      if (stage === 'text') expect(textLayerCancelMock).toHaveBeenCalled()
+    },
+  )
 })

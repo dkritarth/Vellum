@@ -1,0 +1,13 @@
+
+> vellum@0.1.0 test
+> vitest run src/app/NotesPanel.test.tsx
+
+
+ RUN  v2.1.9 /home/dandapat/.t3/worktrees/Vellum/t3-caffbec5
+
+ ✓ src/app/NotesPanel.test.tsx (28 tests) 378ms
+
+ Test Files  1 passed (1)
+      Tests  28 passed (28)
+   Start at  09:50:47
+   Duration  1.27s (transform 116ms, setup 0ms, collect 218ms, tests 378ms, environment 355ms, prepare 82ms)

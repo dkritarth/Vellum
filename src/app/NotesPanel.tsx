@@ -5,6 +5,8 @@
 // Flow:
 //   1. On mount / slug change: `notesGet(slug)` loads the persisted note (or
 //      undefined/null if the paper has none yet — the empty-note state).
+//      Editing and Clear stay disabled until this read succeeds. Failure
+//      shows an explicit error and Retry, never an editable empty note.
 //   2. Typing schedules a debounced `notesSave({ slug, body })` — the storage
 //      layer's upsert-by-paper-slug means autosave never needs to know
 //      whether a note already exists.
@@ -21,6 +23,8 @@ import styles from './NotesPanel.module.css'
 
 const SAVE_DEBOUNCE_MS = 500
 
+type LoadStatus = 'loading' | 'ready' | 'error'
+
 type SaveStatus = 'idle' | 'saving' | 'saved'
 
 interface NotesPanelProps {
@@ -30,6 +34,9 @@ interface NotesPanelProps {
 
 export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
   const [body, setBody] = useState('')
+  const [load, setLoad] = useState<{ slug?: string; status: LoadStatus }>({ slug, status: 'loading' })
+  const [loadAttempt, setLoadAttempt] = useState(0)
+  const canEdit = load.slug === slug && load.status === 'ready'
   const [status, setStatus] = useState<SaveStatus>('idle')
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Ref-mirrored so the flush path (which runs from effect cleanups, outside
@@ -41,9 +48,6 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
   // editor that issued an earlier request. Cleanup retires outgoing results.
   const paperGeneration = useRef(0)
   const editRevision = useRef(0)
-  // Unlike dirtyRef, this stays true after autosave: a delayed read must
-  // never replace an edit, even when that edit has already been saved.
-  const editedSinceLoad = useRef(false)
   const slugRef = useRef<string | undefined>(slug)
   bodyRef.current = body
   slugRef.current = slug
@@ -75,7 +79,7 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
   useEffect(() => {
     paperGeneration.current += 1
     setStatus('idle')
-    editedSinceLoad.current = false
+    setLoad({ slug, status: 'loading' })
     dirtyRef.current = false
 
     if (!slug) {
@@ -89,13 +93,14 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
     window.vellum
       .notesGet(slug)
       .then((note) => {
-        if (cancelled || editedSinceLoad.current) return
+        if (cancelled) return
         setBody(note?.body ?? '')
+        setLoad({ slug, status: 'ready' })
         dirtyRef.current = false
       })
       .catch(() => {
-        if (!cancelled && !editedSinceLoad.current) {
-          setBody('')
+        if (!cancelled) {
+          setLoad({ slug, status: 'error' })
           dirtyRef.current = false
         }
       })
@@ -105,7 +110,7 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
       flushPendingSave(slug)
       paperGeneration.current += 1
     }
-  }, [slug, flushPendingSave])
+  }, [slug, loadAttempt, flushPendingSave])
 
   // Belt-and-suspenders true-unmount flush (empty deps — this cleanup only
   // ever runs once, on unmount, not on every slug change). Uses the
@@ -120,8 +125,7 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
   }, [flushPendingSave])
 
   const clearNote = useCallback(() => {
-    if (!slug) return
-    editedSinceLoad.current = true
+    if (!slug || !canEdit) return
     if (saveTimer.current) {
       clearTimeout(saveTimer.current)
       saveTimer.current = null
@@ -144,28 +148,40 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
         dirtyRef.current = true
         setStatus('idle')
       })
-  }, [slug])
+  }, [slug, canEdit])
 
   if (!slug) return <p className={styles.placeholder}>Open a paper to add notes.</p>
 
   return (
     <div className={styles.notesPanel}>
       <div className={styles.header}>
-        <button type="button" className={styles.clearButton} onClick={clearNote} disabled={!body}>
+        <button type="button" className={styles.clearButton} onClick={clearNote} disabled={!canEdit || !body}>
           Clear note
         </button>
         <p className={styles.status}>{status === 'saving' ? 'Saving…' : status === 'saved' ? 'Saved' : ''}</p>
       </div>
+      {!canEdit && (load.slug !== slug || load.status === 'loading') && (
+        <p className={styles.loadMessage} role="status">Loading note…</p>
+      )}
+      {load.slug === slug && load.status === 'error' && (
+        <div className={styles.loadMessage}>
+          <p role="alert">Could not load this note. Retry to recover saved text before editing.</p>
+          <button type="button" className={styles.clearButton} onClick={() => setLoadAttempt((attempt) => attempt + 1)}>
+            Retry
+          </button>
+        </div>
+      )}
       <textarea
         className={styles.editor}
         aria-label="Note"
         placeholder="Write notes about this paper…"
         value={body}
+        disabled={!canEdit}
         onChange={(event) => {
+          if (!canEdit) return
           const next = event.target.value
           setBody(next)
           bodyRef.current = next
-          editedSinceLoad.current = true
           editRevision.current += 1
           dirtyRef.current = true
           const generation = paperGeneration.current

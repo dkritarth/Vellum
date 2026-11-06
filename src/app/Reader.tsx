@@ -457,6 +457,9 @@ function PaperReader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain, 
   const [searchResults, setSearchResults] = useState<SearchMatch[]>([])
   const [searchIndex, setSearchIndex] = useState(0)
   const [searching, setSearching] = useState(false)
+  const [searchComplete, setSearchComplete] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const searchRequestRef = useRef(0)
   const [highlights, setHighlights] = useState<HighlightRecord[]>([])
   const [textLayerVersion, setTextLayerVersion] = useState(0)
   const [overlays, setOverlays] = useState<OverlayRect[]>([])
@@ -557,6 +560,7 @@ function PaperReader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain, 
     return () => {
       cancelled = true
       paperDisposedRef.current = true
+      searchRequestRef.current += 1
       // The loading task owns its document transport and worker, even when
       // loading fails or is still pending. Do not also destroy the proxy.
       void loadingTask?.destroy().catch(() => {
@@ -856,8 +860,23 @@ function PaperReader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain, 
     setHoveredCitation(null)
   }
 
-  async function runSearch(query: string): Promise<void> {
+  function editSearch(query: string): void {
+    searchRequestRef.current += 1
     setSearchQuery(query)
+    setSearchResults([])
+    setSearchIndex(0)
+    setSearching(false)
+    setSearchComplete(false)
+    setSearchError(null)
+  }
+
+  async function runSearch(query: string): Promise<void> {
+    const request = ++searchRequestRef.current
+    const isCurrent = () => !paperDisposedRef.current && request === searchRequestRef.current
+    setSearchResults([])
+    setSearchIndex(0)
+    setSearchComplete(false)
+    setSearchError(null)
     if (!doc || !query.trim()) {
       setSearchResults([])
       setSearchIndex(0)
@@ -866,14 +885,18 @@ function PaperReader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain, 
     setSearching(true)
     try {
       const results = await searchDocument(doc, query)
-      if (paperDisposedRef.current) return
+      if (!isCurrent()) return
+      setSearchComplete(true)
       setSearchResults(results)
       setSearchIndex(0)
       if (results.length > 0) goToPage(results[0].pageNumber)
     } catch (err: unknown) {
-      if (!paperDisposedRef.current) throw err
+      if (isCurrent()) {
+        const detail = err instanceof Error ? `: ${err.message}` : ''
+        setSearchError(`Could not search this PDF${detail}. Try Search again.`)
+      }
     } finally {
-      if (!paperDisposedRef.current) setSearching(false)
+      if (isCurrent()) setSearching(false)
     }
   }
 
@@ -947,11 +970,12 @@ function PaperReader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain, 
             placeholder="Search…"
             value={searchQuery}
             disabled={!doc}
-            onChange={(event) => setSearchQuery(event.target.value)}
+            onChange={(event) => editSearch(event.target.value)}
           />
           <button type="submit" disabled={!doc || searching}>
             Search
           </button>
+          {searching ? <span role="status">Searching…</span> : null}
           {searchResults.length > 0 ? (
             <>
               <span aria-label="Search matches">
@@ -964,11 +988,13 @@ function PaperReader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain, 
                 ›
               </button>
             </>
-          ) : searchQuery && !searching ? (
+          ) : searchComplete ? (
             <span aria-label="Search matches">0 / 0</span>
           ) : null}
         </form>
       </div>
+
+      {searchError ? <p role="alert" className={styles.searchError}>{searchError}</p> : null}
 
       <div className={styles.body}>
         {tocOpen ? (

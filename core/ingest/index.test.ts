@@ -111,6 +111,34 @@ describe('ingest', () => {
     }
   })
 
+  it('persists usable paper metadata but no unfinished summary across reopen', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-'))
+    const dbPath = join(tmpDir, 'app.db')
+    let db = openDb({ path: dbPath })
+    let sessions = 0
+    const client: AcpClient = {
+      async newSession() {
+        sessions++
+        // Extraction and summary both end prematurely after usable text.
+        return new FakeSession([textUpdate(sessions === 1 ? AGENT_JSON : 'Unfinished summary.')])
+      },
+    }
+    try {
+      const result = await ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client })
+      db.close()
+      db = openDb({ path: dbPath })
+      const paper = getPaper(db, result.slug)
+      expect(paper?.summary).toBeUndefined()
+      expect(paper?.title).toBe('Sample Paper Title (agent-refined)')
+      expect(paper?.authors).toEqual(['Agent Author'])
+      expect(paper?.sections).toHaveLength(2)
+      expect(readFileSync(result.paths.mdPath, 'utf8')).toContain('Sample Paper Title')
+      expect(readFileSync(result.paths.pdfPath)).toEqual(readFileSync(FIXTURE_PDF))
+    } finally {
+      db.close()
+    }
+  })
+
   it('falls back to fetch-time metadata for fields a degraded agent extraction omits', async () => {
     tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-'))
     const db = openDb({ path: ':memory:' })

@@ -576,7 +576,7 @@ function PaperReader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain, 
   // didn't change).
   useEffect(() => {
     if (!jumpTarget) return
-    setPageNumber(clampPage(jumpTarget.page, numPages))
+    goToPage(jumpTarget.page)
     setFlashId(jumpTarget.highlightId)
     const timer = setTimeout(() => setFlashId(null), FLASH_DURATION_MS)
     return () => clearTimeout(timer)

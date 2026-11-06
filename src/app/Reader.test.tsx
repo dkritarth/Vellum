@@ -749,6 +749,52 @@ describe('Reader highlight capture [P2-02]', () => {
   })
 })
 
+describe('Reader annotation selection retirement [#173]', () => {
+  it.each([1, 2])('retires selection on annotation jump to page %i and keeps flash and fresh context', async (page) => {
+    const onAddToChat = vi.fn()
+    window.vellum.highlightsList = vi.fn().mockResolvedValue([{
+      id: 'destination', paperSlug: 'my-paper', page, color: 'yellow',
+      quote: PAGE_TEXT[page - 1].slice(0, 6), anchor: JSON.stringify({ start: 0, end: 6 }), createdAt: 't',
+    }])
+    const { container, rerender } = render(<Reader slug="my-paper" onAddToChat={onAddToChat} />)
+    await waitFor(() => expect(getTextLayer(container)).toHaveTextContent(PAGE_TEXT[0]))
+
+    function select(quote: string): void {
+      const layer = getTextLayer(container)
+      const range = document.createRange()
+      range.setStart(layer.querySelector('span')!.firstChild!, 0)
+      range.setEnd(layer.querySelector('span')!.firstChild!, quote.length)
+      window.getSelection()!.removeAllRanges()
+      window.getSelection()!.addRange(range)
+      fireEvent.mouseUp(layer)
+    }
+
+    select('Introduction')
+    expect(screen.getByRole('toolbar', { name: 'Selection actions' })).toBeVisible()
+    const jumpTarget = { page, highlightId: 'destination', nonce: 1 }
+    rerender(<Reader slug="my-paper" onAddToChat={onAddToChat} jumpTarget={jumpTarget} />)
+    await waitFor(() => expect(getTextLayer(container)).toHaveTextContent(PAGE_TEXT[page - 1]))
+    expect(screen.getByLabelText('Page')).toHaveTextContent(page + ' of 2')
+    expect(screen.queryByRole('toolbar', { name: 'Selection actions' })).not.toBeInTheDocument()
+    await waitFor(() => expect(getOverlayContainer(container).firstElementChild).toHaveClass(/highlightRectFlash/))
+    expect(onAddToChat).not.toHaveBeenCalled()
+
+    const quote = PAGE_TEXT[page - 1].slice(0, 6)
+    select(quote)
+    // An unrelated parent render must not retire a fresh destination selection.
+    rerender(<Reader slug="my-paper" onAddToChat={onAddToChat} jumpTarget={jumpTarget} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add to chat' }))
+    expect(onAddToChat).toHaveBeenCalledTimes(1)
+    expect(onAddToChat).toHaveBeenCalledWith(quote, page)
+
+    // Repeated same-page requests still retire selection and restart the flash.
+    select(quote)
+    rerender(<Reader slug="my-paper" onAddToChat={onAddToChat} jumpTarget={{ ...jumpTarget, nonce: 2 }} />)
+    expect(screen.queryByRole('toolbar', { name: 'Selection actions' })).not.toBeInTheDocument()
+    expect(getOverlayContainer(container).firstElementChild).toHaveClass(/highlightRectFlash/)
+  })
+})
+
 describe('Reader jump/flash seam [P2-02]', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true })

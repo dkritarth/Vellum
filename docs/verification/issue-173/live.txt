@@ -1,0 +1,7 @@
+PASS empty annotations state
+PASS native page 1 selection then visible page 2 annotation removes actions, renders destination and flashes; row retains focus
+PASS same-page selection retirement, flash expiry and keyboard reflash
+PASS rapid annotation jumps finish on latest page with flash and no stale actions
+PASS fresh destination native quote enters Ask composer with page 2, composer focused, no send/model call
+PASS process restart preserves both native-created highlights and note; restored page 2 annotation works
+PASS zero unexpected renderer console warnings/errors/pageerrors

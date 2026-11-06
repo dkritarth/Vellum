@@ -465,3 +465,129 @@ describe('NotesPanel', () => {
     expect(notesSave).not.toHaveBeenCalled()
   })
 })
+
+describe('loaded note mutation recovery', () => {
+  it('retains the unsaved draft through repeated save failure and retries without another edit', async () => {
+    notesGet.mockResolvedValue({ body: 'saved evidence' })
+    notesSave.mockRejectedValueOnce(new Error('save failed')).mockRejectedValueOnce(new Error('still failed'))
+    render(<NotesPanel slug="p1" />)
+    await flushPromises()
+    const editor = screen.getByRole('textbox', { name: 'Note' })
+    fireEvent.change(editor, { target: { value: 'new unsaved evidence' } })
+    await act(async () => { vi.advanceTimersByTime(500) })
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      expect(screen.getByRole('alert')).toHaveTextContent('Could not save this note')
+      expect(editor).toHaveValue('new unsaved evidence')
+      expect(editor).toBeEnabled()
+      expect(screen.queryByText('Saved')).not.toBeInTheDocument()
+      const retry = screen.getByRole('button', { name: 'Retry save' })
+      retry.focus()
+      expect(retry).toHaveFocus()
+      fireEvent.click(retry)
+      await flushPromises()
+    }
+    expect(notesSave).toHaveBeenCalledTimes(3)
+    expect(notesSave).toHaveBeenLastCalledWith({ slug: 'p1', body: 'new unsaved evidence' })
+    expect(screen.getByText('Saved')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(notesGet).toHaveBeenCalledTimes(1)
+  })
+
+  it('restores the unsaved draft after repeated Clear failure and explicitly retries deletion', async () => {
+    notesGet.mockResolvedValue({ body: 'saved evidence' })
+    notesDelete.mockRejectedValueOnce(new Error('delete failed')).mockRejectedValueOnce(new Error('still failed'))
+    render(<NotesPanel slug="p1" />)
+    await flushPromises()
+    const editor = screen.getByRole('textbox', { name: 'Note' })
+    fireEvent.change(editor, { target: { value: 'unsaved evidence before Clear' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Clear note' }))
+    await flushPromises()
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      expect(screen.getByRole('alert')).toHaveTextContent('Could not clear this note')
+      expect(editor).toHaveValue('unsaved evidence before Clear')
+      expect(screen.queryByText('Cleared')).not.toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Retry Clear' }))
+      await flushPromises()
+    }
+    await act(async () => { vi.advanceTimersByTime(1000) })
+    expect(notesDelete).toHaveBeenCalledTimes(3)
+    expect(notesSave).not.toHaveBeenCalled()
+    expect(editor).toHaveValue('')
+    expect(screen.getByText('Cleared')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('new typing invalidates a failed Clear retry and saves the latest text', async () => {
+    notesGet.mockResolvedValue({ body: 'original evidence' })
+    notesDelete.mockRejectedValueOnce(new Error('delete failed'))
+    notesSave.mockRejectedValueOnce(new Error('save failed'))
+    render(<NotesPanel slug="p1" />)
+    await flushPromises()
+    fireEvent.click(screen.getByRole('button', { name: 'Clear note' }))
+    await flushPromises()
+    expect(screen.getByRole('button', { name: 'Retry Clear' })).toBeInTheDocument()
+    const editor = screen.getByRole('textbox', { name: 'Note' })
+    fireEvent.change(editor, { target: { value: 'new research after failed Clear' } })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Retry Clear' })).not.toBeInTheDocument()
+    await act(async () => { vi.advanceTimersByTime(500) })
+    fireEvent.click(screen.getByRole('button', { name: 'Retry save' }))
+    await flushPromises()
+    expect(notesDelete).toHaveBeenCalledTimes(1)
+    expect(notesSave).toHaveBeenLastCalledWith({ slug: 'p1', body: 'new research after failed Clear' })
+    expect(editor).toHaveValue('new research after failed Clear')
+    expect(screen.getByText('Saved')).toBeInTheDocument()
+  })
+
+  it.each(['save', 'clear'] as const)('a late %s retry failure cannot affect a new paper generation', async (operation) => {
+    const late = deferred<void>()
+    notesGet.mockResolvedValue({ body: 'persisted evidence' })
+    const mutation = operation === 'save' ? notesSave : notesDelete
+    mutation.mockRejectedValueOnce(new Error('first failure')).mockReturnValueOnce(late.promise)
+    const { rerender } = render(<NotesPanel slug="p1" />)
+    await flushPromises()
+    if (operation === 'save') {
+      fireEvent.change(screen.getByRole('textbox', { name: 'Note' }), { target: { value: 'draft' } })
+      await act(async () => { vi.advanceTimersByTime(500) })
+    } else {
+      fireEvent.click(screen.getByRole('button', { name: 'Clear note' }))
+      await flushPromises()
+    }
+    fireEvent.click(screen.getByRole('button', { name: operation === 'save' ? 'Retry save' : 'Retry Clear' }))
+    rerender(<NotesPanel slug="p2" />)
+    await flushPromises()
+    rerender(<NotesPanel slug="p1" />)
+    await flushPromises()
+    await act(async () => { late.reject(new Error('obsolete failure')) })
+    expect(screen.getByRole('textbox', { name: 'Note' })).toHaveValue('persisted evidence')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /retry/i })).not.toBeInTheDocument()
+  })
+
+  it.each(['save', 'clear'] as const)('a late %s retry failure cannot affect newer typing', async (operation) => {
+    const late = deferred<void>()
+    notesGet.mockResolvedValue({ body: 'persisted evidence' })
+    const mutation = operation === 'save' ? notesSave : notesDelete
+    mutation.mockRejectedValueOnce(new Error('first failure')).mockReturnValueOnce(late.promise)
+    render(<NotesPanel slug="p1" />)
+    await flushPromises()
+    const editor = screen.getByRole('textbox', { name: 'Note' })
+    if (operation === 'save') {
+      fireEvent.change(editor, { target: { value: 'draft' } })
+      await act(async () => { vi.advanceTimersByTime(500) })
+    } else {
+      fireEvent.click(screen.getByRole('button', { name: 'Clear note' }))
+      await flushPromises()
+    }
+    fireEvent.click(screen.getByRole('button', { name: operation === 'save' ? 'Retry save' : 'Retry Clear' }))
+    fireEvent.change(editor, { target: { value: 'latest draft' } })
+    await act(async () => { late.reject(new Error('obsolete failure')) })
+    expect(editor).toHaveValue('latest draft')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await act(async () => { vi.advanceTimersByTime(500) })
+    expect(notesSave).toHaveBeenLastCalledWith({ slug: 'p1', body: 'latest draft' })
+    expect(screen.getByText('Saved')).toBeInTheDocument()
+  })
+})

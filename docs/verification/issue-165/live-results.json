@@ -1,0 +1,18 @@
+{
+  "results": [
+    "Visible Notes placeholder, real-paper ingestion/rendering, true missing-note editor and normal autosave",
+    "Delayed rejected autosave preserves draft/focus and old storage; keyboard retry repeats failure then saves same draft; process restart retains recovered save",
+    "Repeated Clear failure restores exact unsaved draft; newer keyboard edit removes obsolete Clear intent and Retry saves latest text",
+    "Explicit Clear retry invokes production delete, reports Cleared and removes stored note across process restart",
+    "Late rejected save and Clear after visible paper switch cannot replace B text or show obsolete error; revisit reads persisted A",
+    "Initial read error still locks Note/Clear and has distinct keyboard Retry that reads original without saving",
+    "Normal loaded debounce and quick Notes unmount flush remain functional",
+    "Final restart retains final edit, unrelated note/history message and byte-identical ingested PDFs",
+    "Zero renderer errors, warnings or page errors across four launches"
+  ],
+  "consoleLines": [],
+  "paperHashes": [
+    "bdfaa68d8984f0dc02beaca527b76f207d99b666d31d1da728ee0728182df697",
+    "5692a5514787a8c6727b4ff3b726a3385798bc68e12138d1d4af83947e2acf6e"
+  ]
+}

@@ -1,0 +1,2 @@
+PASS isolated npm run dev: visible real-paper ingestion, empty Notes, keyboard focus, save, Clear, clean renderer console
+Isolated development data: /data/dandapat/.tmp/vellum-165-dev-ktk1Ib

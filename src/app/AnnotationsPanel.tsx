@@ -10,14 +10,16 @@ import styles from './AnnotationsPanel.module.css'
 interface AnnotationsPanelProps {
   /** Slug of the currently open paper, if any. Undefined = no paper open. */
   slug?: string
-  /** Monotonic invalidation count for `slug`, advanced only after a saved creation. */
+  /** Monotonic invalidation count for `slug`, advanced only after a persisted change. */
   highlightsRevision?: number
+  /** Reports only persisted deletions, including late outgoing-paper completions. */
+  onHighlightDeleted?: (paperSlug: string) => void
   /** Drives the Reader to a highlight's page (and flashes it) — wired by
    * App, since Reader and this panel are siblings under it. */
   onJump?: (highlight: HighlightRecord) => void
 }
 
-export function AnnotationsPanel({ slug, onJump, highlightsRevision = 0 }: AnnotationsPanelProps): JSX.Element {
+export function AnnotationsPanel({ slug, onJump, onHighlightDeleted, highlightsRevision = 0 }: AnnotationsPanelProps): JSX.Element {
   const [highlights, setHighlights] = useState<HighlightRecord[]>([])
   const [loading, setLoading] = useState(false)
   // Slug the panel currently shows; a list response for any other paper is
@@ -63,10 +65,13 @@ export function AnnotationsPanel({ slug, onJump, highlightsRevision = 0 }: Annot
       if (!slug) return
       window.vellum
         .highlightsDelete(id)
-        .then(() => load(slug))
+        .then(() => {
+          onHighlightDeleted?.(slug)
+          load(slug)
+        })
         .catch(() => undefined)
     },
-    [slug, load],
+    [slug, load, onHighlightDeleted],
   )
 
   if (!slug) return <p className={styles.placeholder}>Open a paper to view its highlights.</p>

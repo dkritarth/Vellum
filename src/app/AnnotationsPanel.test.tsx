@@ -190,3 +190,36 @@ describe('creation refresh ordering', () => {
     expect(row).toBeInTheDocument()
   })
 })
+
+describe('persisted deletion notification', () => {
+  it('reports the originating paper only after a successful late deletion', async () => {
+    let finish!: () => void
+    highlightsDelete.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve }))
+    const onHighlightDeleted = vi.fn()
+    const { rerender } = render(<AnnotationsPanel slug="p1" onHighlightDeleted={onHighlightDeleted} />)
+    await flushPromises()
+    await userEvent.click(screen.getByRole('button', { name: /delete highlight: first highlight/i }))
+    expect(onHighlightDeleted).not.toHaveBeenCalled()
+    highlightsList.mockResolvedValue([])
+    rerender(<AnnotationsPanel slug="p2" onHighlightDeleted={onHighlightDeleted} />)
+    await flushPromises()
+    const readsBefore = highlightsList.mock.calls.length
+    await act(async () => finish())
+    expect(onHighlightDeleted).toHaveBeenCalledTimes(1)
+    expect(onHighlightDeleted).toHaveBeenCalledWith('p1')
+    expect(highlightsList).toHaveBeenCalledTimes(readsBefore)
+    expect(screen.getByText(/no highlights yet/i)).toBeVisible()
+  })
+
+  it('preserves rows and publishes no success on failed deletion', async () => {
+    highlightsDelete.mockRejectedValueOnce(new Error('delete rejected'))
+    const onHighlightDeleted = vi.fn()
+    render(<AnnotationsPanel slug="p1" onHighlightDeleted={onHighlightDeleted} />)
+    await flushPromises()
+    await userEvent.click(screen.getByRole('button', { name: /delete highlight: first highlight/i }))
+    await flushPromises()
+    expect(onHighlightDeleted).not.toHaveBeenCalled()
+    expect(highlightsList).toHaveBeenCalledTimes(1)
+    expect(screen.getByText('first highlight')).toBeVisible()
+  })
+})

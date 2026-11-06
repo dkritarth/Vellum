@@ -1,0 +1,1 @@
+PASS npm run dev actual Electron native selection creates immediate row and Delete removes overlay/list/storage without navigation. Isolated root /tmp/vellum181-dev-wAp4Zl

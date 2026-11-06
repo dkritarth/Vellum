@@ -1,0 +1,13 @@
+
+> vellum@0.1.0 test
+> vitest run core/chat/manager.test.ts
+
+
+ RUN  v2.1.9 /home/dandapat/.t3/worktrees/Vellum/t3-13c310c5
+
+ ✓ core/chat/manager.test.ts (24 tests) 82ms
+
+ Test Files  1 passed (1)
+      Tests  24 passed (24)
+   Start at  09:39:17
+   Duration  567ms (transform 125ms, setup 0ms, collect 158ms, tests 82ms, environment 0ms, prepare 89ms)

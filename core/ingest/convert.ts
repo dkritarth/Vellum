@@ -13,7 +13,12 @@
 // layout parse — good enough to make paper.md skimmable and greppable by an
 // agent, not a faithful re-typeset of the PDF.
 
-import { extractTextItems } from 'unpdf'
+import { extractTextItems, getDocumentProxy } from 'unpdf'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+// Replaced only by the main-process bundler; absent during source execution.
+declare const __VELLUM_MAIN_BUNDLE__: boolean
 
 const H1_RATIO = 1.8
 const H2_RATIO = 1.15
@@ -30,7 +35,23 @@ export async function convertPdfToMarkdown(pdfBytes: Uint8Array): Promise<string
     throw new Error('convertPdfToMarkdown: empty PDF bytes')
   }
 
-  const { items } = await extractTextItems(pdfBytes)
+  // Bundled CJS cannot rely on unpdf's import.meta.resolve default. Keep fonts
+  // beside the main entry; source execution uses the installed package instead.
+  const standardFontDirectory = typeof __VELLUM_MAIN_BUNDLE__ !== 'undefined' && __VELLUM_MAIN_BUNDLE__
+    ? join(__dirname, 'pdfjs/standard_fonts')
+    : fileURLToPath(new URL('../../node_modules/pdfjs-dist/standard_fonts', import.meta.url))
+  // unpdf 5.6's NodeBinaryDataFactory passes this string to fs.readFile.
+  // It requires a filesystem path, unlike the renderer's DOM resource URLs.
+  const document = await getDocumentProxy(pdfBytes, {
+    standardFontDataUrl: standardFontDirectory + '/',
+    disableFontFace: true,
+  })
+  let items: Awaited<ReturnType<typeof extractTextItems>>['items']
+  try {
+    items = (await extractTextItems(document)).items
+  } finally {
+    await document.destroy()
+  }
 
   const lines = items
     .flat()

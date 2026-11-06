@@ -102,12 +102,24 @@ update kinds, and terminal stop reason. Adapter diagnostics remain on stderr.
 
 If a service rollout selects a model newer than the installed adapter runtime,
 set `VELLUM_CODEX_MODEL` to a model supported by that runtime while upgrading
-the adapter. The value goes directly to the first-party adapter as
-`-c model=<value>` without a shell or alternate authentication path:
+the adapter. Vellum trims the value and delivers it through
+`CODEX_CONFIG.model`, the documented runtime interface in
+`@agentclientprotocol/codex-acp` 2.2.2. Existing JSON object keys survive;
+the override replaces an existing `model` key. Vellum copies the environment
+without changing the caller's values. Invalid or non-object `CODEX_CONFIG`
+fails before spawn with a fixed error that excludes config contents.
 
 ```bash
 VELLUM_CODEX_MODEL=gpt-5.5 npm run smoke:acp -- codex
 ```
+
+An absent or blank override leaves `CODEX_CONFIG` untouched. Claude receives
+no model override. Vellum also retains `-c model=<JSON-encoded value>` as one
+argv entry for legacy adapter compatibility, without invoking a shell.
+Current 2.2.2 server entry ignores arbitrary argv and reads `CODEX_CONFIG`.
+No provider, authentication, sandbox, or service-tier default changes.
+See [issue #136 verification](../../docs/verification/issue-136.md) for
+official source locations, delivery evidence, and live verification limits.
 
 Runs fine from inside a Claude Code terminal/agent now (the `CLAUDECODE`
 stripping above handles it automatically) and no longer hangs forever on a

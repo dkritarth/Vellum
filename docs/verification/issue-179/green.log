@@ -1,0 +1,15 @@
+
+> vellum@0.1.0 test
+> vitest run src/app/AnnotationsPanel.test.tsx src/app/App.annotation-delete.test.tsx src/app/App.annotations.test.tsx
+
+
+ RUN  v2.1.9 /home/dandapat/.t3/worktrees/Vellum/t3-08f74a66
+
+ ✓ src/app/AnnotationsPanel.test.tsx (22 tests) 654ms
+ ✓ src/app/App.annotations.test.tsx (5 tests) 754ms
+ ✓ src/app/App.annotation-delete.test.tsx (11 tests) 1625ms
+
+ Test Files  3 passed (3)
+      Tests  38 passed (38)
+   Start at  15:14:38
+   Duration  2.90s (transform 472ms, setup 0ms, collect 1.38s, tests 3.03s, environment 1.14s, prepare 295ms)

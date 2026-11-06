@@ -1,0 +1,30 @@
+
+> vellum@0.1.0 test
+> vitest run src/app/App.highlight-retry.test.tsx
+
+
+ RUN  v2.1.9 /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4
+
+ ❯ src/app/App.highlight-retry.test.tsx (12 tests | 1 failed) 1739ms
+   ✓ recovers repeated menu save failures with captured context and one persisted result 395ms
+   × does not duplicate a pending highlight when native drag passes through a new range then returns to the original selection 73ms
+     → expected "spy" to be called 1 times, but got 2 times
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/app/App.highlight-retry.test.tsx > does not duplicate a pending highlight when native drag passes through a new range then returns to the original selection
+AssertionError: expected "spy" to be called 1 times, but got 2 times
+ ❯ src/app/App.highlight-retry.test.tsx:303:18
+    301|   fireEvent(document, new Event('selectionchange'))
+    302|   await selectText()
+    303|   expect(create).toHaveBeenCalledTimes(1)
+       |                  ^
+    304|   expect(records).toHaveLength(0)
+    305| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 11 passed (12)
+   Start at  15:28:12
+   Duration  3.05s (transform 390ms, setup 0ms, collect 603ms, tests 1.74s, environment 352ms, prepare 116ms)

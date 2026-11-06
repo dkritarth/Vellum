@@ -36,7 +36,8 @@
   color: var(--vellum-text-dim, #8a8a8a);
 }
 
-.toolbar button {
+.toolbar button,
+.highlightSave button {
   border: 1px solid var(--vellum-border, #2a2a2a);
   border-radius: 6px;
   background: transparent;
@@ -45,12 +46,14 @@
   padding: 4px 8px;
 }
 
-.toolbar button:hover:not(:disabled) {
+.toolbar button:hover:not(:disabled),
+.highlightSave button:hover:not(:disabled) {
   color: var(--vellum-text, #eaeaea);
   background: var(--vellum-surface-hover, #222222);
 }
 
-.toolbar button:disabled {
+.toolbar button:disabled,
+.highlightSave button:disabled {
   opacity: 0.4;
   cursor: default;
 }
@@ -214,4 +217,19 @@
 .citationMarkerFlash {
   outline: 2px solid var(--vellum-text, #eaeaea);
   outline-offset: 1px;
+}
+
+.highlightSave {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vellum-border, #2a2a2a);
+  background: var(--vellum-surface, #1a1a1a);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.highlightSave p {
+  margin: 0;
 }

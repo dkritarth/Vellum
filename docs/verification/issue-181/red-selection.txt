@@ -1,0 +1,41 @@
+
+> vellum@0.1.0 test
+> vitest run src/app/App.highlight-retry.test.tsx
+
+
+ RUN  v2.1.9 /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4
+
+ ❯ src/app/App.highlight-retry.test.tsx (9 tests | 1 failed) 1321ms
+   ✓ recovers repeated menu save failures with captured context and one persisted result 380ms
+   × retires failed retry as soon as native selection changes, without another mouseup 81ms
+     → expected <p role="alert"></p> to be null
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/app/App.highlight-retry.test.tsx > retires failed retry as soon as native selection changes, without another mouseup
+AssertionError: expected <p role="alert"></p> to be null
+
+- Expected:
+null
+
++ Received:
+<p
+  role="alert"
+>
+  Highlight was not saved. Retry to save this selection.
+</p>
+
+ ❯ src/app/App.highlight-retry.test.tsx:247:39
+    245|   window.getSelection()!.addRange(range)
+    246|   fireEvent(document, new Event('selectionchange'))
+    247|   expect(screen.queryByRole('alert')).toBeNull()
+       |                                       ^
+    248|   expect(screen.queryByRole('button', { name: 'Retry saving highlight'…
+    249| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 8 passed (9)
+   Start at  15:22:53
+   Duration  2.70s (transform 414ms, setup 0ms, collect 699ms, tests 1.32s, environment 376ms, prepare 101ms)

@@ -25,6 +25,11 @@ export function CollectionsTree({
   // Initial load, polls, and mutation reloads share one publication owner.
   const mounted = useRef(false)
   const refreshSequence = useRef(0)
+  const currentSelection = useRef({ selectedCollectionId, onSelectCollection })
+
+  useEffect(() => {
+    currentSelection.current = { selectedCollectionId, onSelectCollection }
+  }, [selectedCollectionId, onSelectCollection])
 
   async function refreshTree(): Promise<void> {
     if (!mounted.current) return
@@ -98,11 +103,23 @@ export function CollectionsTree({
       return
     }
 
+    // Retain the subtree before deletion/polling removes its visible rows.
+    const deletedIds = new Set([id])
+    function collectSubtree(nodes: CollectionTreeItem[], deleting = false): void {
+      for (const node of nodes) {
+        const inSubtree = deleting || node.id === id
+        if (inSubtree) deletedIds.add(node.id)
+        collectSubtree(node.children, inSubtree)
+      }
+    }
+    collectSubtree(tree)
+
     try {
       await window.vellum.collectionsDelete(id)
       setActionError(null)
-      if (selectedCollectionId === id) {
-        onSelectCollection(null, null)
+      const selection = currentSelection.current
+      if (selection.selectedCollectionId !== null && deletedIds.has(selection.selectedCollectionId)) {
+        selection.onSelectCollection(null, null)
       }
       await refreshTree()
     } catch (err) {

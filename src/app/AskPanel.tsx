@@ -45,11 +45,17 @@ interface AskPanelProps {
   slug: string
   /** [R1-05] Contextual prompt injected from PDF text selection (Add to chat or Explain) */
   injectedPrompt?: InjectedPrompt | null
+  /** Successful deletions retained by App across Ask tab remounts. */
+  deletedSessionIds?: readonly number[]
   /** [L2-02] Target chat session ID to restore from Chats library */
   targetSessionId?: number | null
 }
 
-export function AskPanel({ slug, injectedPrompt, targetSessionId }: AskPanelProps): JSX.Element {
+export function AskPanel({ slug, injectedPrompt, targetSessionId, deletedSessionIds }: AskPanelProps): JSX.Element {
+  const [deletionRevision, setDeletionRevision] = useState(0)
+  // Durable IDs are never reused. Keep tombstones across Ask tab remounts.
+  const deletedIds = useRef(deletedSessionIds)
+  deletedIds.current = deletedSessionIds
   const [sessionId, setSessionId] = useState<number | null>(null)
   const [messages, setMessages] = useState<DisplayMessage[]>([])
   const [input, setInput] = useState('')
@@ -119,10 +125,19 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId }: AskPanelProp
     else applyUpdate(payload)
   }), [applyUpdate])
 
+  useEffect(() => {
+    if (displayedSessionId.current !== null && deletedSessionIds?.includes(displayedSessionId.current)) {
+      // Invalidate pending starts/New chat immediately, before reopening.
+      contextGeneration.current += 1
+      activeRequestId.current = null
+      setDeletionRevision((revision) => revision + 1)
+    }
+  }, [deletedSessionIds])
+
   // Reload history whenever the open paper changes.
   useEffect(() => {
     let cancelled = false
-    contextGeneration.current += 1
+    const generation = ++contextGeneration.current
     awaitingRequest.current = true
     queuedUpdates.current = []
     lastSequence.current = 0
@@ -136,10 +151,18 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId }: AskPanelProp
     setSwitchingSession(false)
     activeRequestId.current = null
 
-    window.vellum
-      .askOpen(targetSessionId ? { slug, sessionId: targetSessionId } : slug)
+    const open = async () => {
+      const target = targetSessionId && !deletedIds.current?.includes(targetSessionId) ? targetSessionId : null
+      let result = await window.vellum.askOpen(target ? { slug, sessionId: target } : slug)
+      // A delete may finish while this snapshot is in flight.
+      while (!cancelled && generation === contextGeneration.current && deletedIds.current?.includes(result.session.id)) {
+        result = await window.vellum.askOpen(slug)
+      }
+      return result
+    }
+    open()
       .then((result) => {
-        if (cancelled) return
+        if (cancelled || generation !== contextGeneration.current) return
         setSessionId(result.session.id)
         displayedSessionId.current = result.session.id
         setBackend(result.session.backend === 'codex' ? 'codex' : 'claude')
@@ -156,7 +179,7 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId }: AskPanelProp
         replayUpdates()
       })
       .catch((err: unknown) => {
-        if (!cancelled) {
+        if (!cancelled && generation === contextGeneration.current) {
           awaitingRequest.current = false
           queuedUpdates.current = []
           setLoadError(err instanceof Error ? err.message : String(err))
@@ -170,7 +193,7 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId }: AskPanelProp
       queuedUpdates.current = []
       awaitingRequest.current = false
     }
-  }, [slug, targetSessionId, replayUpdates])
+  }, [slug, targetSessionId, deletionRevision, replayUpdates])
 
   const sendTurn = useCallback(async (prompt?: string) => {
     const text = (prompt ?? input).trim()

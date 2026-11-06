@@ -35,6 +35,8 @@ interface RightPanelProps {
   onJumpToHighlight?: (highlight: HighlightRecord) => void
   /** [R1-05] Injected prompt from PDF text selection actions */
   injectedPrompt?: InjectedPrompt | null
+  /** Successful deletions retained by App across Ask tab remounts. */
+  deletedSessionIds?: readonly number[]
   /** [L2-02] Target chat session to open in AskPanel */
   targetSessionId?: number | null
 }
@@ -47,6 +49,7 @@ export function RightPanel({
   onJumpToHighlight,
   injectedPrompt,
   targetSessionId,
+  deletedSessionIds,
 }: RightPanelProps): JSX.Element {
   const [internalTab, setInternalTab] = useState<RightPanelTab>(defaultTab)
   const activeTab = controlledActiveTab ?? internalTab
@@ -77,7 +80,7 @@ export function RightPanel({
       </div>
 
       <div className={styles.tabPanel} role="tabpanel">
-        {renderTabContent(activeTab, slug, onJumpToHighlight, injectedPrompt, targetSessionId)}
+        {renderTabContent(activeTab, slug, onJumpToHighlight, injectedPrompt, targetSessionId, deletedSessionIds)}
       </div>
     </aside>
   )
@@ -89,10 +92,11 @@ function renderTabContent(
   onJumpToHighlight: ((highlight: HighlightRecord) => void) | undefined,
   injectedPrompt: InjectedPrompt | null | undefined,
   targetSessionId?: number | null,
+  deletedSessionIds?: readonly number[],
 ): JSX.Element {
   switch (tab) {
     case 'Ask':
-      if (slug) return <AskPanel slug={slug} injectedPrompt={injectedPrompt} targetSessionId={targetSessionId} />
+      if (slug) return <AskPanel slug={slug} injectedPrompt={injectedPrompt} targetSessionId={targetSessionId} deletedSessionIds={deletedSessionIds} />
       return (
         <div className={styles.askTab}>
           <p className={styles.placeholder}>Open a paper to start asking questions.</p>

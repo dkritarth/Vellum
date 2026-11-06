@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { StrictMode } from 'react'
+import { StrictMode, useState } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CollectionsTree } from './CollectionsTree'
+import { openDb } from '../../core/store/db'
+import { createCollection, deleteCollection, getCollectionsTree, listCollections } from '../../core/collections/repo'
 
 describe('CollectionsTree [L2-01]', () => {
   const mockTree = [
@@ -327,5 +329,117 @@ describe('CollectionsTree refresh ownership', () => {
     await act(async () => { old.resolve([]) })
     expect(screen.getByText(created.name)).toBeVisible()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('recursive deletion selection', () => {
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+  })
+
+  async function setup(initial: 'parent' | 'child' | 'deep' | 'unrelated' = 'child') {
+    const db = openDb({ path: ':memory:' })
+    const parent = createCollection(db, { name: 'Parent research' })
+    const child = createCollection(db, { name: 'Child research', parentId: parent.id })
+    const deep = createCollection(db, { name: 'Deep research', parentId: child.id })
+    const unrelated = createCollection(db, { name: 'Other research' })
+    const collections = { parent, child, deep, unrelated }
+    const onSelect = vi.fn()
+    window.vellum = {
+      ...window.vellum,
+      collectionsTree: vi.fn(async () => getCollectionsTree(db)),
+      collectionsDelete: vi.fn(async (id: number) => deleteCollection(db, id)),
+    }
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    function View() {
+      const [selected, setSelected] = useState<number | null>(collections[initial].id)
+      return <>
+        <p data-testid="filter">{selected === null ? 'All Papers' : `Filtered collection ${selected}`}</p>
+        <CollectionsTree selectedCollectionId={selected} onSelectCollection={(id, name) => {
+          onSelect(id, name)
+          setSelected(id)
+        }} />
+      </>
+    }
+    render(<View />)
+    await screen.findByText('Deep research')
+    return { db, collections, onSelect }
+  }
+
+  it.each(['child', 'deep', 'parent'] as const)('clears selected %s after real recursive parent deletion', async initial => {
+    const { db, onSelect } = await setup(initial)
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Parent research' }))
+      await waitFor(() => expect(screen.queryByText('Parent research')).not.toBeInTheDocument())
+      expect(listCollections(db).map(collection => collection.name)).toEqual(['Other research'])
+      expect(screen.getByTestId('filter')).toHaveTextContent('All Papers')
+      expect(onSelect).toHaveBeenCalledWith(null, null)
+    } finally { db.close() }
+  })
+
+  it('preserves unrelated selection after recursive deletion', async () => {
+    const { db, collections, onSelect } = await setup('unrelated')
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Parent research' }))
+      await waitFor(() => expect(screen.queryByText('Parent research')).not.toBeInTheDocument())
+      expect(screen.getByTestId('filter')).toHaveTextContent(`Filtered collection ${collections.unrelated.id}`)
+      expect(onSelect).not.toHaveBeenCalled()
+    } finally { db.close() }
+  })
+
+  it.each([
+    ['parent', 'Other research', false],
+    ['unrelated', 'Deep research', true],
+    ['child', 'All Papers', false],
+  ] as const)('reconciles latest selection: %s switches to %s while deletion is pending', async (initial, next, clears) => {
+    const { db, collections, onSelect } = await setup(initial)
+    try {
+      const pending = deferred<void>()
+      window.vellum.collectionsDelete = vi.fn(async (id: number) => {
+        await pending.promise
+        deleteCollection(db, id)
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Parent research' }))
+      fireEvent.click(screen.getByRole('treeitem', { name: new RegExp(next) }))
+      onSelect.mockClear()
+      expect(listCollections(db)).toHaveLength(4)
+      await act(async () => pending.resolve())
+      expect(screen.getByTestId('filter')).toHaveTextContent(
+        clears || next === 'All Papers' ? 'All Papers' : `Filtered collection ${collections.unrelated.id}`,
+      )
+      if (clears) expect(onSelect).toHaveBeenCalledWith(null, null)
+      else expect(onSelect).not.toHaveBeenCalled()
+      expect(screen.queryByText('Parent research')).not.toBeInTheDocument()
+    } finally { db.close() }
+  })
+
+  it('retains descendant filter and tree on failure, then clears after retry succeeds', async () => {
+    const { db, collections, onSelect } = await setup('deep')
+    try {
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      window.vellum.collectionsDelete = vi.fn().mockRejectedValueOnce(new Error('disk I/O error'))
+        .mockImplementation(async (id: number) => deleteCollection(db, id))
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Parent research' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete collection "Parent research": disk I/O error')
+      expect(screen.getByTestId('filter')).toHaveTextContent(`Filtered collection ${collections.deep.id}`)
+      expect(listCollections(db)).toHaveLength(4)
+      expect(onSelect).not.toHaveBeenCalled()
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Parent research' }))
+      await waitFor(() => expect(screen.getByTestId('filter')).toHaveTextContent('All Papers'))
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    } finally { db.close() }
+  })
+
+  it('retains descendant filter and tree when confirmation is cancelled', async () => {
+    const { db, collections, onSelect } = await setup()
+    try {
+      vi.mocked(window.confirm).mockReturnValue(false)
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Parent research' }))
+      expect(window.vellum.collectionsDelete).not.toHaveBeenCalled()
+      expect(listCollections(db)).toHaveLength(4)
+      expect(screen.getByTestId('filter')).toHaveTextContent(`Filtered collection ${collections.child.id}`)
+      expect(onSelect).not.toHaveBeenCalled()
+    } finally { db.close() }
   })
 })

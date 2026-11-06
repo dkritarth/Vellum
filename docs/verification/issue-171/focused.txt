@@ -1,0 +1,49 @@
+
+ RUN  v2.1.9 /home/dandapat/.t3/worktrees/Vellum/t3-8415002d
+
+stderr | src/app/CollectionsTree.test.tsx > CollectionsTree [L2-01] > shows a visible error and keeps the input when creating fails
+Failed to create collection Error: parent not found
+    at /home/dandapat/.t3/worktrees/Vellum/t3-8415002d/src/app/CollectionsTree.test.tsx:126:65
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:146:14
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:533:11
+    at runWithTimeout (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:39:7)
+    at runTest (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1056:17)
+    at runSuite (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1205:15)
+    at runSuite (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1205:15)
+    at runFiles (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1262:5)
+    at startTests (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1271:3)
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11
+
+stderr | src/app/CollectionsTree.test.tsx > CollectionsTree [L2-01] > shows a visible error when renaming fails
+Failed to rename collection Error: Collection 1 not found
+    at /home/dandapat/.t3/worktrees/Vellum/t3-8415002d/src/app/CollectionsTree.test.tsx:143:65
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:146:14
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:533:11
+    at runWithTimeout (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:39:7)
+    at runTest (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1056:17)
+    at runSuite (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1205:15)
+    at runSuite (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1205:15)
+    at runFiles (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1262:5)
+    at startTests (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1271:3)
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11
+
+stderr | src/app/CollectionsTree.test.tsx > CollectionsTree [L2-01] > shows a visible error and keeps selection when deleting fails, then clears it on success
+Failed to delete collection Error: disk I/O error
+    at /home/dandapat/.t3/worktrees/Vellum/t3-8415002d/src/app/CollectionsTree.test.tsx:184:30
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:146:14
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:533:11
+    at runWithTimeout (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:39:7)
+    at runTest (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1056:17)
+    at runSuite (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1205:15)
+    at runSuite (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1205:15)
+    at runFiles (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1262:5)
+    at startTests (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1271:3)
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11
+
+ ✓ src/app/CollectionsTree.test.tsx (26 tests) 2821ms
+   ✓ CollectionsTree [L2-01] > shows one persistent load error while polling fails and clears it on the next successful load 2011ms
+
+ Test Files  1 passed (1)
+      Tests  26 passed (26)
+   Start at  10:41:48
+   Duration  3.76s (transform 151ms, setup 0ms, collect 264ms, tests 2.82s, environment 343ms, prepare 83ms)

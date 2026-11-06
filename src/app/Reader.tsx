@@ -433,15 +433,24 @@ interface ActiveSelection {
   anchor: { start: number; end: number }
 }
 
-export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain }: ReaderProps): JSX.Element {
+export function Reader(props: ReaderProps): JSX.Element {
+  const [scale, setScale] = useState(DEFAULT_SCALE)
+  // Paper ownership changes at commit, before passive load/render effects.
+  // Zoom belongs to the reader; document DOM and selection belong to a paper.
+  return <PaperReader key={props.slug ?? ''} {...props} scale={scale} onZoom={(delta) => setScale((current) => clampScale(current + delta))} />
+}
+
+function PaperReader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain, scale, onZoom }: ReaderProps & {
+  scale: number
+  onZoom: (delta: number) => void
+}): JSX.Element {
   const [activeSelection, setActiveSelection] = useState<ActiveSelection | null>(null)
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [numPages, setNumPages] = useState(0)
   const [pageNumber, setPageNumber] = useState(1)
-  const [scale, setScale] = useState(DEFAULT_SCALE)
   const [outline, setOutline] = useState<OutlineItem[]>([])
   const [tocOpen, setTocOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [pageReady, setPageReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [renderError, setRenderError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -482,7 +491,6 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
 
     if (!slug) return
 
-    setLoading(true)
     void (async () => {
       try {
         const bytes = await window.vellum.readPaperFile(slug)
@@ -525,8 +533,6 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
           });
         }
         if (!cancelled) setError('Could not open this PDF.');
-      } finally {
-        if (!cancelled) setLoading(false)
       }
     })()
 
@@ -560,6 +566,7 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
   // Render the current page (canvas + selectable text layer) on page/zoom change.
   useEffect(() => {
     setRenderError(null)
+    setPageReady(false)
     if (!doc) return
     let cancelled = false
     let canvasTask: RenderTask | null = null
@@ -614,6 +621,7 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
         // (needed to re-locate highlight anchors) only exists after this
         // await resolves.
         setTextLayerVersion((version) => version + 1)
+        setPageReady(true)
       }
     })().catch((err: unknown) => {
       if (
@@ -712,7 +720,7 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
 
   function zoomBy(delta: number): void {
     setActiveSelection(null)
-    setScale((current) => clampScale(current + delta))
+    onZoom(delta)
   }
 
   // [P2-02] Highlight capture: when the highlight tool is active, a mouseup
@@ -954,9 +962,9 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
         ) : null}
 
         <div className={styles.pageViewport}>
-          {loading ? <p className={styles.loading}>Loading…</p> : null}
+          {!pageReady && !renderError ? <p role="status" className={styles.loading}>Loading…</p> : null}
           {renderError ? <p role="alert">{renderError}</p> : null}
-          <div className={styles.pageLayer} hidden={renderError !== null}>
+          <div className={styles.pageLayer} hidden={!pageReady || renderError !== null}>
             <canvas ref={canvasRef} className={styles.canvas} />
             <div
               ref={textLayerRef}

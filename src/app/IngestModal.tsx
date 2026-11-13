@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import styles from './IngestModal.module.css'
 
@@ -13,6 +13,17 @@ export function IngestModal({ isOpen, onClose, onSuccess }: IngestModalProps): J
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Escape dismisses the dialog, matching the Close/Cancel buttons — which are
+  // disabled mid-ingest, so Escape is ignored then too.
+  useEffect(() => {
+    if (!isOpen || loading) return
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [isOpen, loading, onClose])
 
   if (!isOpen) return null
 

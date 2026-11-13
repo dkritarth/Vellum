@@ -63,6 +63,31 @@ describe('IngestModal', () => {
     expect(onClose).toHaveBeenCalledTimes(2)
   })
 
+  it('calls onClose when Escape is pressed', async () => {
+    const onClose = vi.fn()
+    const user = userEvent.setup()
+
+    render(<IngestModal isOpen={true} onClose={onClose} onSuccess={vi.fn()} />)
+    await user.keyboard('{Escape}')
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores Escape while an ingest is in progress', async () => {
+    ingestMock.mockReturnValue(new Promise(() => undefined))
+    const onClose = vi.fn()
+    const user = userEvent.setup()
+
+    render(<IngestModal isOpen={true} onClose={onClose} onSuccess={vi.fn()} />)
+    await user.type(screen.getByPlaceholderText(/1706\.03762/), '1706.03762')
+    await user.click(screen.getByRole('button', { name: /add paper/i }))
+    expect(await screen.findByText(/ingesting paper/i)).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('submits valid input, calls window.vellum.ingest, and triggers onSuccess', async () => {
     const onSuccess = vi.fn()
     const user = userEvent.setup()

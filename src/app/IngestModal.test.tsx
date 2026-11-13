@@ -96,4 +96,33 @@ describe('IngestModal', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Failed to fetch from arXiv')
   })
+
+  it('starts clean when reopened after a failed attempt', async () => {
+    ingestMock.mockRejectedValue(new Error('boom'))
+    const user = userEvent.setup()
+    const { rerender } = render(<IngestModal isOpen={true} onClose={vi.fn()} onSuccess={vi.fn()} />)
+
+    await user.type(screen.getByPlaceholderText(/1706\.03762/), 'bad-id')
+    await user.click(screen.getByRole('button', { name: /add paper/i }))
+    await screen.findByRole('alert')
+
+    rerender(<IngestModal isOpen={false} onClose={vi.fn()} onSuccess={vi.fn()} />)
+    rerender(<IngestModal isOpen={true} onClose={vi.fn()} onSuccess={vi.fn()} />)
+
+    expect(screen.getByPlaceholderText(/1706\.03762/)).toHaveValue('')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('strips Electron IPC wrapper noise from ingest errors', async () => {
+    ingestMock.mockRejectedValue(
+      new Error("Error invoking remote method 'vellum:ingest': Error: classifyInput: local PDF not found: /x.pdf"),
+    )
+    const user = userEvent.setup()
+    render(<IngestModal isOpen={true} onClose={vi.fn()} onSuccess={vi.fn()} />)
+
+    await user.type(screen.getByPlaceholderText(/1706\.03762/), '/x.pdf')
+    await user.click(screen.getByRole('button', { name: /add paper/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/^Local PDF not found: \/x\.pdf$/)
+  })
 })

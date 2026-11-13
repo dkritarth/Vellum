@@ -118,4 +118,63 @@ describe('CollectionsTree [L2-01]', () => {
       expect(onSelect).toHaveBeenCalledWith(null, null)
     })
   })
+
+  it('assigns a paper dropped on a collection and reports it', async () => {
+    const collectionsAssign = vi.fn().mockResolvedValue(undefined)
+    window.vellum = { ...window.vellum, collectionsAssign } as any
+    const onPaperAssigned = vi.fn()
+    render(<CollectionsTree selectedCollectionId={null} onSelectCollection={vi.fn()} onPaperAssigned={onPaperAssigned} />)
+
+    const row = (await screen.findByText('AI')).closest('[role="treeitem"]') as HTMLElement
+    const dataTransfer = {
+      types: ['application/x-vellum-paper'],
+      getData: (type: string) => (type === 'application/x-vellum-paper' ? 'arxiv-1706.03762' : ''),
+      dropEffect: '',
+    }
+    fireEvent.dragOver(row, { dataTransfer })
+    expect(row.className).toMatch(/dropTarget/)
+    fireEvent.drop(row, { dataTransfer })
+
+    await waitFor(() => {
+      expect(collectionsAssign).toHaveBeenCalledWith({ paperSlug: 'arxiv-1706.03762', collectionId: 2 })
+      expect(onPaperAssigned).toHaveBeenCalledWith(2)
+    })
+  })
+
+  it('ignores drags that do not carry a paper', async () => {
+    const collectionsAssign = vi.fn()
+    window.vellum = { ...window.vellum, collectionsAssign } as any
+    render(<CollectionsTree selectedCollectionId={null} onSelectCollection={vi.fn()} />)
+
+    const row = (await screen.findByText('AI')).closest('[role="treeitem"]') as HTMLElement
+    const dataTransfer = { types: ['text/plain'], getData: () => 'hello', dropEffect: '' }
+    fireEvent.dragOver(row, { dataTransfer })
+    fireEvent.drop(row, { dataTransfer })
+    expect(row.className).not.toMatch(/dropTarget/)
+    expect(collectionsAssign).not.toHaveBeenCalled()
+  })
+
+  it('lets keyboard users focus and select collection rows with Enter or Space', async () => {
+    const onSelect = vi.fn()
+    render(<CollectionsTree selectedCollectionId={2} onSelectCollection={onSelect} />)
+
+    const row = (await screen.findByText('Computer Science')).closest('[role="treeitem"]') as HTMLElement
+    expect(row).toHaveAttribute('tabindex', '0')
+    fireEvent.keyDown(row, { key: 'Enter' })
+    expect(onSelect).toHaveBeenLastCalledWith(1, 'Computer Science')
+
+    const allPapers = screen.getByText('All Papers').closest('[role="treeitem"]') as HTMLElement
+    expect(allPapers).toHaveAttribute('tabindex', '0')
+    fireEvent.keyDown(allPapers, { key: ' ' })
+    expect(onSelect).toHaveBeenLastCalledWith(null, null)
+  })
+
+  it('does not select a row when Enter is pressed on one of its action buttons', async () => {
+    const onSelect = vi.fn()
+    render(<CollectionsTree selectedCollectionId={null} onSelectCollection={onSelect} />)
+
+    const rename = await screen.findByRole('button', { name: 'Rename AI' })
+    fireEvent.keyDown(rename, { key: 'Enter' })
+    expect(onSelect).not.toHaveBeenCalled()
+  })
 })

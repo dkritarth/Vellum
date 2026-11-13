@@ -157,4 +157,107 @@ describe('App shell', () => {
     expect(await screen.findByRole('region', { name: /usage and telemetry view/i })).toBeInTheDocument()
     expect(screen.getByText('ACP Usage & Plan Telemetry')).toBeInTheDocument()
   })
+
+  it('closing the active tab activates a neighbour and closing the last returns to the empty reader', async () => {
+    const user = userEvent.setup()
+    vi.mocked(window.vellum.listPapers).mockResolvedValue([
+      { slug: 'a', title: 'Paper A', authors: [], addedAt: '2026-01-01T00:00:00.000Z' },
+      { slug: 'b', title: 'Paper B', authors: [], addedAt: '2026-01-01T00:00:00.000Z' },
+    ] as never)
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'Library' }))
+    await user.click(await screen.findByText('Paper A'))
+    await user.click(screen.getByRole('button', { name: 'Library' }))
+    await user.click(await screen.findByText('Paper B'))
+    expect(screen.getByRole('tab', { name: 'Paper B' })).toHaveAttribute('aria-selected', 'true')
+
+    await user.click(screen.getByRole('button', { name: 'Close Paper B' }))
+    expect(screen.queryByRole('tab', { name: 'Paper B' })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Paper A' })).toHaveAttribute('aria-selected', 'true')
+
+    await user.click(screen.getByRole('button', { name: 'Close Paper A' }))
+    expect(screen.getByText(/No papers open/i)).toBeInTheDocument()
+    expect(screen.getByText(/No paper open/i)).toBeInTheDocument()
+  })
+
+  it('the + tab button opens the Library', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /open another paper/i }))
+    expect(await screen.findByLabelText(/search papers by title/i)).toBeInTheDocument()
+  })
+
+  it('keeps the sidebar highlight in sync with the visible view', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    const nav = screen.getByRole('navigation', { name: 'Primary' })
+    const current = () =>
+      Array.from(nav.querySelectorAll('[aria-current="page"], [aria-pressed="true"]')).map((el) => el.textContent)
+
+    expect(current()).toEqual(['Home'])
+
+    // Create opens a dialog; it never becomes the highlighted page.
+    await user.click(screen.getByRole('button', { name: 'Create' }))
+    await user.click(screen.getByRole('button', { name: /cancel/i }))
+    expect(current()).toEqual(['Home'])
+
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+    expect(current()).toEqual(['Search'])
+
+    await user.click(screen.getByRole('button', { name: 'Trash' }))
+    expect(current()).toEqual(['Trash'])
+
+    await user.click(screen.getByRole('button', { name: 'Usage' }))
+    expect(current()).toEqual(['Usage'])
+
+    await user.click(screen.getByRole('button', { name: 'Library' }))
+    expect(current()).toEqual(['Library'])
+
+    // Opening a paper shows the Reader, i.e. Home.
+    await user.click(await screen.findByText('Attention Is All You Need'))
+    expect(current()).toEqual(['Home'])
+  })
+
+  it('Search opens the Library with the title search focused', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+    const search = await screen.findByLabelText(/search papers by title/i)
+    expect(search).toHaveFocus()
+
+    // Clicking Search again while already in the Library re-focuses the box.
+    search.blur()
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+    expect(screen.getByLabelText(/search papers by title/i)).toHaveFocus()
+  })
+
+  it('the Library nav item clears an active collection filter', async () => {
+    const user = userEvent.setup()
+    Object.assign(window.vellum, {
+      collectionsTree: vi.fn().mockResolvedValue([{ id: 5, name: 'Reading', parentId: null, paperCount: 0, children: [] }]),
+    })
+    render(<App />)
+
+    await user.click(await screen.findByText('Reading'))
+    expect(await screen.findByText(/Filtered by collection:/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Library' }))
+    expect(screen.queryByText(/Filtered by collection:/)).not.toBeInTheDocument()
+    expect(window.vellum.listPapers).toHaveBeenLastCalledWith(expect.objectContaining({ collectionId: undefined }))
+  })
+
+  it('Back to Library from Trash shows the plain Library, not the Search state', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+    await user.click(screen.getByRole('button', { name: 'Trash' }))
+    await user.click(await screen.findByRole('button', { name: /back to library/i }))
+
+    const search = await screen.findByLabelText(/search papers by title/i)
+    expect(search).not.toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Library' })).toHaveAttribute('aria-current', 'page')
+  })
 })

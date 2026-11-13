@@ -233,4 +233,18 @@ describe('App shell', () => {
     await user.click(screen.getByRole('button', { name: 'Search' }))
     expect(screen.getByLabelText(/search papers by title/i)).toHaveFocus()
   })
+
+  it('the Library nav item clears an active collection filter', async () => {
+    const user = userEvent.setup()
+    Object.assign(window.vellum, {
+      collectionsTree: vi.fn().mockResolvedValue([{ id: 5, name: 'Reading', parentId: null, paperCount: 0, children: [] }]),
+    })
+    render(<App />)
+
+    await user.click(await screen.findByText('Reading'))
+    expect(await screen.findByText(/Filtered by collection:/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Library' }))
+    expect(screen.queryByText(/Filtered by collection:/)).not.toBeInTheDocument()
+    expect(window.vellum.listPapers).toHaveBeenLastCalledWith(expect.objectContaining({ collectionId: undefined }))
+  })
 })

@@ -145,6 +145,11 @@ export function App(): JSX.Element {
       setView('library')
     } else {
       setLibraryViaSearch(false)
+      if (item === 'Library') {
+        // The Library item means "all papers"; collection rows filter.
+        setSelectedCollectionId(null)
+        setSelectedCollectionName(null)
+      }
       setView(item === 'Library' ? 'library' : 'reader')
     }
   }

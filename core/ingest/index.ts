@@ -14,15 +14,12 @@
 // (see index.test.ts — fake AcpClient + stubbed global fetch + a temp-file
 // SQLite DB via core/store/db.ts's openDb({ path })).
 //
-// Idempotency: classifyInput() is a pure function of the input string, so
-// re-ingesting the same input always resolves to the same slug. Files are
-// written with writeFile (overwrite in place, never appended/renamed), and
-// the DB row is upserted (core/library/repo.ts's upsertPaper, `ON CONFLICT
-// slug DO UPDATE`) — a second ingest() call for the same input can never
-// produce a duplicate row or a duplicate/corrupt file.
+// Idempotency: location hashes distinguish PDF sources; source-identity.ts
+// safely reuses byte-matched legacy slugs without renaming research keys.
+// Re-ingest updates files and metadata through the same paper slug.
 
 import { mkdir, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname } from 'node:path'
 
 import type { Database } from 'better-sqlite3'
 
@@ -34,6 +31,7 @@ import type { ClassifiedInput, InputKind } from './classify.js'
 import { convertPdfToMarkdown } from './convert.js'
 import { extractPaper } from './extract.js'
 import { fetchSource } from './fetch.js'
+import { recordPaperSource, resolvePaperSource } from './source-identity.js'
 import { summarizePaper } from './summary.js'
 
 export type { InputKind }
@@ -95,10 +93,13 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
   // fetched.pdfBytes stays intact for the paper.pdf write below.
   const markdown = await convertPdfToMarkdown(fetched.pdfBytes.slice())
 
-  const paperDir = join(dataDir, 'papers', classified.slug)
-  await mkdir(paperDir, { recursive: true })
-  const pdfPath = join(paperDir, 'paper.pdf')
-  const mdPath = join(paperDir, 'paper.md')
+  const { slug, pdfPath, mdPath } = resolvePaperSource(classified, fetched.pdfBytes, {
+    db: options.db, dataDir,
+  })
+  await Promise.all([
+    mkdir(dirname(pdfPath), { recursive: true }),
+    mkdir(dirname(mdPath), { recursive: true }),
+  ])
   // Overwrite in place (not append/rename) — re-ingest of the same slug
   // replaces prior file contents rather than accumulating duplicates.
   await Promise.all([writeFile(pdfPath, fetched.pdfBytes), writeFile(mdPath, markdown)])
@@ -138,7 +139,7 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
   }
 
   const record: PaperRecord = {
-    slug: classified.slug,
+    slug,
     title: metadata.title,
     authors: metadata.authors,
     year: metadata.year,
@@ -153,10 +154,13 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
     addedAt: new Date().toISOString(),
     authorOrcids: metadata.authorOrcids,
   }
-  upsertPaper(options.db, record)
+  options.db.transaction(() => {
+    upsertPaper(options.db, record)
+    recordPaperSource(options.db, classified, slug)
+  })()
 
   return {
-    slug: classified.slug,
+    slug,
     title: metadata.title,
     metadata,
     paths: { pdfPath, mdPath },

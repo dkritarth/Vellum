@@ -111,6 +111,19 @@ export function App(): JSX.Element {
     setView('reader')
   }
 
+  // Close a tab. Closing the active one activates its right neighbour, else
+  // its left one, else nothing (the Reader's empty state).
+  function closeTab(id: string): void {
+    const index = tabs.findIndex((tab) => tab.id === id)
+    if (index === -1) return
+    const remaining = tabs.filter((tab) => tab.id !== id)
+    setTabs(remaining)
+    if (activeTabId === id) {
+      const next = remaining[index] ?? remaining[index - 1] ?? null
+      setActiveTabId(next ? next.id : null)
+    }
+  }
+
   function handleNavChange(item: NavItem): void {
     if (item === 'Create') {
       setIsIngestOpen(true)
@@ -129,7 +142,13 @@ export function App(): JSX.Element {
 
   return (
     <div className={styles.shell}>
-      <TabStrip tabs={tabs} activeTabId={activeTabId} onSelectTab={selectTab} />
+      <TabStrip
+        tabs={tabs}
+        activeTabId={activeTabId}
+        onSelectTab={selectTab}
+        onCloseTab={closeTab}
+        onNewTab={() => setView('library')}
+      />
       <div className={styles.body}>
         <Sidebar
           onNavChange={handleNavChange}

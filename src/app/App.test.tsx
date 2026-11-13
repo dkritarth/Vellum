@@ -157,4 +157,35 @@ describe('App shell', () => {
     expect(await screen.findByRole('region', { name: /usage and telemetry view/i })).toBeInTheDocument()
     expect(screen.getByText('ACP Usage & Plan Telemetry')).toBeInTheDocument()
   })
+
+  it('closing the active tab activates a neighbour and closing the last returns to the empty reader', async () => {
+    const user = userEvent.setup()
+    vi.mocked(window.vellum.listPapers).mockResolvedValue([
+      { slug: 'a', title: 'Paper A', authors: [], addedAt: '2026-01-01T00:00:00.000Z' },
+      { slug: 'b', title: 'Paper B', authors: [], addedAt: '2026-01-01T00:00:00.000Z' },
+    ] as never)
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'Library' }))
+    await user.click(await screen.findByText('Paper A'))
+    await user.click(screen.getByRole('button', { name: 'Library' }))
+    await user.click(await screen.findByText('Paper B'))
+    expect(screen.getByRole('tab', { name: 'Paper B' })).toHaveAttribute('aria-selected', 'true')
+
+    await user.click(screen.getByRole('button', { name: 'Close Paper B' }))
+    expect(screen.queryByRole('tab', { name: 'Paper B' })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Paper A' })).toHaveAttribute('aria-selected', 'true')
+
+    await user.click(screen.getByRole('button', { name: 'Close Paper A' }))
+    expect(screen.getByText(/No papers open/i)).toBeInTheDocument()
+    expect(screen.getByText(/No paper open/i)).toBeInTheDocument()
+  })
+
+  it('the + tab button opens the Library', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /open another paper/i }))
+    expect(await screen.findByLabelText(/search papers by title/i)).toBeInTheDocument()
+  })
 })

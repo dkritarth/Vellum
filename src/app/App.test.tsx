@@ -58,6 +58,7 @@ beforeEach(() => {
         backends: {
           claude: { backend: 'claude', turnsCount: 0, turnsWithMetrics: 0, totalInputTokens: null, totalOutputTokens: null, totalTokens: null, contextUsedLatest: null, contextSizeLatest: null, totalCost: null, costCurrency: null, lastRecordedAt: null },
           codex: { backend: 'codex', turnsCount: 0, turnsWithMetrics: 0, totalInputTokens: null, totalOutputTokens: null, totalTokens: null, contextUsedLatest: null, contextSizeLatest: null, totalCost: null, costCurrency: null, lastRecordedAt: null },
+          antigravity: { backend: 'antigravity', turnsCount: 0, turnsWithMetrics: 0, totalInputTokens: null, totalOutputTokens: null, totalTokens: null, contextUsedLatest: null, contextSizeLatest: null, totalCost: null, costCurrency: null, lastRecordedAt: null },
         },
       }),
       usageGetList: vi.fn().mockResolvedValue([]),

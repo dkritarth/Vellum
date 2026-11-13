@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS paper_collections (
 CREATE TABLE IF NOT EXISTS chat_sessions (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   paper_slug  TEXT REFERENCES papers(slug) ON DELETE CASCADE,
-  backend     TEXT NOT NULL,   -- 'claude' | 'codex'
+  backend     TEXT NOT NULL,   -- 'claude' | 'codex' | 'antigravity'
   title       TEXT,
   created_at  TEXT NOT NULL
 );

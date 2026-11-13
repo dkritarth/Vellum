@@ -2,7 +2,14 @@
 // and explicit "Unavailable" state when adapters do not emit metrics.
 import { useState, useEffect, useCallback } from 'react'
 import type { UsageSummary, UsageRecord } from '../../core/usage/repo.js'
+import type { AcpBackend } from '../../core/acp/client.js'
 import styles from './UsageView.module.css'
+
+const USAGE_CARDS: Array<{ backend: AcpBackend; title: string }> = [
+  { backend: 'claude', title: 'Claude (claude-code-acp)' },
+  { backend: 'codex', title: 'Codex (codex-acp)' },
+  { backend: 'antigravity', title: 'Gemini (agy acp)' },
+]
 
 export interface UsageViewProps {
   onBackToLibrary?: () => void
@@ -91,7 +98,7 @@ export function UsageView({ onBackToLibrary }: UsageViewProps): JSX.Element {
 
       <div className={styles.noticeBanner} role="note">
         <strong>First-Party Telemetry Only:</strong> Vellum connects directly to official ACP adapters
-        (<code>claude-code-acp</code> via Agent-SDK credit, <code>codex-acp</code> via ChatGPT subscription).
+        (<code>claude-code-acp</code> via Agent-SDK credit, <code>codex-acp</code> via ChatGPT subscription, <code>agy acp</code> via Google AI plan).
         Metrics are displayed exactly as emitted by adapter streams. When an adapter omits token counts, Vellum
         reports <em>Unavailable</em> rather than fabricating zero values.
       </div>
@@ -107,101 +114,59 @@ export function UsageView({ onBackToLibrary }: UsageViewProps): JSX.Element {
       ) : summary ? (
         <>
           <div className={styles.grid}>
-            {/* Claude Adapter Card */}
-            <div className={styles.card} data-testid="claude-usage-card">
-              <div className={styles.cardHeader}>
-                <div className={styles.cardTitle}>Claude (claude-code-acp)</div>
-                <span className={summary.backends.claude.turnsCount > 0 ? styles.badgeActive : styles.badgeIdle}>
-                  {summary.backends.claude.turnsCount > 0 ? 'Active' : 'Idle'}
-                </span>
-              </div>
-              <div className={styles.metricsList}>
-                <div className={styles.metricRow}>
-                  <span className={styles.metricLabel}>Turns Recorded</span>
-                  <span className={styles.metricValue}>{summary.backends.claude.turnsCount}</span>
+            {USAGE_CARDS.map(({ backend, title }) => {
+              const usage = summary.backends[backend]
+              // A main process from before this backend existed omits it.
+              if (!usage) return null
+              return (
+                <div key={backend} className={styles.card} data-testid={`${backend}-usage-card`}>
+                  <div className={styles.cardHeader}>
+                    <div className={styles.cardTitle}>{title}</div>
+                    <span className={usage.turnsCount > 0 ? styles.badgeActive : styles.badgeIdle}>
+                      {usage.turnsCount > 0 ? 'Active' : 'Idle'}
+                    </span>
+                  </div>
+                  <div className={styles.metricsList}>
+                    <div className={styles.metricRow}>
+                      <span className={styles.metricLabel}>Turns Recorded</span>
+                      <span className={styles.metricValue}>{usage.turnsCount}</span>
+                    </div>
+                    <div className={styles.metricRow}>
+                      <span className={styles.metricLabel}>Input Tokens</span>
+                      <span className={usage.totalInputTokens !== null ? styles.metricValue : styles.metricUnavailable}>
+                        {formatNumber(usage.totalInputTokens, 'tokens')}
+                      </span>
+                    </div>
+                    <div className={styles.metricRow}>
+                      <span className={styles.metricLabel}>Output Tokens</span>
+                      <span className={usage.totalOutputTokens !== null ? styles.metricValue : styles.metricUnavailable}>
+                        {formatNumber(usage.totalOutputTokens, 'tokens')}
+                      </span>
+                    </div>
+                    <div className={styles.metricRow}>
+                      <span className={styles.metricLabel}>Total Tokens</span>
+                      <span className={usage.totalTokens !== null ? styles.metricValue : styles.metricUnavailable}>
+                        {formatNumber(usage.totalTokens, 'tokens')}
+                      </span>
+                    </div>
+                    <div className={styles.metricRow}>
+                      <span className={styles.metricLabel}>Context Window</span>
+                      <span className={usage.contextUsedLatest !== null ? styles.metricValue : styles.metricUnavailable}>
+                        {usage.contextUsedLatest !== null && usage.contextSizeLatest !== null
+                          ? `${usage.contextUsedLatest.toLocaleString()} / ${usage.contextSizeLatest.toLocaleString()}`
+                          : 'Unavailable'}
+                      </span>
+                    </div>
+                    <div className={styles.metricRow}>
+                      <span className={styles.metricLabel}>Plan Cost / Credit</span>
+                      <span className={usage.totalCost !== null ? styles.metricValue : styles.metricUnavailable}>
+                        {formatCost(usage.totalCost, usage.costCurrency)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className={styles.metricRow}>
-                  <span className={styles.metricLabel}>Input Tokens</span>
-                  <span className={summary.backends.claude.totalInputTokens !== null ? styles.metricValue : styles.metricUnavailable}>
-                    {formatNumber(summary.backends.claude.totalInputTokens, 'tokens')}
-                  </span>
-                </div>
-                <div className={styles.metricRow}>
-                  <span className={styles.metricLabel}>Output Tokens</span>
-                  <span className={summary.backends.claude.totalOutputTokens !== null ? styles.metricValue : styles.metricUnavailable}>
-                    {formatNumber(summary.backends.claude.totalOutputTokens, 'tokens')}
-                  </span>
-                </div>
-                <div className={styles.metricRow}>
-                  <span className={styles.metricLabel}>Total Tokens</span>
-                  <span className={summary.backends.claude.totalTokens !== null ? styles.metricValue : styles.metricUnavailable}>
-                    {formatNumber(summary.backends.claude.totalTokens, 'tokens')}
-                  </span>
-                </div>
-                <div className={styles.metricRow}>
-                  <span className={styles.metricLabel}>Context Window</span>
-                  <span className={summary.backends.claude.contextUsedLatest !== null ? styles.metricValue : styles.metricUnavailable}>
-                    {summary.backends.claude.contextUsedLatest !== null && summary.backends.claude.contextSizeLatest !== null
-                      ? `${summary.backends.claude.contextUsedLatest.toLocaleString()} / ${summary.backends.claude.contextSizeLatest.toLocaleString()}`
-                      : 'Unavailable'}
-                  </span>
-                </div>
-                <div className={styles.metricRow}>
-                  <span className={styles.metricLabel}>Plan Cost / Credit</span>
-                  <span className={summary.backends.claude.totalCost !== null ? styles.metricValue : styles.metricUnavailable}>
-                    {formatCost(summary.backends.claude.totalCost, summary.backends.claude.costCurrency)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Codex Adapter Card */}
-            <div className={styles.card} data-testid="codex-usage-card">
-              <div className={styles.cardHeader}>
-                <div className={styles.cardTitle}>Codex (codex-acp)</div>
-                <span className={summary.backends.codex.turnsCount > 0 ? styles.badgeActive : styles.badgeIdle}>
-                  {summary.backends.codex.turnsCount > 0 ? 'Active' : 'Idle'}
-                </span>
-              </div>
-              <div className={styles.metricsList}>
-                <div className={styles.metricRow}>
-                  <span className={styles.metricLabel}>Turns Recorded</span>
-                  <span className={styles.metricValue}>{summary.backends.codex.turnsCount}</span>
-                </div>
-                <div className={styles.metricRow}>
-                  <span className={styles.metricLabel}>Input Tokens</span>
-                  <span className={summary.backends.codex.totalInputTokens !== null ? styles.metricValue : styles.metricUnavailable}>
-                    {formatNumber(summary.backends.codex.totalInputTokens, 'tokens')}
-                  </span>
-                </div>
-                <div className={styles.metricRow}>
-                  <span className={styles.metricLabel}>Output Tokens</span>
-                  <span className={summary.backends.codex.totalOutputTokens !== null ? styles.metricValue : styles.metricUnavailable}>
-                    {formatNumber(summary.backends.codex.totalOutputTokens, 'tokens')}
-                  </span>
-                </div>
-                <div className={styles.metricRow}>
-                  <span className={styles.metricLabel}>Total Tokens</span>
-                  <span className={summary.backends.codex.totalTokens !== null ? styles.metricValue : styles.metricUnavailable}>
-                    {formatNumber(summary.backends.codex.totalTokens, 'tokens')}
-                  </span>
-                </div>
-                <div className={styles.metricRow}>
-                  <span className={styles.metricLabel}>Context Window</span>
-                  <span className={summary.backends.codex.contextUsedLatest !== null ? styles.metricValue : styles.metricUnavailable}>
-                    {summary.backends.codex.contextUsedLatest !== null && summary.backends.codex.contextSizeLatest !== null
-                      ? `${summary.backends.codex.contextUsedLatest.toLocaleString()} / ${summary.backends.codex.contextSizeLatest.toLocaleString()}`
-                      : 'Unavailable'}
-                  </span>
-                </div>
-                <div className={styles.metricRow}>
-                  <span className={styles.metricLabel}>Plan Cost / Credit</span>
-                  <span className={summary.backends.codex.totalCost !== null ? styles.metricValue : styles.metricUnavailable}>
-                    {formatCost(summary.backends.codex.totalCost, summary.backends.codex.costCurrency)}
-                  </span>
-                </div>
-              </div>
-            </div>
+              )
+            })}
           </div>
 
           {/* Activity Log */}

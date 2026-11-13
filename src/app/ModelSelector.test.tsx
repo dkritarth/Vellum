@@ -13,6 +13,7 @@ describe('ModelSelector', () => {
 
     expect(screen.getByRole('option', { name: 'Claude' })).toHaveValue('claude')
     expect(screen.getByRole('option', { name: 'Codex' })).toHaveValue('codex')
+    expect(screen.getByRole('option', { name: 'Gemini (Antigravity)' })).toHaveValue('antigravity')
     await user.selectOptions(screen.getByLabelText(/model backend/i), 'codex')
 
     expect(onChange).toHaveBeenCalledWith('codex')

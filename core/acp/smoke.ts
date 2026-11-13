@@ -9,6 +9,7 @@
 //   npm run smoke:acp                 # tries both backends
 //   npm run smoke:acp -- claude       # just claude-code-acp
 //   npm run smoke:acp -- codex        # just codex-acp
+//   npm run smoke:acp -- antigravity  # just `agy acp`
 //
 // This script deliberately does NOT run as part of `npm test` / CI — the
 // mocked unit tests in stdio-client.test.ts cover the transport logic
@@ -38,8 +39,14 @@ import type { AcpBackend } from './client.js'
 
 const PROMPT = 'Reply with exactly the word "pong" and nothing else.'
 
+const ADAPTER_NAMES: Record<AcpBackend, string> = {
+  claude: 'claude-code-acp',
+  codex: 'codex-acp',
+  antigravity: 'agy acp',
+}
+
 async function smoke(backend: AcpBackend): Promise<void> {
-  console.log(`\n=== ${backend} (${backend === 'claude' ? 'claude-code-acp' : 'codex-acp'}) ===`)
+  console.log(`\n=== ${backend} (${ADAPTER_NAMES[backend]}) ===`)
   console.log(`startedAt=${new Date().toISOString()}`)
   const client = new StdioAcpClient()
   let session

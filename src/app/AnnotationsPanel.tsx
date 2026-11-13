@@ -3,7 +3,7 @@
 // delete it. Talks only to `window.vellum` (preload bridge) — never imports
 // Node/core directly, per AGENTS.md. Mirrors NotesPanel's slug-driven
 // load/reset shape.
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { HighlightRecord } from '../../core/highlights/repo'
 import styles from './AnnotationsPanel.module.css'
 
@@ -18,19 +18,30 @@ interface AnnotationsPanelProps {
 export function AnnotationsPanel({ slug, onJump }: AnnotationsPanelProps): JSX.Element {
   const [highlights, setHighlights] = useState<HighlightRecord[]>([])
   const [loading, setLoading] = useState(false)
+  // Slug the panel currently shows; a list response for any other paper is
+  // stale (user switched tabs mid-request) and must not overwrite the view.
+  const currentSlug = useRef(slug)
+  currentSlug.current = slug
 
   const load = useCallback((paperSlug: string) => {
     setLoading(true)
     window.vellum
       .highlightsList(paperSlug)
-      .then((records) => setHighlights(records))
-      .catch(() => setHighlights([]))
-      .finally(() => setLoading(false))
+      .then((records) => {
+        if (currentSlug.current === paperSlug) setHighlights(records)
+      })
+      .catch(() => {
+        if (currentSlug.current === paperSlug) setHighlights([])
+      })
+      .finally(() => {
+        if (currentSlug.current === paperSlug) setLoading(false)
+      })
   }, [])
 
   useEffect(() => {
+    setHighlights([])
     if (!slug) {
-      setHighlights([])
+      setLoading(false)
       return
     }
     load(slug)

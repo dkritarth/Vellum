@@ -164,4 +164,77 @@ describe('Library', () => {
       expect(screen.queryByText('Attention Is All You Need')).not.toBeInTheDocument()
     })
   })
+
+  it('adds a paper to a collection from the card control and shows the new tag', async () => {
+    listPapers.mockResolvedValue([makePaper()])
+    let assigned = false
+    const collectionsForPaper = vi.fn(async () => (assigned ? [{ id: 2, name: 'AI', parentId: 1 }] : []))
+    const collectionsList = vi.fn().mockResolvedValue([
+      { id: 1, name: 'Computer Science', parentId: null },
+      { id: 2, name: 'AI', parentId: 1 },
+    ])
+    const collectionsAssign = vi.fn(async () => {
+      assigned = true
+    })
+    Object.defineProperty(window, 'vellum', {
+      configurable: true,
+      value: { listPapers, collectionsForPaper, collectionsList, collectionsAssign },
+    })
+    const user = userEvent.setup()
+    render(<Library onOpenPaper={vi.fn()} />)
+
+    const select = await screen.findByRole('combobox', { name: 'Add Attention Is All You Need to a collection' })
+    // Nested collections are listed with their full path.
+    expect(await screen.findByRole('option', { name: 'Computer Science / AI' })).toBeInTheDocument()
+    await user.selectOptions(select, '2')
+
+    expect(collectionsAssign).toHaveBeenCalledWith({ paperSlug: 'arxiv-1706.03762', collectionId: 2 })
+    expect(await screen.findByText('AI')).toBeInTheDocument()
+    // Control resets to its prompt, and the paper's own collection is no longer offered.
+    expect(select).toHaveValue('')
+    await waitFor(() => expect(screen.queryByRole('option', { name: 'Computer Science / AI' })).not.toBeInTheDocument())
+  })
+
+  it('makes cards draggable with the paper slug as drag data', async () => {
+    listPapers.mockResolvedValue([makePaper()])
+    render(<Library onOpenPaper={vi.fn()} />)
+
+    const card = (await screen.findByText('Attention Is All You Need')).closest('[role="listitem"]') as HTMLElement
+    expect(card).toHaveAttribute('draggable', 'true')
+    const setData = vi.fn()
+    fireEvent.dragStart(card, { dataTransfer: { setData, effectAllowed: '' } })
+    expect(setData).toHaveBeenCalledWith('application/x-vellum-paper', 'arxiv-1706.03762')
+  })
+
+  it('removes a paper from the filtered collection', async () => {
+    listPapers.mockResolvedValue([makePaper()])
+    const collectionsRemove = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(window, 'vellum', {
+      configurable: true,
+      value: { listPapers, collectionsRemove, collectionsForPaper: vi.fn().mockResolvedValue([]) },
+    })
+    const user = userEvent.setup()
+    render(<Library onOpenPaper={vi.fn()} selectedCollectionId={7} selectedCollectionName="Reading" />)
+
+    await user.click(await screen.findByRole('button', { name: 'Remove Attention Is All You Need from Reading' }))
+
+    expect(collectionsRemove).toHaveBeenCalledWith({ paperSlug: 'arxiv-1706.03762', collectionId: 7 })
+    await waitFor(() => expect(screen.queryByText('Attention Is All You Need')).not.toBeInTheDocument())
+  })
+
+  it('says the collection is empty (not the library) when a filtered collection has no papers', async () => {
+    listPapers.mockResolvedValue([])
+    render(<Library onOpenPaper={vi.fn()} selectedCollectionId={7} selectedCollectionName="Reading" />)
+
+    expect(await screen.findByText(/no papers in this collection yet/i)).toBeInTheDocument()
+    expect(screen.queryByText(/ingest one to get started/i)).not.toBeInTheDocument()
+  })
+
+  it('re-queries when refreshNonce changes (e.g. a paper was dropped on a collection)', async () => {
+    listPapers.mockResolvedValue([])
+    const { rerender } = render(<Library onOpenPaper={vi.fn()} refreshNonce={0} />)
+    await waitFor(() => expect(listPapers).toHaveBeenCalledTimes(1))
+    rerender(<Library onOpenPaper={vi.fn()} refreshNonce={1} />)
+    await waitFor(() => expect(listPapers).toHaveBeenCalledTimes(2))
+  })
 })

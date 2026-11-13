@@ -10,7 +10,11 @@
 // for IngestResult/VellumApi).
 import { useEffect, useRef, useState } from 'react'
 import type { ListPapersOptions, PaperRecord, PaperSortColumn } from '../../core/library/repo'
+import type { CollectionRecord } from '../../core/collections/repo'
 import styles from './Library.module.css'
+
+/** Drag-data type a Library card carries; CollectionsTree rows accept it. */
+export const PAPER_DRAG_TYPE = 'application/x-vellum-paper'
 
 export interface LibraryProps {
   onOpenPaper: (paper: { slug: string; title: string }) => void
@@ -22,6 +26,9 @@ export interface LibraryProps {
   /** Focus the title search box whenever this changes (and on mount when
    * non-zero) — the sidebar's Search item. */
   focusSearchNonce?: number
+  /** Re-query papers and collections whenever this changes (App bumps it
+   * after a paper is dropped onto a sidebar collection). */
+  refreshNonce?: number
 }
 
 const SORT_OPTIONS: { value: PaperSortColumn; label: string }[] = [
@@ -39,13 +46,15 @@ export function Library({
   onClearCollectionFilter,
   onTrashPaper,
   focusSearchNonce = 0,
+  refreshNonce = 0,
 }: LibraryProps): JSX.Element {
   const searchInputRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
     if (focusSearchNonce > 0) searchInputRef.current?.focus()
   }, [focusSearchNonce])
   const [papers, setPapers] = useState<PaperRecord[]>([])
-  const [paperCollections, setPaperCollections] = useState<Record<string, string[]>>({})
+  const [paperCollections, setPaperCollections] = useState<Record<string, CollectionRecord[]>>({})
+  const [collections, setCollections] = useState<CollectionRecord[]>([])
   const [status, setStatus] = useState<Status>('loading')
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<PaperSortColumn>('addedAt')
@@ -59,6 +68,49 @@ export function Library({
       onTrashPaper?.(slug)
     } catch (err) {
       console.error('Failed to move paper to trash:', err)
+    }
+  }
+
+  // All collections, for each card's "Add to collection" control.
+  useEffect(() => {
+    let cancelled = false
+    window.vellum?.collectionsList?.()
+      .then((rows) => {
+        if (!cancelled) setCollections(rows)
+      })
+      .catch(() => {
+        // Control just offers nothing; the sidebar tree surfaces load errors.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [refreshNonce])
+
+  async function loadPaperCollections(slug: string): Promise<void> {
+    if (!window.vellum?.collectionsForPaper) return
+    try {
+      const rows = await window.vellum.collectionsForPaper(slug)
+      setPaperCollections((prev) => ({ ...prev, [slug]: rows }))
+    } catch {
+      // Keep the previous tags.
+    }
+  }
+
+  async function handleAssign(paper: PaperRecord, collectionId: number): Promise<void> {
+    try {
+      await window.vellum.collectionsAssign({ paperSlug: paper.slug, collectionId })
+      await loadPaperCollections(paper.slug)
+    } catch (err) {
+      console.error('Failed to add paper to collection:', err)
+    }
+  }
+
+  async function handleRemoveFromCollection(paper: PaperRecord, collectionId: number): Promise<void> {
+    try {
+      await window.vellum.collectionsRemove({ paperSlug: paper.slug, collectionId })
+      setPapers((prev) => prev.filter((p) => p.slug !== paper.slug))
+    } catch (err) {
+      console.error('Failed to remove paper from collection:', err)
     }
   }
 
@@ -82,11 +134,10 @@ export function Library({
 
         // Fetch collection tags for displayed papers
         if (window.vellum?.collectionsForPaper) {
-          const tags: Record<string, string[]> = {}
+          const tags: Record<string, CollectionRecord[]> = {}
           for (const paper of rows) {
             try {
-              const colls = await window.vellum.collectionsForPaper(paper.slug)
-              tags[paper.slug] = colls.map((c) => c.name)
+              tags[paper.slug] = await window.vellum.collectionsForPaper(paper.slug)
             } catch {
               // ignore error
             }
@@ -101,7 +152,9 @@ export function Library({
     return () => {
       cancelled = true
     }
-  }, [search, sort, selectedCollectionId])
+  }, [search, sort, selectedCollectionId, refreshNonce])
+
+  const collectionPaths = collectionPathNames(collections)
 
   return (
     <div className={styles.library}>
@@ -145,7 +198,11 @@ export function Library({
         <p className={styles.empty}>Could not load your library.</p>
       ) : status === 'ready' && papers.length === 0 ? (
         <p className={styles.empty}>
-          {search.trim() ? 'No papers match your search.' : 'No papers yet — ingest one to get started.'}
+          {search.trim()
+            ? 'No papers match your search.'
+            : selectedCollectionId !== null
+              ? 'No papers in this collection yet. Drag a paper card onto the collection in the sidebar, or use “Add to collection…” on a card.'
+              : 'No papers yet — ingest one to get started.'}
         </p>
       ) : (
         <div className={styles.grid} role="list" aria-label="Papers">
@@ -154,6 +211,12 @@ export function Library({
               key={paper.slug}
               role="listitem"
               className={styles.card}
+              draggable
+              onDragStart={(event) => {
+                event.dataTransfer.setData(PAPER_DRAG_TYPE, paper.slug)
+                event.dataTransfer.setData('text/plain', paper.title)
+                event.dataTransfer.effectAllowed = 'copy'
+              }}
             >
               <div className={styles.cardHeader}>
                 <button
@@ -183,12 +246,44 @@ export function Library({
                 </span>
                 {paperCollections[paper.slug] && paperCollections[paper.slug].length > 0 && (
                   <div className={styles.collectionsTagList}>
-                    {paperCollections[paper.slug].map((cName) => (
-                      <span key={cName} className={styles.collectionTag}>
-                        {cName}
+                    {paperCollections[paper.slug].map((collection) => (
+                      <span key={collection.id} className={styles.collectionTag}>
+                        {collection.name}
                       </span>
                     ))}
                   </div>
+                )}
+              </div>
+              <div className={styles.cardActions}>
+                {collections.length > 0 && (
+                  <select
+                    className={styles.collectionSelect}
+                    aria-label={`Add ${paper.title} to a collection`}
+                    value=""
+                    onChange={(event) => {
+                      const id = Number(event.target.value)
+                      if (id > 0) void handleAssign(paper, id)
+                    }}
+                  >
+                    <option value="">Add to collection…</option>
+                    {collections
+                      .filter((collection) => !paperCollections[paper.slug]?.some((c) => c.id === collection.id))
+                      .map((collection) => (
+                        <option key={collection.id} value={collection.id}>
+                          {collectionPaths.get(collection.id) ?? collection.name}
+                        </option>
+                      ))}
+                  </select>
+                )}
+                {selectedCollectionId !== null && (
+                  <button
+                    type="button"
+                    className={styles.removeFromCollectionButton}
+                    aria-label={`Remove ${paper.title} from ${selectedCollectionName || 'this collection'}`}
+                    onClick={() => void handleRemoveFromCollection(paper, selectedCollectionId)}
+                  >
+                    Remove from collection
+                  </button>
                 )}
               </div>
             </div>
@@ -203,4 +298,22 @@ function formatAuthors(authors: string[]): string {
   if (authors.length === 0) return ''
   if (authors.length <= 3) return authors.join(', ')
   return `${authors.slice(0, 3).join(', ')} et al.`
+}
+
+/** "Parent / Child" display names for a flat collection list. */
+function collectionPathNames(collections: CollectionRecord[]): Map<number, string> {
+  const byId = new Map(collections.map((c) => [c.id, c]))
+  const names = new Map<number, string>()
+  for (const collection of collections) {
+    const parts: string[] = []
+    const seen = new Set<number>()
+    let current: CollectionRecord | undefined = collection
+    while (current && !seen.has(current.id)) {
+      seen.add(current.id)
+      parts.unshift(current.name)
+      current = current.parentId === null ? undefined : byId.get(current.parentId)
+    }
+    names.set(collection.id, parts.join(' / '))
+  }
+  return names
 }

@@ -190,3 +190,9 @@
   font-style: italic;
   padding: 8px 6px;
 }
+
+.dropTarget {
+  outline: 1px dashed var(--vellum-accent, #6d8cff);
+  outline-offset: -1px;
+  background: rgba(109, 140, 255, 0.15);
+}

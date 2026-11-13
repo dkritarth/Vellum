@@ -55,6 +55,9 @@ export function App(): JSX.Element {
   // title search box. The nonce re-focuses it on repeat clicks.
   const [libraryViaSearch, setLibraryViaSearch] = useState(false)
   const [searchFocusNonce, setSearchFocusNonce] = useState(0)
+  // Bumped when a paper is dropped on a sidebar collection so the Library
+  // re-reads tags and the filtered list.
+  const [libraryRefreshNonce, setLibraryRefreshNonce] = useState(0)
 
   const activeNavItem: NavItem | null =
     view === 'reader' ? 'Home' : view === 'library' ? (libraryViaSearch ? 'Search' : 'Library') : null
@@ -177,6 +180,7 @@ export function App(): JSX.Element {
           onSelectUsage={() => setView('usage')}
           activeNavItem={activeNavItem}
           activeFooterItem={activeFooterItem}
+          onPaperAssigned={() => setLibraryRefreshNonce((n) => n + 1)}
         />
         <main className={styles.centerPane} aria-label="Paper view">
           {chatBanner && (
@@ -197,6 +201,7 @@ export function App(): JSX.Element {
             <Library
               onOpenPaper={openPaper}
               focusSearchNonce={libraryViaSearch ? searchFocusNonce : 0}
+              refreshNonce={libraryRefreshNonce}
               selectedCollectionId={selectedCollectionId}
               selectedCollectionName={selectedCollectionName}
               onClearCollectionFilter={() => {

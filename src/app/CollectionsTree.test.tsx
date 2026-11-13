@@ -118,4 +118,39 @@ describe('CollectionsTree [L2-01]', () => {
       expect(onSelect).toHaveBeenCalledWith(null, null)
     })
   })
+
+  it('assigns a paper dropped on a collection and reports it', async () => {
+    const collectionsAssign = vi.fn().mockResolvedValue(undefined)
+    window.vellum = { ...window.vellum, collectionsAssign } as any
+    const onPaperAssigned = vi.fn()
+    render(<CollectionsTree selectedCollectionId={null} onSelectCollection={vi.fn()} onPaperAssigned={onPaperAssigned} />)
+
+    const row = (await screen.findByText('AI')).closest('[role="treeitem"]') as HTMLElement
+    const dataTransfer = {
+      types: ['application/x-vellum-paper'],
+      getData: (type: string) => (type === 'application/x-vellum-paper' ? 'arxiv-1706.03762' : ''),
+      dropEffect: '',
+    }
+    fireEvent.dragOver(row, { dataTransfer })
+    expect(row.className).toMatch(/dropTarget/)
+    fireEvent.drop(row, { dataTransfer })
+
+    await waitFor(() => {
+      expect(collectionsAssign).toHaveBeenCalledWith({ paperSlug: 'arxiv-1706.03762', collectionId: 2 })
+      expect(onPaperAssigned).toHaveBeenCalledWith(2)
+    })
+  })
+
+  it('ignores drags that do not carry a paper', async () => {
+    const collectionsAssign = vi.fn()
+    window.vellum = { ...window.vellum, collectionsAssign } as any
+    render(<CollectionsTree selectedCollectionId={null} onSelectCollection={vi.fn()} />)
+
+    const row = (await screen.findByText('AI')).closest('[role="treeitem"]') as HTMLElement
+    const dataTransfer = { types: ['text/plain'], getData: () => 'hello', dropEffect: '' }
+    fireEvent.dragOver(row, { dataTransfer })
+    fireEvent.drop(row, { dataTransfer })
+    expect(row.className).not.toMatch(/dropTarget/)
+    expect(collectionsAssign).not.toHaveBeenCalled()
+  })
 })

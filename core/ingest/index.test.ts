@@ -6,7 +6,7 @@
 //  - the DB is an in-memory core/store/db.ts instance.
 //  - files are written under a per-test temp dir, never the repo's real data/.
 
-import { mkdtempSync, rmSync, readFileSync, existsSync, mkdirSync, copyFileSync, writeFileSync } from 'node:fs'
+import fs, { readdirSync, mkdtempSync, rmSync, readFileSync, existsSync, mkdirSync, copyFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -20,6 +20,8 @@ import type { AcpClient, AcpPromptRequest, AcpSession, AcpUpdate } from '../acp/
 import { getPaper, listPapers, upsertPaper, restorePaper, trashPaper } from '../library/repo.js'
 import { getNote, upsertNote } from '../notes/repo.js'
 import { addChatMessage, createChatSession, getChatMessages, getLatestChatSession } from '../chat/repo.js'
+import { createHighlight, listHighlights } from '../highlights/repo.js'
+import { createCollection, assignPaperToCollection, listPaperCollections } from '../collections/repo.js'
 import { openDb } from '../store/db.js'
 import { ingest } from './index.js'
 
@@ -28,9 +30,11 @@ const FIXTURE_PDF = fileURLToPath(new URL('./fixtures/sample.pdf', import.meta.u
 class FakeSession implements AcpSession {
   disposed = false
   requests: AcpPromptRequest[] = []
+  contextContents: string[] = []
   constructor(private readonly updates: AcpUpdate[]) {}
   async *prompt(req: AcpPromptRequest): AsyncIterable<AcpUpdate> {
     this.requests.push(req)
+    this.contextContents.push(...(req.contextFiles ?? []).map(file => readFileSync(file, 'utf8')))
     for (const update of this.updates) yield update
   }
   async dispose(): Promise<void> {
@@ -70,6 +74,7 @@ describe('ingest', () => {
   let tmpDir: string | undefined
 
   afterEach(() => {
+    vi.restoreAllMocks()
     if (tmpDir) {
       rmSync(tmpDir, { recursive: true, force: true })
       tmpDir = undefined
@@ -108,12 +113,311 @@ describe('ingest', () => {
         { title: '1. Introduction', startOffset: 21, endOffset: 100 },
       ])
 
-      // extractPaper was passed the actual mdPath just written, as a
-      // contextFile (agent reads the file itself — no inlined content).
-      expect(client.session?.requests[0]?.contextFiles).toEqual([result.paths.mdPath])
+      // Analysis reads the candidate from disk before it is published.
+      expect(client.session?.contextContents).toEqual([md])
+      const contextPath = client.session?.requests[0]?.contextFiles?.[0]
+      expect(contextPath).not.toBe(result.paths.mdPath)
+      expect(existsSync(contextPath!)).toBe(false)
     } finally {
       db.close()
     }
+  })
+
+  it('preserves published content and all research after a rejected DB update, reopen, and retry', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-preserve-'))
+    const source = join(tmpDir, 'source.pdf')
+    copyFileSync(FIXTURE_PDF, source)
+    const dbPath = join(tmpDir, 'app.db')
+    let db = openDb({ path: dbPath })
+    const client = new FakeClient([textUpdate(AGENT_JSON), doneUpdate])
+    try {
+      const original = await ingest(source, { db, dataDir: tmpDir, client })
+      upsertNote(db, original.slug, 'Research about original content')
+      createHighlight(db, { id: 'original', paperSlug: original.slug, page: 1, color: 'yellow', quote: 'Sample Paper Title', anchor: '{}', createdAt: '2026-01-01' })
+      const collection = createCollection(db, { name: 'Research' })
+      assignPaperToCollection(db, { paperSlug: original.slug, collectionId: collection.id })
+      const chat = createChatSession(db, { paperSlug: original.slug, backend: 'codex' })
+      addChatMessage(db, { sessionId: chat.id, role: 'user', content: 'Original question' })
+      const research = () => ({
+        note: getNote(db, original.slug), highlights: listHighlights(db, original.slug),
+        collections: listPaperCollections(db, original.slug), chat: getChatMessages(db, chat.id),
+      })
+      const oldResearch = research()
+      const oldRow = getPaper(db, original.slug)
+      const oldPdf = readFileSync(original.paths.pdfPath)
+      const oldMd = readFileSync(original.paths.mdPath)
+      db.exec("CREATE TRIGGER reject_update BEFORE UPDATE ON papers BEGIN SELECT RAISE(ABORT, 'injected storage failure'); END")
+      copyFileSync(fileURLToPath(new URL('./fixtures/sample2.pdf', import.meta.url)), source)
+      await expect(ingest(source, { db, dataDir: tmpDir, client })).rejects.toThrow('injected storage failure')
+      db.close()
+      db = openDb({ path: dbPath })
+      expect(getPaper(db, original.slug)).toEqual(oldRow)
+      expect(research()).toEqual(oldResearch)
+      expect(readFileSync(original.paths.pdfPath)).toEqual(oldPdf)
+      expect(readFileSync(original.paths.mdPath)).toEqual(oldMd)
+      db.exec('DROP TRIGGER reject_update')
+      const retry = await ingest(source, { db, dataDir: tmpDir, client: new FakeClient() })
+      expect(retry.slug).toBe(original.slug)
+      expect(retry.paths).toEqual(original.paths)
+      expect(readFileSync(retry.paths.pdfPath)).toEqual(readFileSync(source))
+      expect(readFileSync(retry.paths.mdPath)).not.toEqual(oldMd)
+      expect(getPaper(db, retry.slug)?.title).toBe(source)
+      expect(research()).toEqual(oldResearch)
+      expect(listPapers(db)).toHaveLength(1)
+    } finally {
+      db.close()
+    }
+  })
+
+  it.each(['candidate copy', 'original backup', 'second publication'])('restores original pair after %s failure', async (failure) => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-publication-'))
+    const source = join(tmpDir, 'source.pdf')
+    copyFileSync(FIXTURE_PDF, source)
+    const db = openDb({ path: ':memory:' })
+    const client = new FakeClient()
+    try {
+      const original = await ingest(source, { db, dataDir: tmpDir, client })
+      const oldPdf = readFileSync(original.paths.pdfPath)
+      const oldMd = readFileSync(original.paths.mdPath)
+      const oldRow = getPaper(db, original.slug)
+      copyFileSync(fileURLToPath(new URL('./fixtures/sample2.pdf', import.meta.url)), source)
+      const rename = fs.renameSync
+      const copy = fs.copyFileSync
+      vi.spyOn(fs, 'copyFileSync').mockImplementation((from, to, flags) => {
+        if (failure === 'candidate copy' && String(from).endsWith('paper.md')) throw new Error('injected copy failure')
+        return copy(from, to, flags)
+      })
+      let publicationFailed = false
+      vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+        if ((failure === 'original backup' && from === original.paths.mdPath) ||
+            (failure === 'second publication' && to === original.paths.mdPath && !publicationFailed)) {
+          publicationFailed = true
+          throw new Error('injected rename failure')
+        }
+        return rename(from, to)
+      })
+      await expect(ingest(source, { db, dataDir: tmpDir, client })).rejects.toThrow('injected')
+      expect(readFileSync(original.paths.pdfPath)).toEqual(oldPdf)
+      expect(readFileSync(original.paths.mdPath)).toEqual(oldMd)
+      expect(getPaper(db, original.slug)).toEqual(oldRow)
+      expect(readdirSync(join(tmpDir, 'papers'), { recursive: true }).filter(name => name.includes('.ingest-') || name.includes('.vellum-ingest-'))).toEqual([])
+      vi.restoreAllMocks()
+      await expect(ingest(source, { db, dataDir: tmpDir, client })).resolves.toMatchObject({ slug: original.slug })
+    } finally { db.close() }
+  })
+
+  it('reports recovery locations and retains the only original if restoration fails', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-recovery-'))
+    const source = join(tmpDir, 'source.pdf')
+    copyFileSync(FIXTURE_PDF, source)
+    const db = openDb({ path: ':memory:' })
+    const client = new FakeClient()
+    try {
+      const original = await ingest(source, { db, dataDir: tmpDir, client })
+      const oldPdf = readFileSync(original.paths.pdfPath)
+      const oldMd = readFileSync(original.paths.mdPath)
+      const oldRow = getPaper(db, original.slug)
+      copyFileSync(fileURLToPath(new URL('./fixtures/sample2.pdf', import.meta.url)), source)
+      const rename = fs.renameSync
+      let recoveryPath = ''
+      let publicationFailed = false
+      vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+        if (to === original.paths.mdPath && !publicationFailed) {
+          publicationFailed = true
+          throw new Error('injected publication failure')
+        }
+        if (to === original.paths.pdfPath && publicationFailed) {
+          recoveryPath = String(from)
+          throw new Error('injected recovery failure')
+        }
+        return rename(from, to)
+      })
+      const error = await ingest(source, { db, dataDir: tmpDir, client }).catch((error: unknown) => error)
+      expect(error).toBeInstanceOf(AggregateError)
+      expect((error as Error).message).toContain(recoveryPath)
+      expect((error as Error).message).toContain(original.paths.pdfPath)
+      expect((error as AggregateError).errors.map(String).join(' ')).toMatch(/publication failure.*recovery failure/)
+      expect(readFileSync(recoveryPath)).toEqual(oldPdf)
+      expect(readFileSync(original.paths.mdPath)).toEqual(oldMd)
+      expect(getPaper(db, original.slug)).toEqual(oldRow)
+      // Manual recovery remains possible from the reported original file.
+      vi.restoreAllMocks()
+      rename(recoveryPath, original.paths.pdfPath)
+      expect(readFileSync(original.paths.pdfPath)).toEqual(oldPdf)
+    } finally { db.close() }
+  })
+
+  it('rolls back new files, paper row and source binding together, then retries cleanly', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-new-failure-'))
+    const db = openDb({ path: ':memory:' })
+    const client = new FakeClient()
+    try {
+      db.exec("CREATE TRIGGER reject_binding BEFORE INSERT ON paper_sources BEGIN SELECT RAISE(ABORT, 'injected source binding failure'); END")
+      await expect(ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client })).rejects.toThrow('injected source binding failure')
+      expect(listPapers(db)).toEqual([])
+      expect(db.prepare('SELECT * FROM paper_sources').all()).toEqual([])
+      expect(readdirSync(join(tmpDir, 'papers'), { recursive: true }).filter(name => /paper\.(pdf|md)$|\.ingest-|\.vellum-ingest-/.test(String(name)))).toEqual([])
+      db.exec('DROP TRIGGER reject_binding')
+      const retry = await ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client })
+      expect(readFileSync(retry.paths.pdfPath)).toEqual(readFileSync(FIXTURE_PDF))
+      expect(db.prepare('SELECT paper_slug FROM paper_sources').all()).toEqual([{ paper_slug: retry.slug }])
+    } finally { db.close() }
+  })
+
+  it('allows independent progress and prevents a failed overlapping re-ingest from undoing a successful one', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-overlap-'))
+    const source = join(tmpDir, 'source.pdf')
+    copyFileSync(FIXTURE_PDF, source)
+    const db = openDb({ path: ':memory:' })
+    const client = new FakeClient()
+    let release!: () => void
+    const blocked = new Promise<void>(resolve => { release = resolve })
+    let entered!: () => void
+    const analyzing = new Promise<void>(resolve => { entered = resolve })
+    let calls = 0
+    const slow: AcpClient = { async newSession() {
+      // Hold only first analysis; no database transaction may stay open here.
+      if (++calls === 1) { entered(); await blocked }
+      return new FakeSession([textUpdate(JSON.stringify({ sections: [], metadata: { title: 'Rejected candidate' } })), doneUpdate])
+    } }
+    try {
+      const original = await ingest(source, { db, dataDir: tmpDir, client })
+      const originalPdf = readFileSync(original.paths.pdfPath), originalMd = readFileSync(original.paths.mdPath)
+      copyFileSync(fileURLToPath(new URL('./fixtures/sample2.pdf', import.meta.url)), source)
+      const pending = ingest(source, { db, dataDir: tmpDir, client: slow })
+      await analyzing
+      expect(db.inTransaction).toBe(false)
+      expect(readFileSync(original.paths.pdfPath)).toEqual(originalPdf)
+      expect(readFileSync(original.paths.mdPath)).toEqual(originalMd)
+      const independent = await ingest(fileURLToPath(new URL('./fixtures/sample2.pdf', import.meta.url)), { db, dataDir: tmpDir, client })
+      expect(independent.slug).not.toBe(original.slug)
+      copyFileSync(fileURLToPath(new URL('./fixtures/sample2.pdf', import.meta.url)), source)
+      const success = await ingest(source, { db, dataDir: tmpDir, client })
+      const successfulRow = getPaper(db, success.slug)
+      const successfulPdf = readFileSync(success.paths.pdfPath)
+      const successfulMd = readFileSync(success.paths.mdPath)
+      db.exec("CREATE TRIGGER reject_candidate BEFORE UPDATE ON papers WHEN NEW.title = 'Rejected candidate' BEGIN SELECT RAISE(ABORT, 'injected concurrent failure'); END")
+      release()
+      await expect(pending).rejects.toThrow('injected concurrent failure')
+      expect(getPaper(db, success.slug)).toEqual(successfulRow)
+      expect(readFileSync(success.paths.pdfPath)).toEqual(successfulPdf)
+      expect(readFileSync(success.paths.mdPath)).toEqual(successfulMd)
+      expect(listPapers(db)).toHaveLength(2)
+    } finally { release(); db.close() }
+  })
+
+  it('restores files when SQLite rejects COMMIT after successful statements', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-commit-'))
+    const source = join(tmpDir, 'source.pdf')
+    copyFileSync(FIXTURE_PDF, source)
+    const db = openDb({ path: ':memory:' })
+    const client = new FakeClient()
+    try {
+      const original = await ingest(source, { db, dataDir: tmpDir, client })
+      const oldPdf = readFileSync(original.paths.pdfPath), oldMd = readFileSync(original.paths.mdPath)
+      const oldRow = getPaper(db, original.slug)
+      db.exec(`CREATE TABLE deferred_failure (paper_slug TEXT REFERENCES papers(slug) DEFERRABLE INITIALLY DEFERRED);
+        CREATE TRIGGER reject_commit AFTER UPDATE ON papers BEGIN INSERT INTO deferred_failure VALUES ('missing-paper'); END;`)
+      copyFileSync(fileURLToPath(new URL('./fixtures/sample2.pdf', import.meta.url)), source)
+      await expect(ingest(source, { db, dataDir: tmpDir, client })).rejects.toThrow('FOREIGN KEY constraint failed')
+      expect(db.inTransaction).toBe(false)
+      expect(getPaper(db, original.slug)).toEqual(oldRow)
+      expect(readFileSync(original.paths.pdfPath)).toEqual(oldPdf)
+      expect(readFileSync(original.paths.mdPath)).toEqual(oldMd)
+      expect(db.prepare('SELECT * FROM deferred_failure').all()).toEqual([])
+    } finally { db.close() }
+  })
+
+  it('resolves concurrent legacy matches only at commit and rolls back failed adoption binding', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-legacy-overlap-'))
+    const source = join(tmpDir, 'alpha', 'paper.pdf')
+    const other = join(tmpDir, 'beta', 'paper.pdf')
+    for (const directory of ['alpha', 'beta', 'legacy']) mkdirSync(join(tmpDir, directory))
+    copyFileSync(FIXTURE_PDF, source)
+    copyFileSync(FIXTURE_PDF, other)
+    const pdfPath = join(tmpDir, 'legacy', 'paper.pdf'), mdPath = join(tmpDir, 'legacy', 'paper.md')
+    copyFileSync(FIXTURE_PDF, pdfPath)
+    writeFileSync(mdPath, '# Original legacy markdown')
+    const db = openDb({ path: ':memory:' })
+    let release!: () => void, entered!: () => void
+    const blocked = new Promise<void>(resolve => { release = resolve })
+    const analyzing = new Promise<void>(resolve => { entered = resolve })
+    const slow: AcpClient = { async newSession() { entered(); await blocked; return new FakeSession([]) } }
+    try {
+      upsertPaper(db, { slug: 'local-paper', title: 'Legacy', authors: [], pdfPath, mdPath, addedAt: '2025-01-01' })
+      upsertNote(db, 'local-paper', 'Legacy research')
+      db.exec("CREATE TRIGGER reject_adoption BEFORE UPDATE ON papers BEGIN SELECT RAISE(ABORT, 'injected adoption failure'); END")
+      await expect(ingest(source, { db, dataDir: tmpDir, client: new FakeClient() })).rejects.toThrow('adoption failure')
+      expect(db.prepare('SELECT * FROM paper_sources').all()).toEqual([])
+      expect(readFileSync(mdPath, 'utf8')).toBe('# Original legacy markdown')
+      db.exec('DROP TRIGGER reject_adoption')
+      const pending = ingest(source, { db, dataDir: tmpDir, client: slow })
+      await analyzing
+      const winner = await ingest(other, { db, dataDir: tmpDir, client: new FakeClient() })
+      expect(winner.slug).toBe('local-paper')
+      const winnerRow = getPaper(db, winner.slug), winnerMd = readFileSync(mdPath)
+      release()
+      const later = await pending
+      expect(later.slug).not.toBe(winner.slug)
+      expect(getPaper(db, winner.slug)).toEqual(winnerRow)
+      expect(readFileSync(mdPath)).toEqual(winnerMd)
+      expect(getNote(db, winner.slug)?.body).toBe('Legacy research')
+      expect(listPapers(db)).toHaveLength(2)
+      expect(db.prepare('SELECT paper_slug FROM paper_sources ORDER BY paper_slug').all()).toEqual([
+        { paper_slug: winner.slug }, { paper_slug: later.slug },
+      ])
+    } finally { release(); db.close() }
+  })
+
+  it('never replaces or deletes a directory found at a paper file path', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-nonfile-'))
+    const db = openDb({ path: ':memory:' })
+    const client = new FakeClient()
+    try {
+      const original = await ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client })
+      rmSync(original.paths.mdPath)
+      mkdirSync(original.paths.mdPath)
+      const valuable = join(original.paths.mdPath, 'keep.txt')
+      writeFileSync(valuable, 'Preserve unexpected existing data')
+      await expect(ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client })).rejects.toThrow()
+      expect(readFileSync(valuable, 'utf8')).toBe('Preserve unexpected existing data')
+    } finally { db.close() }
+  })
+
+  it('reports success after commit even if temporary backup cleanup fails', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-cleanup-'))
+    const source = join(tmpDir, 'source.pdf')
+    copyFileSync(FIXTURE_PDF, source)
+    const db = openDb({ path: ':memory:' })
+    const client = new FakeClient()
+    try {
+      const original = await ingest(source, { db, dataDir: tmpDir, client })
+      copyFileSync(fileURLToPath(new URL('./fixtures/sample2.pdf', import.meta.url)), source)
+      const remove = fs.rmSync
+      const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      vi.spyOn(fs, 'rmSync').mockImplementation((target, options) => {
+        if (String(target).includes('.vellum-ingest-')) throw new Error('injected cleanup failure')
+        remove(target, options)
+      })
+      const updated = await ingest(source, { db, dataDir: tmpDir, client })
+      expect(updated.slug).toBe(original.slug)
+      expect(readFileSync(updated.paths.pdfPath)).toEqual(readFileSync(source))
+      expect(readFileSync(updated.paths.mdPath, 'utf8')).toContain('Sample Paper Two')
+      expect(getPaper(db, updated.slug)?.pdfPath).toBe(updated.paths.pdfPath)
+      expect(warning).toHaveBeenCalledWith(expect.stringContaining('temporary files retained at'), expect.any(Error))
+    } finally { db.close() }
+  })
+
+  it('rejects a caller-owned transaction before doing any file work', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-transaction-'))
+    const db = openDb({ path: ':memory:' })
+    try {
+      db.exec('BEGIN')
+      await expect(ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client: new FakeClient() })).rejects.toThrow('requires ownership')
+      expect(db.inTransaction).toBe(true)
+      expect(existsSync(join(tmpDir, 'papers'))).toBe(false)
+      db.exec('ROLLBACK')
+    } finally { db.close() }
   })
 
   it('falls back to fetch-time metadata for fields a degraded agent extraction omits', async () => {

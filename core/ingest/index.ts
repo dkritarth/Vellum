@@ -6,8 +6,8 @@
 //   3. convert  — convert.ts   (PDF bytes -> paper.md markdown, text-layer only)
 //   4. extract  — extract.ts   (one ACP agent turn over paper.md -> sections +
 //                                agent-refined metadata; never throws, degrades)
-//   5. store    — write data/papers/<slug>/{paper.pdf,paper.md} to disk, then
-//                 upsert the SQLite row via core/library/repo.ts
+//   5. store    — publish staged files with recoverable backups around the
+//                 final SQLite metadata/source transaction.
 //
 // Dependencies (ACP client, DB handle, data dir) are injected so tests run
 // hermetically: no real adapter spawned, no real network call, no real app.db
@@ -18,8 +18,8 @@
 // reconciliation uses PDF bytes or stored DOI names without renaming research keys.
 // Re-ingest updates files and metadata through the same paper slug.
 
-import { mkdir, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 
 import type { Database } from 'better-sqlite3'
 
@@ -32,6 +32,7 @@ import { convertPdfToMarkdown } from './convert.js'
 import { extractPaper } from './extract.js'
 import { fetchSource } from './fetch.js'
 import { recordPaperSource, resolvePaperSource } from './source-identity.js'
+import { withPaperPublication } from './publication.js'
 import { summarizePaper } from './summary.js'
 
 export type { InputKind }
@@ -62,7 +63,8 @@ export interface IngestResult {
 export interface IngestOptions {
   /** Open SQLite handle (core/store/db.ts's openDb()) — required; the
    * orchestrator persists through it but never opens/closes it itself, so
-   * callers (electron/main.ts, tests) control the DB's lifecycle. */
+   * callers (electron/main.ts, tests) control the DB's lifecycle. Must not
+   * already be inside a caller-owned transaction. */
   db: Database
   /** Base dir papers are written under, as `<dataDir>/papers/<slug>/`.
    * Defaults to 'data', matching core/store/db.ts's DEFAULT_DB_PATH and
@@ -116,6 +118,8 @@ function resolveIngestSource(
  * files + DB row. See module comment for the idempotency guarantee.
  */
 export async function ingest(raw: string, options: IngestOptions): Promise<IngestResult> {
+  // A caller-owned transaction could roll back after files were committed.
+  if (options.db.inTransaction) throw new Error('ingest: requires ownership of the final database transaction')
   const dataDir = options.dataDir ?? DEFAULT_DATA_DIR
 
   const classified: ClassifiedInput = classifyInput(raw)
@@ -125,76 +129,84 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
   // fetched.pdfBytes stays intact for the paper.pdf write below.
   const markdown = await convertPdfToMarkdown(fetched.pdfBytes.slice())
 
-  const { slug, pdfPath, mdPath } = resolveIngestSource(classified, fetched.pdfBytes, {
-    db: options.db, dataDir,
-  })
-  await Promise.all([
-    mkdir(dirname(pdfPath), { recursive: true }),
-    mkdir(dirname(mdPath), { recursive: true }),
-  ])
-  // Overwrite in place (not append/rename) — re-ingest of the same slug
-  // replaces prior file contents rather than accumulating duplicates.
-  await Promise.all([writeFile(pdfPath, fetched.pdfBytes), writeFile(mdPath, markdown)])
+  const stagingRoot = join(dataDir, 'papers')
+  await mkdir(stagingRoot, { recursive: true })
+  const staging = await mkdtemp(join(stagingRoot, '.ingest-'))
+  const candidate = { pdfPath: join(staging, 'paper.pdf'), mdPath: join(staging, 'paper.md') }
+  try {
+    // Sequential writes settle before cleanup even if one fails.
+    await writeFile(candidate.pdfPath, fetched.pdfBytes)
+    await writeFile(candidate.mdPath, markdown)
+    const extracted = await extractPaper(candidate.mdPath, { client: options.client, backend: options.backend })
+    const summary = await summarizePaper(candidate.mdPath, { client: options.client, backend: options.backend })
 
-  const extracted = await extractPaper(mdPath, { client: options.client, backend: options.backend })
-  const summary = await summarizePaper(mdPath, { client: options.client, backend: options.backend })
+    // Prefer the agent's paper.md-derived metadata (extract.ts); fall back to
+    // the raw fetch-time metadata (arXiv/Crossref) for whatever the agent
+    // didn't find, and finally to the classified input value so `title` is
+    // never empty even in a fully degraded extraction.
+    const finalAuthors = extracted.metadata.authors ?? fetched.metadata?.authors ?? []
 
-  // Prefer the agent's paper.md-derived metadata (extract.ts); fall back to
-  // the raw fetch-time metadata (arXiv/Crossref) for whatever the agent
-  // didn't find, and finally to the classified input value so `title` is
-  // never empty even in a fully degraded extraction.
-  const finalAuthors = extracted.metadata.authors ?? fetched.metadata?.authors ?? []
+    // ORCIDs are a fetch-only signal (Crossref), positionally aligned to
+    // fetched.metadata.authors — NOT to whatever the agent-extracted authors
+    // array ends up being. If the agent's author list wins and diverges from
+    // Crossref's (reorder, different formatting, truncation, extra/missing
+    // author), keeping the Crossref-aligned ORCIDs would attach badges to the
+    // wrong author. Only trust authorOrcids when the persisted authors array
+    // is content-equal (same length + order + strings) to the Crossref list
+    // it was aligned to; otherwise drop it (undefined -> DB column NULL). No
+    // fuzzy re-matching — conservative "aligned or nothing".
+    const fetchedAuthors = fetched.metadata?.authors
+    const authorsMatchFetched =
+      fetchedAuthors !== undefined &&
+      finalAuthors.length === fetchedAuthors.length &&
+      finalAuthors.every((a, i) => a === fetchedAuthors[i])
+    const authorOrcids = authorsMatchFetched ? fetched.metadata?.authorOrcids : undefined
 
-  // ORCIDs are a fetch-only signal (Crossref), positionally aligned to
-  // fetched.metadata.authors — NOT to whatever the agent-extracted authors
-  // array ends up being. If the agent's author list wins and diverges from
-  // Crossref's (reorder, different formatting, truncation, extra/missing
-  // author), keeping the Crossref-aligned ORCIDs would attach badges to the
-  // wrong author. Only trust authorOrcids when the persisted authors array
-  // is content-equal (same length + order + strings) to the Crossref list
-  // it was aligned to; otherwise drop it (undefined -> DB column NULL). No
-  // fuzzy re-matching — conservative "aligned or nothing".
-  const fetchedAuthors = fetched.metadata?.authors
-  const authorsMatchFetched =
-    fetchedAuthors !== undefined &&
-    finalAuthors.length === fetchedAuthors.length &&
-    finalAuthors.every((a, i) => a === fetchedAuthors[i])
-  const authorOrcids = authorsMatchFetched ? fetched.metadata?.authorOrcids : undefined
+    const metadata: IngestMetadata = {
+      title: extracted.metadata.title ?? fetched.metadata?.title ?? classified.value,
+      authors: finalAuthors,
+      year: extracted.metadata.year ?? fetched.metadata?.year,
+      venue: extracted.metadata.venue ?? fetched.metadata?.venue,
+      abstract: extracted.metadata.abstract ?? fetched.metadata?.abstract,
+      authorOrcids,
+    }
 
-  const metadata: IngestMetadata = {
-    title: extracted.metadata.title ?? fetched.metadata?.title ?? classified.value,
-    authors: finalAuthors,
-    year: extracted.metadata.year ?? fetched.metadata?.year,
-    venue: extracted.metadata.venue ?? fetched.metadata?.venue,
-    abstract: extracted.metadata.abstract ?? fetched.metadata?.abstract,
-    authorOrcids,
-  }
+    // Resolve only at final commit: two asynchronously staged sources may
+    // both match an unclaimed legacy paper. Adoption/binding rolls back with files.
+    const { slug, pdfPath, mdPath } = withPaperPublication(candidate, (publish) => options.db.transaction(() => {
+      const paths = resolveIngestSource(classified, fetched.pdfBytes, { db: options.db, dataDir })
+      const { slug, pdfPath, mdPath } = paths
+      const record: PaperRecord = {
+        slug,
+        title: metadata.title,
+        authors: metadata.authors,
+        year: metadata.year,
+        venue: metadata.venue,
+        doi: classified.kind === 'doi' ? classified.value : undefined,
+        arxivId: classified.kind === 'arxiv' ? classified.value : undefined,
+        abstract: metadata.abstract,
+        summary,
+        mdPath,
+        pdfPath,
+        sections: extracted.sections,
+        addedAt: new Date().toISOString(),
+        authorOrcids: metadata.authorOrcids,
+      }
+      publish(paths)
+      upsertPaper(options.db, record)
+      recordPaperSource(options.db, classified, slug)
+      return paths
+    }).immediate())
 
-  const record: PaperRecord = {
-    slug,
-    title: metadata.title,
-    authors: metadata.authors,
-    year: metadata.year,
-    venue: metadata.venue,
-    doi: classified.kind === 'doi' ? classified.value : undefined,
-    arxivId: classified.kind === 'arxiv' ? classified.value : undefined,
-    abstract: metadata.abstract,
-    summary,
-    mdPath,
-    pdfPath,
-    sections: extracted.sections,
-    addedAt: new Date().toISOString(),
-    authorOrcids: metadata.authorOrcids,
-  }
-  options.db.transaction(() => {
-    upsertPaper(options.db, record)
-    recordPaperSource(options.db, classified, slug)
-  })()
-
-  return {
-    slug,
-    title: metadata.title,
-    metadata,
-    paths: { pdfPath, mdPath },
+    return {
+      slug,
+      title: metadata.title,
+      metadata,
+      paths: { pdfPath, mdPath },
+    }
+  } finally {
+    await rm(staging, { recursive: true, force: true }).catch(error => {
+      console.warn(`ingest: candidate files retained at ${staging}`, error)
+    })
   }
 }

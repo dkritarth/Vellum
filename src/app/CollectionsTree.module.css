@@ -150,7 +150,10 @@
 }
 
 .nameInput {
-  flex: 1;
+  flex: 1 1 0;
+  /* Inputs have an intrinsic min width (~20ch) that otherwise pushes the
+     Add/✕ buttons past the narrow sidebar's edge. */
+  min-width: 0;
   background: #111111;
   border: 1px solid var(--vellum-border, #3a3a3a);
   border-radius: 4px;
@@ -165,6 +168,7 @@
 }
 
 .confirmBtn {
+  flex-shrink: 0;
   background: #2563eb;
   color: #ffffff;
   border: none;
@@ -175,6 +179,7 @@
 }
 
 .cancelBtn {
+  flex-shrink: 0;
   background: transparent;
   color: #888888;
   border: 1px solid #444444;

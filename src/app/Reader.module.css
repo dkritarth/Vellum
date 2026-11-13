@@ -155,13 +155,77 @@
 
 /* pdf.js text layer — positioned to exactly overlay the canvas glyph-for-glyph
    so selection matches what's visually rendered. Text is transparent; only
-   the user's selection highlight is visible (pdf.js applies this via its own
-   inline styles/CSS custom properties on rendered spans). */
+   the user's selection highlight is visible.
+
+   pdf.js's TextLayer only sets per-span custom properties (left/top as %,
+   --font-height, --scale-x, --rotate) and relies on the stylesheet below to
+   turn them into geometry. These rules are ported from
+   pdfjs-dist/web/pdf_viewer.css (.textLayer). Without them, spans flow as
+   visible plain text over the canvas. Reader.tsx sets --total-scale-factor
+   on this element to the render scale. */
 .textLayer {
   position: absolute;
   inset: 0;
-  overflow: hidden;
+  overflow: clip;
+  text-align: initial;
+  opacity: 1;
   line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 0;
+  --total-scale-factor: 1;
+  /* setLayerDimensions() sizes this div with round(down, …, var(--scale-round-*)). */
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+.textLayer :global(span),
+.textLayer :global(br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  user-select: text;
+}
+
+.textLayer > :global(:not(.markedContent)),
+.textLayer :global(.markedContent span:not(.markedContent)) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.textLayer :global(.markedContent) {
+  display: contents;
+}
+
+.textLayer ::selection {
+  background: color-mix(in srgb, AccentColor, transparent 50%);
+  color: transparent;
+}
+
+.textLayer :global(br)::selection {
+  background: transparent;
+}
+
+.textLayer :global(.endOfContent) {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  user-select: none;
 }
 
 .textLayer[data-highlight-mode='active'] {

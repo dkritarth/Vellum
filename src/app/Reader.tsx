@@ -584,6 +584,9 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
         textLayerContainer.innerHTML = ''
         textLayerContainer.style.width = `${viewport.width}px`
         textLayerContainer.style.height = `${viewport.height}px`
+        // pdf.js text-layer CSS (Reader.module.css) sizes glyph spans from
+        // this var; the viewport maps 1 PDF unit to `scale` CSS px.
+        textLayerContainer.style.setProperty('--total-scale-factor', String(scale))
         const textContent = await page.getTextContent()
         if (cancelled) return
         const textLayer = new TextLayer({

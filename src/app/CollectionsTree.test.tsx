@@ -153,4 +153,28 @@ describe('CollectionsTree [L2-01]', () => {
     expect(row.className).not.toMatch(/dropTarget/)
     expect(collectionsAssign).not.toHaveBeenCalled()
   })
+
+  it('lets keyboard users focus and select collection rows with Enter or Space', async () => {
+    const onSelect = vi.fn()
+    render(<CollectionsTree selectedCollectionId={2} onSelectCollection={onSelect} />)
+
+    const row = (await screen.findByText('Computer Science')).closest('[role="treeitem"]') as HTMLElement
+    expect(row).toHaveAttribute('tabindex', '0')
+    fireEvent.keyDown(row, { key: 'Enter' })
+    expect(onSelect).toHaveBeenLastCalledWith(1, 'Computer Science')
+
+    const allPapers = screen.getByText('All Papers').closest('[role="treeitem"]') as HTMLElement
+    expect(allPapers).toHaveAttribute('tabindex', '0')
+    fireEvent.keyDown(allPapers, { key: ' ' })
+    expect(onSelect).toHaveBeenLastCalledWith(null, null)
+  })
+
+  it('does not select a row when Enter is pressed on one of its action buttons', async () => {
+    const onSelect = vi.fn()
+    render(<CollectionsTree selectedCollectionId={null} onSelectCollection={onSelect} />)
+
+    const rename = await screen.findByRole('button', { name: 'Rename AI' })
+    fireEvent.keyDown(rename, { key: 'Enter' })
+    expect(onSelect).not.toHaveBeenCalled()
+  })
 })

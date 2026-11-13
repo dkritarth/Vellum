@@ -10,6 +10,15 @@ export interface CollectionsTreeProps {
   onPaperAssigned?: (collectionId: number) => void
 }
 
+/** Enter/Space on the row itself (not a nested button or input) selects it. */
+function selectOnKey(event: React.KeyboardEvent, select: () => void): void {
+  if (event.target !== event.currentTarget) return
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault()
+    select()
+  }
+}
+
 function carriesPaper(event: React.DragEvent): boolean {
   return Array.from(event.dataTransfer?.types ?? []).includes(PAPER_DRAG_TYPE)
 }
@@ -152,6 +161,8 @@ export function CollectionsTree({
               }`}
               style={{ paddingLeft: `${depth * 14 + 6}px` }}
               onClick={() => onSelectCollection(node.id, node.name)}
+              onKeyDown={(event) => selectOnKey(event, () => onSelectCollection(node.id, node.name))}
+              tabIndex={0}
               onDragOver={(event) => {
                 if (!carriesPaper(event)) return
                 event.preventDefault()
@@ -271,6 +282,8 @@ export function CollectionsTree({
       <div
         className={`${styles.allPapersItem} ${selectedCollectionId === null ? styles.allPapersActive : ''}`}
         onClick={() => onSelectCollection(null, null)}
+        onKeyDown={(event) => selectOnKey(event, () => onSelectCollection(null, null))}
+        tabIndex={0}
         role="treeitem"
         aria-selected={selectedCollectionId === null}
       >

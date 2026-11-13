@@ -40,6 +40,72 @@ afterEach(() => {
 })
 
 describe('AskPanel', () => {
+  it('inserts paragraphs with Shift+Enter and submits once with Enter', async () => {
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    const input = screen.getByRole('textbox', { name: 'Ask a question' })
+    await waitFor(() => expect(input).toBeEnabled())
+    await user.type(input, '  First paragraph')
+    await user.keyboard('{Shift>}{Enter}{Enter}{/Shift}Second paragraph  ')
+    expect(input).toHaveValue('  First paragraph\n\nSecond paragraph  ')
+    expect(askStart).not.toHaveBeenCalled()
+    await user.keyboard('{Enter}{Enter}')
+    expect(askStart).toHaveBeenCalledTimes(1)
+    expect(askStart).toHaveBeenCalledWith({ chatSessionId: 1, slug: 'p1', text: 'First paragraph\n\nSecond paragraph' })
+    expect(input).toBeDisabled()
+  })
+
+  it('does not submit an empty draft or repeated Enter keydown', async () => {
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    const input = screen.getByRole('textbox', { name: 'Ask a question' })
+    await waitFor(() => expect(input).toBeEnabled())
+    await user.type(input, '  ')
+    await user.keyboard('{Enter}')
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+    expect(askStart).not.toHaveBeenCalled()
+    await user.type(input, 'Question')
+    fireEvent.keyDown(input, { key: 'Enter', repeat: true })
+    expect(askStart).not.toHaveBeenCalled()
+    expect(input).toHaveValue('  Question')
+  })
+
+  it('keeps composition and commit Enter out of submission, then accepts ordinary Enter', async () => {
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    const input = screen.getByRole('textbox', { name: 'Ask a question' })
+    await waitFor(() => expect(input).toBeEnabled())
+    await user.type(input, '説明')
+    fireEvent.compositionStart(input)
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: false })
+    fireEvent.compositionEnd(input)
+    // Some engines end composition before keydown, but mark commit with 229.
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 })
+    fireEvent.keyUp(input, { key: 'Enter' })
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
+    expect(askStart).not.toHaveBeenCalled()
+    expect(input).toHaveValue('説明')
+    await user.keyboard('{Enter}')
+    expect(askStart).toHaveBeenCalledTimes(1)
+    expect(askStart).toHaveBeenCalledWith({ chatSessionId: 1, slug: 'p1', text: '説明' })
+  })
+
+  it.each([false, true])('preserves draft separators and multiline quotes through Send (edit=%s)', async (edit) => {
+    const user = userEvent.setup()
+    const view = render(<AskPanel slug="p1" />)
+    const input = screen.getByRole('textbox', { name: 'Ask a question' })
+    await waitFor(() => expect(input).toBeEnabled())
+    await user.type(input, '  Compare this claim')
+    view.rerender(<AskPanel slug="p1" injectedPrompt={{ text: '> "Line one\nLine two" (p. 2)', nonce: 1 }} />)
+    expect(input).toHaveFocus()
+    expect(input).toHaveValue('  Compare this claim\n\n> "Line one\nLine two" (p. 2)')
+    if (edit) await user.type(input, ' Why?  ')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    expect(askStart).toHaveBeenCalledTimes(1)
+    expect(askStart).toHaveBeenCalledWith({ chatSessionId: 1, slug: 'p1',
+      text: edit ? 'Compare this claim\n\n> "Line one\nLine two" (p. 2) Why?' : 'Compare this claim\n\n> "Line one\nLine two" (p. 2)' })
+  })
+
   it('loads and shows prior history for the open paper', async () => {
     askOpen.mockResolvedValue({
       session: { id: 1, paperSlug: 'p1', backend: 'claude', title: null, createdAt: 't' },

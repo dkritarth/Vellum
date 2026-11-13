@@ -3,14 +3,24 @@
 Vellum's single AI seam. See `client.ts` for the contract, `stdio-client.ts`
 for the implementation ([P1-01] — done).
 
-## Backends (both official, first-party — no OAuth bridge)
+## Backends (all official, first-party — no OAuth bridge)
 
 | Backend | Adapter subprocess | Auth source |
 |---------|--------------------|-------------|
 | `claude` | `claude-code-acp` | Claude plan's Agent-SDK credit |
 | `codex`  | `codex-acp`        | ChatGPT plan (Codex sign-in) |
+| `antigravity` | `agy acp` (Google Antigravity CLI) | Google AI plan (agy's own Google sign-in) |
 
 Adding a backend later = spawn a different ACP server. No new client code.
+
+**Antigravity (Gemini).** Vellum runs `agy acp --app-data-dir antigravity-acp`.
+`agy` is resolved from `VELLUM_AGY_PATH`, then `PATH`, then `~/.local/bin/agy`.
+Sign in once with `agy acp --login`; agy stores the token itself and Vellum
+never reads it. `GEMINI_API_KEY`, `GOOGLE_API_KEY` and Google cloud credentials
+are stripped from agy's env. Optional `VELLUM_ANTIGRAVITY_MODEL` (for example
+`claude-sonnet-4-6`) is applied with `session/set_config_option`. The
+standalone Gemini CLI is not a backend: personal Google sign-in there now
+fails with `IneligibleTierError` and points to Antigravity.
 
 Install the maintained Codex adapter as
 `@agentclientprotocol/codex-acp`. The older
@@ -91,6 +101,7 @@ fine (if slowly) before this timeout existed.
 npm run smoke:acp             # both backends
 npm run smoke:acp -- claude   # just claude-code-acp
 npm run smoke:acp -- codex    # just codex-acp
+npm run smoke:acp -- antigravity  # just agy acp
 ```
 
 Requires the adapter CLI(s) actually installed and signed in to your

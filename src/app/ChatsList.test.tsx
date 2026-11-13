@@ -62,13 +62,13 @@ describe('ChatsList [L2-02]', () => {
 
     expect(await screen.findByText('Explain Transformer architecture')).toBeInTheDocument()
     expect(screen.getByText(/Attention Is All You Need/)).toBeInTheDocument()
-    expect(screen.getByText('claude')).toBeInTheDocument()
+    expect(screen.getByText('Claude')).toBeInTheDocument()
     expect(screen.getByText('4 turns')).toBeInTheDocument()
 
     // Missing paper fallback
     expect(screen.getByText('Orphaned Chat Discussion')).toBeInTheDocument()
     expect(screen.getByText(/Paper not in library/)).toBeInTheDocument()
-    expect(screen.getByText('codex')).toBeInTheDocument()
+    expect(screen.getByText('Codex')).toBeInTheDocument()
   })
 
   it('invokes onSelectSession when clicking a session item', async () => {

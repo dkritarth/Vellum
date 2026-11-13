@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { AcpBackend } from '../../core/acp/client'
 import type { QuestionCategory, SuggestedQuestionRecord } from '../../core/questions/repo'
 import styles from './SuggestedQuestions.module.css'
 
 interface SuggestedQuestionsProps {
   slug: string
-  backend: 'claude' | 'codex'
+  backend: AcpBackend
   disabled: boolean
   onSelectQuestion: (question: string) => void
 }

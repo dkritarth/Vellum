@@ -17,7 +17,9 @@ import {
   StdioAcpClient,
   buildAdapterArgs,
   buildAdapterEnv,
+  describeSessionError,
   mapSessionUpdate,
+  resolveAdapterCommand,
   type SpawnAdapter,
 } from './stdio-client.js'
 
@@ -145,6 +147,13 @@ describe('mapSessionUpdate', () => {
       content: { type: 'text', text: 'hi' },
     } as never)
     expect(result).toEqual({ kind: 'text', data: { type: 'text', text: 'hi' } })
+  })
+
+  it('keeps echoed user prompts and agent reasoning out of answer text', () => {
+    for (const sessionUpdate of ['user_message_chunk', 'agent_thought_chunk']) {
+      const raw = { sessionUpdate, content: { type: 'text', text: 'not the answer' } }
+      expect(mapSessionUpdate(raw as never)).toEqual({ kind: 'tool_result', data: raw })
+    }
   })
 
   it('maps tool_call to a tool_call update', () => {
@@ -472,5 +481,41 @@ describe('buildAdapterArgs', () => {
   it('uses normal adapter configuration when no Codex model override is set', () => {
     expect(buildAdapterArgs('codex', {})).toEqual([])
     expect(buildAdapterArgs('claude', { VELLUM_CODEX_MODEL: 'gpt-5.5' })).toEqual([])
+  })
+})
+
+describe('antigravity backend', () => {
+  it('starts agy as an ACP stdio server with its own app-data dir', () => {
+    expect(buildAdapterArgs('antigravity', {})).toEqual(['acp', '--app-data-dir', 'antigravity-acp'])
+  })
+
+  it('strips raw Google API keys and cloud credentials so auth comes from agy sign-in', () => {
+    const env = buildAdapterEnv(
+      { PATH: '/usr/bin', GEMINI_API_KEY: 'k', GOOGLE_API_KEY: 'k', GOOGLE_APPLICATION_CREDENTIALS: '/x.json' },
+      'antigravity',
+    )
+    expect(env).toEqual({ PATH: '/usr/bin' })
+  })
+
+  it('leaves Google env alone for other backends', () => {
+    expect(buildAdapterEnv({ GEMINI_API_KEY: 'k' }, 'codex')).toEqual({ GEMINI_API_KEY: 'k' })
+  })
+
+  it('resolves agy from VELLUM_AGY_PATH, then PATH, then ~/.local/bin', () => {
+    const none = (): boolean => false
+    expect(resolveAdapterCommand('antigravity', { VELLUM_AGY_PATH: '/opt/agy' }, none)).toBe('/opt/agy')
+    expect(resolveAdapterCommand('antigravity', { PATH: '/a:/b', HOME: '/h' }, (f) => f === '/b/agy')).toBe('agy')
+    expect(resolveAdapterCommand('antigravity', { PATH: '/a', HOME: '/h' }, (f) => f === '/h/.local/bin/agy')).toBe(
+      '/h/.local/bin/agy',
+    )
+    expect(resolveAdapterCommand('antigravity', { PATH: '/a', HOME: '/h' }, none)).toBe('agy')
+    expect(resolveAdapterCommand('codex', { VELLUM_AGY_PATH: '/opt/agy' }, none)).toBe('codex-acp')
+  })
+
+  it('maps ACP auth-required errors to a sign-in instruction', () => {
+    expect(describeSessionError('antigravity', { code: -32000, message: 'Authentication required' })?.message).toMatch(
+      /agy acp --login/,
+    )
+    expect(describeSessionError('antigravity', new Error('boom'))).toBeUndefined()
   })
 })

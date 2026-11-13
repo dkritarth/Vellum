@@ -13,6 +13,9 @@
 // third-party harness.
 
 import { spawn, type ChildProcessByStdio } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { delimiter, join } from 'node:path'
 import { Readable, Writable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
 import {
@@ -45,6 +48,29 @@ type AdapterChildProcess = ChildProcessByStdio<Writable, Readable, null>
 const ADAPTERS: Record<AcpBackend, { command: string }> = {
   claude: { command: 'claude-code-acp' },
   codex: { command: 'codex-acp' },
+  // Google's own Antigravity CLI, run as an ACP server. It owns Google sign-in
+  // and token storage (macOS keychain); Vellum never touches its credentials.
+  antigravity: { command: 'agy' },
+}
+
+/** Resolves the executable for a backend. Antigravity honours
+ * `VELLUM_AGY_PATH`, then `agy` on PATH, then `~/.local/bin/agy` — a GUI-launched
+ * Electron app on macOS does not inherit the shell PATH, and `~/.local/bin` is
+ * where a user-level CLI install usually lands. */
+export function resolveAdapterCommand(
+  backend: AcpBackend,
+  sourceEnv: NodeJS.ProcessEnv = process.env,
+  fileExists: (path: string) => boolean = existsSync,
+): string {
+  const { command } = ADAPTERS[backend]
+  if (backend !== 'antigravity') return command
+  const override = sourceEnv.VELLUM_AGY_PATH?.trim()
+  if (override) return override
+  for (const dir of (sourceEnv.PATH ?? '').split(delimiter)) {
+    if (dir && fileExists(join(dir, command))) return command
+  }
+  const userLocal = join(sourceEnv.HOME ?? homedir(), '.local', 'bin', command)
+  return fileExists(userLocal) ? userLocal : command
 }
 
 /** Legacy adapter compatibility. Current codex-acp reads CODEX_CONFIG instead;
@@ -53,6 +79,11 @@ export function buildAdapterArgs(
   backend: AcpBackend,
   sourceEnv: NodeJS.ProcessEnv = process.env,
 ): string[] {
+  if (backend === 'antigravity') {
+    // Separate app-data dir from the interactive `agy` CLI's own history,
+    // matching Antigravity's documented ACP layout. Sign-in is shared.
+    return ['acp', '--app-data-dir', 'antigravity-acp']
+  }
   const model = sourceEnv.VELLUM_CODEX_MODEL?.trim()
   return backend === 'codex' && model ? ['-c', `model=${JSON.stringify(model)}`] : []
 }
@@ -75,6 +106,7 @@ export type SpawnAdapter = (backend: AcpBackend) => AdapterChildProcess
  * the normal (non-nested) case. Everything else the adapter needs for auth
  * (PATH, HOME, the CLI's own creds/config env) passes through. For Codex only,
  * a nonblank VELLUM_CODEX_MODEL replaces CODEX_CONFIG.model in the copied env.
+ * Antigravity drops raw Google API-key/cloud credential env vars.
  * Exported standalone for tests at the child-environment boundary. */
 export function buildAdapterEnv(
   sourceEnv: NodeJS.ProcessEnv = process.env,
@@ -97,12 +129,44 @@ export function buildAdapterEnv(
     }
     rest.CODEX_CONFIG = JSON.stringify({ ...config, model })
   }
+  if (backend === 'antigravity') {
+    // Same rule as the other backends: auth comes from the signed-in CLI,
+    // never from a raw API key or cloud credential sitting in the env.
+    for (const key of ANTIGRAVITY_SCRUBBED_ENV) delete rest[key]
+  }
   return rest
 }
 
+const ANTIGRAVITY_SCRUBBED_ENV = [
+  'GEMINI_API_KEY',
+  'GOOGLE_API_KEY',
+  'GOOGLE_APPLICATION_CREDENTIALS',
+  'GOOGLE_CLOUD_PROJECT',
+  'GOOGLE_CLOUD_LOCATION',
+  'GOOGLE_GENAI_USE_VERTEXAI',
+]
+
+/** Model override for Antigravity (e.g. `claude-sonnet-4-6`), applied with
+ * ACP `session/set_config_option` after `session/new`. Unset = agent default. */
+export function antigravityModelOverride(sourceEnv: NodeJS.ProcessEnv = process.env): string | undefined {
+  return sourceEnv.VELLUM_ANTIGRAVITY_MODEL?.trim() || undefined
+}
+
+/** ACP error code agents use for "authentication required". */
+const ACP_AUTH_REQUIRED = -32000
+
+/** Turns an auth-required failure into an actionable message for the user. */
+export function describeSessionError(backend: AcpBackend, err: unknown): Error | undefined {
+  const code = typeof err === 'object' && err !== null ? (err as { code?: unknown }).code : undefined
+  if (code !== ACP_AUTH_REQUIRED) return undefined
+  if (backend === 'antigravity') {
+    return new Error('Antigravity is not signed in. Run `agy acp --login` in a terminal, then try again.')
+  }
+  return new Error(`${ADAPTERS[backend].command} is not signed in. Sign in with its CLI, then try again.`)
+}
+
 const defaultSpawnAdapter: SpawnAdapter = (backend) => {
-  const { command } = ADAPTERS[backend]
-  return spawn(command, buildAdapterArgs(backend), {
+  return spawn(resolveAdapterCommand(backend), buildAdapterArgs(backend), {
     stdio: ['pipe', 'pipe', 'inherit'],
     env: buildAdapterEnv(process.env, backend),
     detached: process.platform !== 'win32',
@@ -178,10 +242,15 @@ async function terminateAdapter(child: AdapterChildProcess): Promise<void> {
  * Exported standalone so the mapping can be unit-tested without a subprocess. */
 export function mapSessionUpdate(update: SessionUpdate): AcpUpdate {
   switch (update.sessionUpdate) {
-    case 'user_message_chunk':
     case 'agent_message_chunk':
-    case 'agent_thought_chunk':
       return { kind: 'text', data: update.content }
+    // Only the agent's answer is 'text'. Some agents (agy) echo the user's
+    // prompt back as user_message_chunk and stream reasoning as
+    // agent_thought_chunk; treating those as text pasted the prompt and the
+    // model's private reasoning into the answer and into persisted chats.
+    case 'user_message_chunk':
+    case 'agent_thought_chunk':
+      return { kind: 'tool_result', data: update }
     case 'tool_call':
       return { kind: 'tool_call', data: update }
     case 'tool_call_update':
@@ -513,6 +582,7 @@ export class StdioAcpClient implements AcpClient {
       await Promise.race([
         connection.initialize({
           protocolVersion: PROTOCOL_VERSION,
+          clientInfo: { name: 'vellum', version: '0.1.0' },
           clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
         }),
         failure,
@@ -524,6 +594,18 @@ export class StdioAcpClient implements AcpClient {
         failure,
         handshake.promise,
       ])
+      const model = backend === 'antigravity' ? antigravityModelOverride() : undefined
+      if (model) {
+        await Promise.race([
+          connection.setSessionConfigOption({
+            sessionId: newSessionResult.sessionId,
+            configId: 'model',
+            value: model,
+          }),
+          failure,
+          handshake.promise,
+        ])
+      }
       handshake.cancel()
       const turnMs = this.timeouts.turnMs ?? DEFAULT_TURN_TIMEOUT_MS
       session = new StdioAcpSession(connection, newSessionResult.sessionId, child, turnMs, tracker.message)
@@ -542,6 +624,8 @@ export class StdioAcpClient implements AcpClient {
       if (err instanceof Error && err.message.startsWith('ACP handshake timed out')) {
         throw err
       }
+      const authError = describeSessionError(backend, err)
+      if (authError) throw authError
       await failure.catch(() => undefined)
       const message = tracker.message()
       throw message ? new Error(message) : err

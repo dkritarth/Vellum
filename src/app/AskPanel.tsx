@@ -16,7 +16,7 @@ import { SuggestedQuestions } from './SuggestedQuestions'
 //      conversation (main process disposes the cached ACP session).
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AskUpdatePayload } from '../../electron/preload'
-import { ModelSelector } from './ModelSelector'
+import { ModelSelector, isChatBackend } from './ModelSelector'
 import type { ChatBackend } from './ModelSelector'
 import { QuickActions } from './QuickActions'
 import styles from './AskPanel.module.css'
@@ -167,7 +167,7 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId, deletedSession
         if (cancelled || generation !== contextGeneration.current) return
         setSessionId(result.session.id)
         displayedSessionId.current = result.session.id
-        setBackend(result.session.backend === 'codex' ? 'codex' : 'claude')
+        setBackend(isChatBackend(result.session.backend) ? result.session.backend : 'claude')
         const turn = result.activeTurn
         activeRequestId.current = turn?.requestId ?? null
         activeTurnSessionId.current = turn?.chatSessionId ?? null
@@ -252,7 +252,7 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId, deletedSession
         if (generation !== contextGeneration.current) return
         setSessionId(result.session.id)
         displayedSessionId.current = result.session.id
-        setBackend(result.session.backend === 'codex' ? 'codex' : 'claude')
+        setBackend(isChatBackend(result.session.backend) ? result.session.backend : 'claude')
         setMessages([])
       })
       .catch((err: unknown) => {

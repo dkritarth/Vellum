@@ -34,7 +34,8 @@ npm run dev
 ```
 
 Requires `claude-code-acp` / `codex-acp` on PATH and their CLIs signed in
-(see the wiki's ACP-Integration page).
+(see the wiki's ACP-Integration page). For Gemini, install Google's Antigravity
+CLI (`agy`) and sign in once with `agy acp --login` (see `core/acp/README.md`).
 
 ## Why
 

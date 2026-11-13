@@ -130,27 +130,61 @@
   cursor: default;
 }
 
+/* #198: one vertical scroll column holding every page. `.pages` is at
+   least as wide as the pane (pages centred) and grows to the widest page
+   when zoomed in, so horizontal scroll reaches both edges — the old
+   `justify-content: center` on the scroll container clipped the left side. */
 .pageViewport {
   flex: 1;
+  min-width: 0;
   overflow: auto;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 16px;
+  position: relative;
+  outline: none;
+  overscroll-behavior: contain;
+}
+
+.pageViewport:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--vellum-accent, #4f8cff);
 }
 
 .loading {
   color: var(--vellum-text-dim, #8a8a8a);
   font-size: 13px;
+  text-align: center;
+  margin: 16px;
 }
 
-.pageLayer {
+.pages {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  width: max-content;
+  min-width: 100%;
+  box-sizing: border-box;
+}
+
+/* One page. Sized inline (ReaderPage) from --total-scale-factor so canvas,
+   text layer and overlays share one box at every zoom. White so pages that
+   haven't rendered yet still read as paper. */
+.pageSlot {
+  position: relative;
+  flex-shrink: 0;
+  background: #ffffff;
+  box-shadow: 0 0 0 1px var(--vellum-border, #2a2a2a), 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.canvasHost {
+  position: absolute;
+  inset: 0;
 }
 
 .canvas {
   display: block;
-  box-shadow: 0 0 0 1px var(--vellum-border, #2a2a2a);
+  width: 100%;
+  height: 100%;
 }
 
 /* pdf.js text layer — positioned to exactly overlay the canvas glyph-for-glyph
@@ -161,8 +195,9 @@
    --font-height, --scale-x, --rotate) and relies on the stylesheet below to
    turn them into geometry. These rules are ported from
    pdfjs-dist/web/pdf_viewer.css (.textLayer). Without them, spans flow as
-   visible plain text over the canvas. Reader.tsx sets --total-scale-factor
-   on this element to the render scale. */
+   visible plain text over the canvas. --total-scale-factor is inherited
+   from the page slot (ReaderPage), so zoom rescales the layer without a
+   re-render. */
 .textLayer {
   position: absolute;
   inset: 0;
@@ -177,7 +212,6 @@
   transform-origin: 0 0;
   caret-color: CanvasText;
   z-index: 0;
-  --total-scale-factor: 1;
   /* setLayerDimensions() sizes this div with round(down, …, var(--scale-round-*)). */
   --scale-round-x: 1px;
   --scale-round-y: 1px;
@@ -246,6 +280,14 @@
   position: absolute;
   opacity: 0.35;
   mix-blend-mode: multiply;
+}
+
+/* Search hits for the submitted query, on every rendered page. */
+.searchHit {
+  position: absolute;
+  background: rgba(255, 196, 0, 0.4);
+  mix-blend-mode: multiply;
+  border-radius: 2px;
 }
 
 .highlightRectFlash {

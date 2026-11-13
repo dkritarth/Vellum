@@ -15,17 +15,54 @@
 // build) with zero extra config. `GlobalWorkerOptions.workerSrc` is set once
 // at module load, before any `getDocument()` call.
 //
-// No paper/slug is wired up yet (library + open-in-tab land in later P1
-// cards), so `slug` is optional and undefined by default — the empty state
-// below is what App.tsx shows today.
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
-import { GlobalWorkerOptions, TextLayer, getDocument, type PDFDocumentProxy } from 'pdfjs-dist/legacy/build/pdf.mjs'
+// Layout (#198): every page sits in one vertical scroll column at its zoomed
+// size; only pages near the viewport mount a canvas + text layer (see
+// ReaderPage). Zoom (#199) comes from the toolbar, Ctrl/Cmd +/-/0, and
+// trackpad pinch / Ctrl+wheel, anchored at the cursor or pane centre.
+//
+// `slug` is optional and undefined when no paper is open (empty state).
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+} from 'react'
+import { flushSync } from 'react-dom'
+import { GlobalWorkerOptions, getDocument, type PDFDocumentProxy } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import workerSrc from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url'
 import type { HighlightColor } from './ReaderToolbar'
 import type { HighlightRecord } from '../../core/highlights/repo'
 import { CitationTooltip } from './CitationTooltip'
+import { ReaderPage } from './ReaderPage'
 import { SelectionMenu } from './SelectionMenu'
+import { anchorFromRange, buildReferenceIndex, type HighlightAnchor, type ReferenceIndex } from './readerText'
+import {
+  captureZoomAnchor,
+  pagesInWindow,
+  pickCurrentPage,
+  restoreZoomAnchor,
+  steppedScale,
+  wheelZoomFactor,
+  zoomKeyAction,
+  type PageBox,
+  type ZoomAnchor,
+} from './readerViewport'
 import styles from './Reader.module.css'
+
+export {
+  anchorFromRange,
+  buildReferenceIndex,
+  expandCitationNumbers,
+  findTextMatches,
+  injectCitationMarkers,
+  rangeFromAnchor,
+  type HighlightAnchor,
+  type ReferenceEntry,
+  type ReferenceIndex,
+} from './readerText'
 
 GlobalWorkerOptions.workerSrc = workerSrc
 
@@ -59,72 +96,6 @@ export function countOccurrences(text: string, query: string): number {
   return count
 }
 
-/** [P2-02] Opaque anchor shape stored (JSON-stringified) as `HighlightRecord.anchor` —
- * character offsets into the current page's text layer container, walking
- * text nodes in DOM order. Re-locatable via `rangeFromAnchor` as long as the
- * page's text layer renders the same text content in the same order (true
- * for a fixed PDF page — scale/zoom only affects layout, not text-node
- * order). Kept as plain offsets (not e.g. a CSS selector) so it survives
- * across zoom levels without re-derivation. */
-export interface HighlightAnchor {
-  start: number
-  end: number
-}
-
-/**
- * Serialize a DOM `Range` inside `container` into character offsets over
- * `container`'s text nodes (document order) — the opaque anchor a highlight
- * is stored under and later re-located from (`rangeFromAnchor`). Returns
- * null if the range's start/end containers aren't found while walking
- * `container`'s text nodes (e.g. the selection isn't actually inside it).
- */
-export function anchorFromRange(container: Node, range: Range): HighlightAnchor | null {
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
-  let offset = 0
-  let start = -1
-  let end = -1
-  let node: Node | null = walker.nextNode()
-  while (node) {
-    const length = (node as Text).data.length
-    if (start === -1 && node === range.startContainer) start = offset + range.startOffset
-    if (node === range.endContainer) end = offset + range.endOffset
-    offset += length
-    node = walker.nextNode()
-  }
-  if (start === -1 || end === -1 || end <= start) return null
-  return { start, end }
-}
-
-/**
- * Inverse of `anchorFromRange`: reconstruct a `Range` covering `anchor`'s
- * character span inside `container`'s current text nodes. Returns null if
- * the anchor no longer fits (e.g. the page re-rendered with different/less
- * text than when the highlight was created) rather than throwing — a stale
- * highlight should be silently skipped, not crash the reader.
- */
-export function rangeFromAnchor(container: Node, anchor: HighlightAnchor): Range | null {
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
-  let offset = 0
-  let startSet = false
-  let endSet = false
-  const range = document.createRange()
-  let node: Node | null = walker.nextNode()
-  while (node && !(startSet && endSet)) {
-    const length = (node as Text).data.length
-    if (!startSet && anchor.start >= offset && anchor.start <= offset + length) {
-      range.setStart(node, anchor.start - offset)
-      startSet = true
-    }
-    if (!endSet && anchor.end >= offset && anchor.end <= offset + length) {
-      range.setEnd(node, anchor.end - offset)
-      endSet = true
-    }
-    offset += length
-    node = walker.nextNode()
-  }
-  if (!startSet || !endSet) return null
-  return range
-}
 
 export interface OutlineItem {
   title: string
@@ -212,199 +183,6 @@ export async function searchDocument(pdf: PDFDocumentProxy, query: string): Prom
   return results
 }
 
-// ---------------------------------------------------------------------------
-// [P2-03] Inline citation click-through.
-//
-// References are not structured data anywhere in a PDF — the only signal is
-// the raw per-page text pdf.js's text layer already extracts. Detection is
-// therefore two passes over that text, both pure/DOM-free (unit-testable
-// without rendering anything):
-//
-//   1. `buildReferenceIndex` scans a loaded document's per-page text once
-//      (on doc load, memoized in Reader's `referenceIndex` state — never
-//      rescanned on page/zoom changes) for a "References"/"Bibliography"
-//      heading, then parses `[n] ...` entries on/after that page into a
-//      number → { page, text } map.
-//   2. `injectCitationMarkers` runs after each page's text layer renders and
-//      wraps `[n]`/`[n, m]`/`[n-m]`-shaped substrings whose number(s) resolve
-//      in that index in a clickable `<button>` — everything else (including
-//      unresolved markers, when no references section was found at all)
-//      stays plain text, so a paper with no detectable bibliography is
-//      simply inert rather than broken.
-// ---------------------------------------------------------------------------
-
-/** One parsed reference-list entry: the number `[n]` was defined under, the
- * (1-based) page it was found on, and its trailing citation text (used for
- * the hover tooltip). */
-export interface ReferenceEntry {
-  number: number
-  page: number
-  text: string
-}
-
-/** Reference number → its entry. Empty when no references/bibliography
- * section was found (or the document has none) — callers treat an empty
- * index as "feature inert", not an error. */
-export type ReferenceIndex = Map<number, ReferenceEntry>
-
-/** Matches an inline citation marker's bracket contents: a single number, a
- * comma-separated list (`1, 2`), a dash range (`3-5`), or any mix of those
- * (`1, 3-5, 7`). Capture group 1 is the raw contents between the brackets. */
-const INLINE_CITATION_REGEX = /\[(\d+(?:\s*[-,]\s*\d+)*)\]/g
-
-/** A page-local text heading that marks the start of the reference list.
- * Checked against a single text item's trimmed content (headings are
- * typically their own text-layer item), not a whole page's joined text. */
-const REFERENCES_HEADING_REGEX = /^(references|bibliography)$/i
-
-/** Largest `[n-m]` range span (inclusive) `expandCitationNumbers` will
- * expand. A garbled PDF's text layer can produce nonsense like
- * `[1-999999999]`; without a cap that would synchronously allocate a
- * near-billion-element array inside a render-effect and hang the UI.
- * Reference lists are never remotely this large, so any range wider than
- * this is treated as garbage and dropped entirely (not clamped — clamping
- * would silently attach the marker to a wrong/arbitrary reference). */
-const MAX_CITATION_RANGE_SPAN = 100
-
-/**
- * Expand a citation marker's raw bracket contents (e.g. `"3-5"`, `"1, 2"`,
- * `"1, 3-5, 7"`) into the individual reference numbers it covers. Malformed
- * fragments (neither a bare number nor a `n-m` range) are silently dropped
- * rather than throwing, as is any range wider than `MAX_CITATION_RANGE_SPAN`
- * (garbled-PDF guard — see that constant's doc comment).
- */
-export function expandCitationNumbers(raw: string): number[] {
-  const numbers: number[] = []
-  for (const part of raw.split(',')) {
-    const trimmed = part.trim()
-    const range = trimmed.match(/^(\d+)\s*-\s*(\d+)$/)
-    if (range) {
-      const start = Number(range[1])
-      const end = Number(range[2])
-      if (end - start > MAX_CITATION_RANGE_SPAN) continue
-      for (let n = start; n <= end; n += 1) numbers.push(n)
-    } else if (/^\d+$/.test(trimmed)) {
-      numbers.push(Number(trimmed))
-    }
-  }
-  return numbers
-}
-
-/**
- * Build a reference index from a document's per-page text, given as one
- * string array per page (the order `page.getTextContent()`'s `items`
- * naturally come in — Reader passes each item's `.str`). Finds the first
- * page whose text contains a standalone "References"/"Bibliography"
- * heading, then parses `[n] ...` entries from that page onward (a heading
- * and its list commonly share a page). The first occurrence of a given
- * number wins if a reference is (mis-)detected more than once. Returns an
- * empty map — not an error — when no heading is found at all.
- */
-export function buildReferenceIndex(pages: string[][]): ReferenceIndex {
-  const index: ReferenceIndex = new Map()
-
-  let startPage = -1
-  outer: for (let i = 0; i < pages.length; i += 1) {
-    for (const item of pages[i]) {
-      for (const line of item.split(/\r?\n/)) {
-        if (REFERENCES_HEADING_REGEX.test(line.trim())) {
-          startPage = i
-          break outer
-        }
-      }
-    }
-  }
-  if (startPage === -1) return index
-
-  const entryStartRegex = /\[(\d+)\]\s*/g
-  for (let i = startPage; i < pages.length; i += 1) {
-    const pageText = pages[i].join(' ')
-    entryStartRegex.lastIndex = 0
-    const starts: Array<{ number: number; markerStart: number; contentStart: number }> = []
-    let match: RegExpExecArray | null
-    while ((match = entryStartRegex.exec(pageText))) {
-      starts.push({ number: Number(match[1]), markerStart: match.index, contentStart: entryStartRegex.lastIndex })
-    }
-    for (let s = 0; s < starts.length; s += 1) {
-      const current = starts[s]
-      const next = starts[s + 1]
-      const text = pageText.slice(current.contentStart, next ? next.markerStart : undefined).trim()
-      if (!index.has(current.number)) {
-        index.set(current.number, { number: current.number, page: i + 1, text })
-      }
-    }
-  }
-
-  return index
-}
-
-/**
- * Walk `container`'s text nodes (as rendered by pdf.js's `TextLayer`, one
- * `<span>` per text item) and replace any `[n]`/`[n, m]`/`[n-m]` marker whose
- * number(s) resolve in `referenceIndex` with a `<button data-citation-number
- * ="n">` carrying the same visible text — a plain-DOM-mutation seam, tested
- * without rendering pdf.js. Markers whose number(s) don't resolve (including
- * every marker when `referenceIndex` is empty — no references section
- * found) are left untouched as plain text. Total text content is preserved
- * exactly, so callers that re-derive character offsets over the container
- * (e.g. highlight anchors) keep working unaffected.
- */
-export function injectCitationMarkers(container: HTMLElement, referenceIndex: ReferenceIndex): void {
-  if (referenceIndex.size === 0) return
-
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
-  const textNodes: Text[] = []
-  let node: Node | null = walker.nextNode()
-  while (node) {
-    textNodes.push(node as Text)
-    node = walker.nextNode()
-  }
-
-  for (const textNode of textNodes) {
-    const data = textNode.data
-    INLINE_CITATION_REGEX.lastIndex = 0
-    const matches: Array<{ index: number; length: number; primary: number }> = []
-    let match: RegExpExecArray | null
-    while ((match = INLINE_CITATION_REGEX.exec(data))) {
-      const numbers = expandCitationNumbers(match[1])
-      const primary = numbers.find((n) => referenceIndex.has(n))
-      if (primary !== undefined) matches.push({ index: match.index, length: match[0].length, primary })
-    }
-    if (matches.length === 0) continue
-
-    const parent = textNode.parentNode
-    if (!parent) continue
-
-    const fragment = document.createDocumentFragment()
-    let cursor = 0
-    for (const m of matches) {
-      if (m.index > cursor) fragment.appendChild(document.createTextNode(data.slice(cursor, m.index)))
-      const raw = data.slice(m.index, m.index + m.length)
-      const button = document.createElement('button')
-      button.type = 'button'
-      button.className = styles.citationMarker
-      button.textContent = raw
-      button.setAttribute('data-citation-number', String(m.primary))
-      button.setAttribute('aria-label', `Jump to reference ${m.primary}`)
-      fragment.appendChild(button)
-      cursor = m.index + m.length
-    }
-    if (cursor < data.length) fragment.appendChild(document.createTextNode(data.slice(cursor)))
-    parent.replaceChild(fragment, textNode)
-  }
-}
-
-/** One highlight's rendered overlay rect, positioned relative to the text
- * layer container (`pageLayer`'s coordinate space). */
-interface OverlayRect {
-  id: string
-  color: string
-  flash: boolean
-  left: number
-  top: number
-  width: number
-  height: number
-}
 
 interface ReaderProps {
   /** Paper slug (data/papers/<slug>/). Undefined = no paper open (empty state). */
@@ -424,60 +202,91 @@ interface ReaderProps {
 }
 
 const FLASH_DURATION_MS = 1500
+/** Delay after the last zoom change before pages re-rasterise at the new
+ * scale. Until then the previous canvases are stretched. */
+const RENDER_SCALE_DEBOUNCE_MS = 150
+/** Space left above a page when jumping to it. */
+const JUMP_TOP_MARGIN_PX = 8
+
+const NO_HIGHLIGHTS: HighlightRecord[] = []
+
+interface PageSize {
+  width: number
+  height: number
+}
 
 interface ActiveSelection {
   x: number
   y: number
   quote: string
   page: number
-  anchor: { start: number; end: number }
+  /** Null when the selection crosses pages: Ask/Explain still work, but a
+   * highlight needs a single-page anchor. */
+  anchor: HighlightAnchor | null
 }
 
 export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain }: ReaderProps): JSX.Element {
   const [activeSelection, setActiveSelection] = useState<ActiveSelection | null>(null)
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
-  const [numPages, setNumPages] = useState(0)
+  const [pageSizes, setPageSizes] = useState<PageSize[]>([])
   const [pageNumber, setPageNumber] = useState(1)
   const [scale, setScale] = useState(DEFAULT_SCALE)
+  const [renderScale, setRenderScale] = useState(DEFAULT_SCALE)
+  const [renderWindow, setRenderWindow] = useState({ first: 1, last: 1 })
   const [outline, setOutline] = useState<OutlineItem[]>([])
   const [tocOpen, setTocOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  // The query the current results belong to; hits are marked for it.
+  const [submittedQuery, setSubmittedQuery] = useState('')
   const [searchResults, setSearchResults] = useState<SearchMatch[]>([])
   const [searchIndex, setSearchIndex] = useState(0)
   const [searching, setSearching] = useState(false)
+  const [searchFocus, setSearchFocus] = useState<{ page: number; nonce: number } | null>(null)
   const [highlights, setHighlights] = useState<HighlightRecord[]>([])
-  const [textLayerVersion, setTextLayerVersion] = useState(0)
-  const [overlays, setOverlays] = useState<OverlayRect[]>([])
   const [flashId, setFlashId] = useState<string | null>(null)
   // [P2-03] Built once per loaded doc (see the doc-load effect) from a
   // single pass over every page's text — never rescanned on page/zoom
   // changes. Empty when no references section was found (feature inert).
   const [referenceIndex, setReferenceIndex] = useState<ReferenceIndex>(new Map())
-  const [citationFlash, setCitationFlash] = useState<number | null>(null)
+  const [citationFlash, setCitationFlash] = useState<{ page: number; number: number } | null>(null)
   const [hoveredCitation, setHoveredCitation] = useState<{ text: string; left: number; top: number } | null>(null)
 
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const textLayerRef = useRef<HTMLDivElement>(null)
+  const numPages = pageSizes.length
+  const [viewportEl, setViewportEl] = useState<HTMLDivElement | null>(null)
+  const viewportRef = useRef<HTMLDivElement | null>(null)
+  viewportRef.current = viewportEl
+  const pagesRef = useRef<HTMLDivElement>(null)
+  const scaleRef = useRef(scale)
+  // Page a programmatic jump targeted. While it stays visible, the
+  // indicator keeps showing it (e.g. the last page at low zoom can't be
+  // scrolled to the top, so "most visible" would report the page before).
+  // Cleared by any user scroll input.
+  const pageLockRef = useRef<number | null>(null)
+  const scrollFrameRef = useRef<number | null>(null)
 
   // Load the document whenever the open paper changes.
   useEffect(() => {
     let cancelled = false
 
     setDoc(null)
-    setNumPages(0)
+    setPageSizes([])
     setPageNumber(1)
+    setRenderWindow({ first: 1, last: 1 })
     setOutline([])
     setSearchQuery('')
+    setSubmittedQuery('')
     setSearchResults([])
     setSearchIndex(0)
+    setSearchFocus(null)
     setError(null)
     setHighlights([])
     setReferenceIndex(new Map())
     setCitationFlash(null)
     setHoveredCitation(null)
     setActiveSelection(null)
+    pageLockRef.current = null
 
     if (!slug) return
 
@@ -492,8 +301,19 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
         }
         const pdf = await getDocument({ data: bytes }).promise
         if (cancelled) return
+
+        // Every page's unscaled size up front, so the scroll column has its
+        // full, correct height before any page renders (#198).
+        const sizes: PageSize[] = []
+        for (let n = 1; n <= pdf.numPages; n += 1) {
+          const page = await pdf.getPage(n)
+          if (cancelled) return
+          const viewport = page.getViewport({ scale: 1 })
+          sizes.push({ width: viewport.width, height: viewport.height })
+        }
+        setPageSizes(sizes)
         setDoc(pdf)
-        setNumPages(pdf.numPages)
+        setLoading(false)
 
         const rawOutline = (await pdf.getOutline()) as RawOutlineNode[] | null
         if (cancelled) return
@@ -502,8 +322,8 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
         // [P2-03] One pass over every page's text to build the reference
         // index — done once per doc load (not on every page/zoom change).
         const pagesText: string[][] = []
-        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-          const page = await pdf.getPage(pageNumber)
+        for (let n = 1; n <= pdf.numPages; n += 1) {
+          const page = await pdf.getPage(n)
           if (cancelled) return
           const textContent = await page.getTextContent()
           if (cancelled) return
@@ -512,18 +332,8 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
         if (cancelled) return
         setReferenceIndex(buildReferenceIndex(pagesText))
       } catch (err: unknown) {
-        console.error("[Reader] Failed to load PDF:", err);
-        if (err && typeof err === "object") {
-          const e = err as Record<string, unknown>;
-          console.error("[Reader] Error details:", {
-            name: e.name,
-            message: e.message,
-            code: e.code,
-            cause: e.cause,
-            stack: e.stack,
-          });
-        }
-        if (!cancelled) setError('Could not open this PDF.');
+        console.error('[Reader] Failed to load PDF:', err)
+        if (!cancelled) setError('Could not open this PDF.')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -543,172 +353,210 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
     }
   }, [slug])
 
+  // Measure page slots and derive (a) which pages mount a canvas/text layer
+  // and (b), for scroll-driven updates, the "N of M" page indicator.
+  const updateViewport = useCallback((fromScroll: boolean): void => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    const boxes: PageBox[] = Array.from(viewport.querySelectorAll<HTMLElement>('[data-page-slot]'), (el) => ({
+      top: el.offsetTop,
+      height: el.offsetHeight,
+    }))
+    if (boxes.length === 0) return
+    const { scrollTop, clientHeight } = viewport
+    const next = pagesInWindow(boxes, scrollTop, clientHeight, clientHeight)
+    setRenderWindow((prev) => (prev.first === next.first && prev.last === next.last ? prev : next))
+    if (!fromScroll) return
+    const lock = pageLockRef.current
+    if (lock !== null) {
+      const box = boxes[lock - 1]
+      if (box && box.top < scrollTop + clientHeight && box.top + box.height > scrollTop) {
+        setPageNumber(lock)
+        return
+      }
+      pageLockRef.current = null
+    }
+    setPageNumber(pickCurrentPage(boxes, scrollTop, clientHeight))
+  }, [])
+
+  // New document: start at the top-left and compute the first window.
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport || !doc) return
+    viewport.scrollTop = 0
+    viewport.scrollLeft = 0
+    updateViewport(false)
+  }, [doc, updateViewport])
+
+  // Pane resizes (window resize, TOC/right panel toggles) change how many
+  // pages fit.
+  useEffect(() => {
+    if (!viewportEl || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => updateViewport(false))
+    observer.observe(viewportEl)
+    return () => observer.disconnect()
+  }, [viewportEl, updateViewport])
+
+  useEffect(
+    () => () => {
+      if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current)
+    },
+    [],
+  )
+
+  function handleScroll(): void {
+    if (scrollFrameRef.current !== null) return
+    scrollFrameRef.current = requestAnimationFrame(() => {
+      scrollFrameRef.current = null
+      updateViewport(true)
+    })
+  }
+
+  // Re-rasterise at the final zoom once the user stops zooming.
+  useEffect(() => {
+    if (renderScale === scale) return
+    const timer = setTimeout(() => setRenderScale(scale), RENDER_SCALE_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [scale, renderScale])
+
+  /** Zoom to `target`, keeping the content under `(clientX, clientY)` — or
+   * the pane centre — fixed on screen (#199). */
+  const applyZoom = useCallback(
+    (target: number, clientX?: number, clientY?: number): void => {
+      const from = scaleRef.current
+      const to = clampScale(Math.round(target * 1000) / 1000)
+      if (to === from) return
+      const viewport = viewportRef.current
+      let anchor: ZoomAnchor | null = null
+      if (viewport) {
+        const rect = viewport.getBoundingClientRect()
+        anchor = captureZoomAnchor(
+          viewport,
+          clientX ?? rect.left + viewport.clientWidth / 2,
+          clientY ?? rect.top + viewport.clientHeight / 2,
+        )
+      }
+      scaleRef.current = to
+      // Commit the new layout synchronously so the anchor can be restored
+      // against it before the browser paints.
+      flushSync(() => {
+        setScale(to)
+        setActiveSelection(null)
+        setHoveredCitation(null)
+      })
+      if (viewport && anchor) restoreZoomAnchor(viewport, anchor)
+      updateViewport(false)
+    },
+    [updateViewport],
+  )
+
+  // Trackpad pinch (and Ctrl/Cmd + mouse wheel) arrives as a `wheel` event
+  // with ctrlKey set. React's onWheel is passive, so preventDefault — which
+  // stops Chromium zooming the whole page instead — needs a native listener.
+  useEffect(() => {
+    if (!viewportEl) return
+    function handleWheel(event: WheelEvent): void {
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault()
+        applyZoom(scaleRef.current * wheelZoomFactor(event.deltaY, event.deltaMode), event.clientX, event.clientY)
+        return
+      }
+      pageLockRef.current = null
+    }
+    viewportEl.addEventListener('wheel', handleWheel, { passive: false })
+    return () => viewportEl.removeEventListener('wheel', handleWheel)
+  }, [viewportEl, applyZoom])
+
+  // Cmd/Ctrl + = / - / 0 zoom the reader while focus is inside it — or on
+  // <body>, which is where focus lands after e.g. the zoom button disables
+  // itself at the bound. preventDefault stops Electron's menu zoom (#199).
+  const readerRootRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!doc) return
+    function handleKeyDown(event: globalThis.KeyboardEvent): void {
+      if (event.defaultPrevented) return
+      const action = zoomKeyAction(event)
+      if (!action) return
+      const active = document.activeElement
+      const root = readerRootRef.current
+      if (active && active !== document.body && !root?.contains(active)) return
+      event.preventDefault()
+      if (action === 'reset') applyZoom(DEFAULT_SCALE)
+      else applyZoom(steppedScale(scaleRef.current, SCALE_STEP, action === 'in' ? 1 : -1))
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [doc, applyZoom])
+
+  function goToPage(next: number): void {
+    const target = clampPage(next, numPages)
+    setActiveSelection(null)
+    setPageNumber(target)
+    pageLockRef.current = target
+    const viewport = viewportRef.current
+    const slot = viewport?.querySelector<HTMLElement>(`[data-page-slot][data-page-number="${target}"]`)
+    if (viewport && slot) viewport.scrollTop = Math.max(0, slot.offsetTop - JUMP_TOP_MARGIN_PX)
+  }
+
   // Jump seam: drive the reader to a highlight's page and flash it briefly.
   // Fires on every `jumpTarget` change (the caller bumps `nonce` so clicking
   // the same annotation twice re-triggers the flash even though page/id
-  // didn't change).
+  // didn't change). The page reveals the flashing rect once it renders.
   useEffect(() => {
     if (!jumpTarget) return
-    setPageNumber(clampPage(jumpTarget.page, numPages))
+    goToPage(jumpTarget.page)
     setFlashId(jumpTarget.highlightId)
     const timer = setTimeout(() => setFlashId(null), FLASH_DURATION_MS)
     return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- numPages intentionally excluded: re-clamping on every doc load isn't the intent, only on an actual jump request.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only an actual jump request should move the reader.
   }, [jumpTarget])
 
-  // Render the current page (canvas + selectable text layer) on page/zoom change.
-  useEffect(() => {
-    if (!doc) return
-    let cancelled = false
-
-    void (async () => {
-      const page = await doc.getPage(pageNumber)
-      if (cancelled) return
-      const viewport = page.getViewport({ scale })
-
-      const canvas = canvasRef.current
-      if (canvas) {
-        canvas.width = viewport.width
-        canvas.height = viewport.height
-        const ctx = canvas.getContext('2d')
-        // jsdom (unit tests) returns null for 2d context — real Chromium
-        // renderer always has one. Guard rather than crash either way.
-        if (ctx) {
-          await page.render({ canvasContext: ctx, canvas, viewport }).promise
-        }
-      }
-      if (cancelled) return
-
-      const textLayerContainer = textLayerRef.current
-      if (textLayerContainer) {
-        textLayerContainer.innerHTML = ''
-        textLayerContainer.style.width = `${viewport.width}px`
-        textLayerContainer.style.height = `${viewport.height}px`
-        // pdf.js text-layer CSS (Reader.module.css) sizes glyph spans from
-        // this var; the viewport maps 1 PDF unit to `scale` CSS px.
-        textLayerContainer.style.setProperty('--total-scale-factor', String(scale))
-        const textContent = await page.getTextContent()
-        if (cancelled) return
-        const textLayer = new TextLayer({
-          textContentSource: textContent,
-          container: textLayerContainer,
-          viewport,
-        })
-        await textLayer.render()
-        if (cancelled) return
-        // Bumps the overlay-recompute effect below — the text layer's DOM
-        // (needed to re-locate highlight anchors) only exists after this
-        // await resolves.
-        setTextLayerVersion((version) => version + 1)
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [doc, pageNumber, scale])
-
-  // [P2-03] Wrap resolved `[n]` markers in the just-rendered text layer as
-  // clickable buttons. Kept separate from the page-render effect above
-  // (rather than folded in) so building/updating the reference index never
-  // forces a canvas re-render — this only re-runs the DOM-mutation pass over
-  // the already-rendered text layer, keyed off the same `textLayerVersion`
-  // "DOM actually updated" signal the overlay-recompute effect below uses.
-  useEffect(() => {
-    const container = textLayerRef.current
-    if (!container) return
-    injectCitationMarkers(container, referenceIndex)
-  }, [referenceIndex, pageNumber, textLayerVersion])
-
-  // [P2-03] Briefly flash the reference-list entry a citation marker was
-  // clicked through to, on the page it's rendered on — mirrors the
-  // highlight jump/flash pattern above (a class toggled for
-  // `FLASH_DURATION_MS`), but keyed off `citationFlash` rather than a prop.
-  useEffect(() => {
-    if (citationFlash === null) return
-    const container = textLayerRef.current
-    if (!container) return
-    const marker = container.querySelector(`[data-citation-number="${citationFlash}"]`)
-    if (!marker) return
-    marker.classList.add(styles.citationMarkerFlash)
-    return () => marker.classList.remove(styles.citationMarkerFlash)
-  }, [citationFlash, pageNumber, textLayerVersion])
-
-  // Recompute highlight overlay rects whenever the highlight list, current
-  // page, or the rendered text layer itself changes. Anchors that no longer
-  // resolve (stale page content) are silently skipped — see `rangeFromAnchor`.
-  useEffect(() => {
-    const container = textLayerRef.current
-    if (!container) {
-      setOverlays([])
-      return
-    }
-
-    const next: OverlayRect[] = []
-    const containerRect = container.getBoundingClientRect()
+  const highlightsByPage = useMemo(() => {
+    const byPage = new Map<number, HighlightRecord[]>()
     for (const highlight of highlights) {
-      if (highlight.page !== pageNumber) continue
-      let anchor: HighlightAnchor
-      try {
-        anchor = JSON.parse(highlight.anchor) as HighlightAnchor
-      } catch {
-        continue
-      }
-      const range = rangeFromAnchor(container, anchor)
-      if (!range) continue
-      for (const rect of Array.from(range.getClientRects())) {
-        next.push({
-          id: highlight.id,
-          color: highlight.color,
-          flash: highlight.id === flashId,
-          left: rect.left - containerRect.left,
-          top: rect.top - containerRect.top,
-          width: rect.width,
-          height: rect.height,
-        })
-      }
+      const list = byPage.get(highlight.page)
+      if (list) list.push(highlight)
+      else byPage.set(highlight.page, [highlight])
     }
-    setOverlays(next)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- textLayerVersion is the "has the DOM actually re-rendered" signal; highlights/pageNumber/flashId are the real deps.
-  }, [highlights, pageNumber, textLayerVersion, flashId])
+    return byPage
+  }, [highlights])
 
-  function goToPage(next: number): void {
-    setActiveSelection(null)
-    setPageNumber(clampPage(next, numPages))
+  /** Position of `rect` relative to the page column (the coordinate space
+   * the selection menu and citation tooltip are placed in). */
+  function relativeToPages(rect: { left: number; top: number }): { left: number; top: number } {
+    const pagesRect = pagesRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 }
+    return { left: rect.left - pagesRect.left, top: rect.top - pagesRect.top }
   }
 
-  function zoomBy(delta: number): void {
-    setActiveSelection(null)
-    setScale((current) => clampScale(current + delta))
-  }
-
-  // [P2-02] Highlight capture: when the highlight tool is active, a mouseup
-  // inside the text layer with a non-collapsed selection creates a
-  // highlight from that selection (page, quote, anchor) and clears the
-  // native selection so it doesn't linger visually once the overlay paints.
-  function handleTextLayerMouseUp(): void {
+  // [P2-02]/[R1-05] Selection capture on any page. With the highlight tool
+  // active, a selection becomes a highlight; otherwise the selection menu
+  // (Add to chat / Explain / highlight colours) opens above it.
+  function handlePagesMouseUp(event: MouseEvent<HTMLDivElement>): void {
     if (!slug) return
+    if ((event.target as HTMLElement).closest('[role="toolbar"]')) return
     const selection = window.getSelection()
     if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
       setActiveSelection(null)
       return
     }
 
-    const container = textLayerRef.current
-    if (!container) return
     const range = selection.getRangeAt(0)
-    if (!container.contains(range.commonAncestorContainer)) return
+    const startNode = range.startContainer
+    const startEl = startNode instanceof Element ? startNode : startNode.parentElement
+    const layer = startEl?.closest<HTMLElement>('[data-text-layer]')
+    if (!layer || !pagesRef.current?.contains(layer)) return
+    const page = Number(layer.closest<HTMLElement>('[data-page-slot]')?.dataset.pageNumber)
+    if (!page) return
 
     const quote = selection.toString().trim()
     if (!quote) {
       setActiveSelection(null)
       return
     }
-    const anchor = anchorFromRange(container, range)
-    if (!anchor) return
+    const anchor = layer.contains(range.endContainer) ? anchorFromRange(layer, range) : null
 
-    const page = pageNumber
     if (highlightTool?.active) {
+      if (!anchor) return
       const color = highlightTool.color
       void window.vellum
         .highlightsCreate({ slug, page, color, quote, anchor: JSON.stringify(anchor) })
@@ -721,19 +569,16 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
       return
     }
 
-    const rangeRect = typeof range.getBoundingClientRect === 'function'
-      ? range.getBoundingClientRect()
-      : { left: 0, top: 0, width: 0, height: 0 }
-    const containerRect = typeof container.getBoundingClientRect === 'function'
-      ? container.getBoundingClientRect()
-      : { left: 0, top: 0, width: 0, height: 0 }
-    const x = rangeRect.left - containerRect.left + rangeRect.width / 2
-    const y = rangeRect.top - containerRect.top
-    setActiveSelection({ x, y, quote, page, anchor })
+    const rangeRect =
+      typeof range.getBoundingClientRect === 'function'
+        ? range.getBoundingClientRect()
+        : { left: 0, top: 0, width: 0, height: 0 }
+    const { left, top } = relativeToPages(rangeRect)
+    setActiveSelection({ x: left + rangeRect.width / 2, y: top, quote, page, anchor })
   }
 
   function handleMenuHighlight(color: HighlightColor): void {
-    if (!slug || !activeSelection) return
+    if (!slug || !activeSelection?.anchor) return
     const { page, quote, anchor } = activeSelection
     void window.vellum
       .highlightsCreate({ slug, page, color, quote, anchor: JSON.stringify(anchor) })
@@ -757,39 +602,38 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
     setActiveSelection(null)
   }
 
-  // [P2-03] Event delegation on the text layer (rather than imperative
-  // listeners attached per-marker in `injectCitationMarkers`) — React's
-  // synthetic click bubbles up from any `<button data-citation-number>` the
-  // injection pass created, so it's found via `closest`.
+  // [P2-03] Event delegation on the page column: React's synthetic click
+  // bubbles up from any `<button data-citation-number>` the injection pass
+  // created on any page, so it's found via `closest`.
+  const citationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(
+    () => () => {
+      if (citationTimerRef.current) clearTimeout(citationTimerRef.current)
+    },
+    [],
+  )
   function handleCitationClick(event: MouseEvent<HTMLDivElement>): void {
     const target = (event.target as HTMLElement).closest('[data-citation-number]')
     if (!target) return
     const number = Number(target.getAttribute('data-citation-number'))
     const entry = referenceIndex.get(number)
     if (!entry) return
+    setHoveredCitation(null)
     goToPage(entry.page)
-    setCitationFlash(number)
-    window.setTimeout(() => setCitationFlash(null), FLASH_DURATION_MS)
+    setCitationFlash({ page: entry.page, number })
+    if (citationTimerRef.current) clearTimeout(citationTimerRef.current)
+    citationTimerRef.current = setTimeout(() => setCitationFlash(null), FLASH_DURATION_MS)
   }
 
-  // [P2-03] Same delegation approach for the hover tooltip: position it
-  // relative to the text layer container (same coordinate space
-  // `OverlayRect`s use) from the hovered marker's own client rect.
   function handleCitationMouseOver(event: MouseEvent<HTMLDivElement>): void {
     const target = (event.target as HTMLElement).closest('[data-citation-number]')
     if (!target) return
     const number = Number(target.getAttribute('data-citation-number'))
     const entry = referenceIndex.get(number)
     if (!entry) return
-    const container = textLayerRef.current
-    if (!container) return
     const targetRect = target.getBoundingClientRect()
-    const containerRect = container.getBoundingClientRect()
-    setHoveredCitation({
-      text: entry.text,
-      left: targetRect.left - containerRect.left,
-      top: targetRect.bottom - containerRect.top,
-    })
+    const { left, top } = relativeToPages({ left: targetRect.left, top: targetRect.bottom })
+    setHoveredCitation({ text: entry.text, left, top })
   }
 
   function handleCitationMouseOut(event: MouseEvent<HTMLDivElement>): void {
@@ -798,19 +642,37 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
     setHoveredCitation(null)
   }
 
+  function focusSearchResult(page: number): void {
+    goToPage(page)
+    setSearchFocus((current) => ({ page, nonce: (current?.nonce ?? 0) + 1 }))
+  }
+
+  function clearSearch(): void {
+    setSearchQuery('')
+    setSubmittedQuery('')
+    setSearchResults([])
+    setSearchIndex(0)
+    setSearchFocus(null)
+  }
+
   async function runSearch(query: string): Promise<void> {
-    setSearchQuery(query)
-    if (!doc || !query.trim()) {
-      setSearchResults([])
-      setSearchIndex(0)
+    const trimmed = query.trim()
+    if (!doc || !trimmed) {
+      clearSearch()
+      return
+    }
+    // Enter on an unchanged query steps to the next match.
+    if (trimmed === submittedQuery && searchResults.length > 0) {
+      stepMatch(1)
       return
     }
     setSearching(true)
     try {
-      const results = await searchDocument(doc, query)
+      const results = await searchDocument(doc, trimmed)
+      setSubmittedQuery(trimmed)
       setSearchResults(results)
       setSearchIndex(0)
-      if (results.length > 0) goToPage(results[0].pageNumber)
+      if (results.length > 0) focusSearchResult(results[0].pageNumber)
     } finally {
       setSearching(false)
     }
@@ -820,7 +682,7 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
     if (searchResults.length === 0) return
     const next = (searchIndex + delta + searchResults.length) % searchResults.length
     setSearchIndex(next)
-    goToPage(searchResults[next].pageNumber)
+    focusSearchResult(searchResults[next].pageNumber)
   }
 
   if (!slug) {
@@ -844,31 +706,53 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
     )
   }
 
+  const searchIsCurrent = submittedQuery !== '' && searchQuery.trim() === submittedQuery && !searching
+
   return (
-    <div className={styles.reader}>
+    <div ref={readerRootRef} className={styles.reader}>
       <div className={styles.toolbar}>
         <button type="button" onClick={() => setTocOpen((open) => !open)} aria-pressed={tocOpen}>
           Outline
         </button>
 
         <div className={styles.pageNav}>
-          <button type="button" onClick={() => goToPage(pageNumber - 1)} disabled={!doc || pageNumber <= 1}>
+          <button
+            type="button"
+            aria-label="Previous page"
+            onClick={() => goToPage(pageNumber - 1)}
+            disabled={!doc || pageNumber <= 1}
+          >
             ‹
           </button>
           <span aria-label="Page">
             {doc ? pageNumber : '–'} of {doc ? numPages : '–'}
           </span>
-          <button type="button" onClick={() => goToPage(pageNumber + 1)} disabled={!doc || pageNumber >= numPages}>
+          <button
+            type="button"
+            aria-label="Next page"
+            onClick={() => goToPage(pageNumber + 1)}
+            disabled={!doc || pageNumber >= numPages}
+          >
             ›
           </button>
         </div>
 
         <div className={styles.zoom}>
-          <button type="button" onClick={() => zoomBy(-SCALE_STEP)} disabled={!doc || scale <= MIN_SCALE}>
+          <button
+            type="button"
+            aria-label="Zoom out"
+            onClick={() => applyZoom(steppedScale(scale, SCALE_STEP, -1))}
+            disabled={!doc || scale <= MIN_SCALE}
+          >
             −
           </button>
           <span aria-label="Zoom">{Math.round(scale * 100)}%</span>
-          <button type="button" onClick={() => zoomBy(SCALE_STEP)} disabled={!doc || scale >= MAX_SCALE}>
+          <button
+            type="button"
+            aria-label="Zoom in"
+            onClick={() => applyZoom(steppedScale(scale, SCALE_STEP, 1))}
+            disabled={!doc || scale >= MAX_SCALE}
+          >
             +
           </button>
         </div>
@@ -886,12 +770,31 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
             placeholder="Search…"
             value={searchQuery}
             disabled={!doc}
-            onChange={(event) => setSearchQuery(event.target.value)}
+            onChange={(event) => {
+              const value = event.target.value
+              setSearchQuery(value)
+              // Editing (or clearing with the native ×) invalidates results.
+              if (value.trim() !== submittedQuery) {
+                setSubmittedQuery('')
+                setSearchResults([])
+                setSearchIndex(0)
+                setSearchFocus(null)
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.preventDefault()
+                clearSearch()
+              } else if (event.key === 'Enter' && event.shiftKey && searchResults.length > 0) {
+                event.preventDefault()
+                stepMatch(-1)
+              }
+            }}
           />
           <button type="submit" disabled={!doc || searching}>
             Search
           </button>
-          {searchResults.length > 0 ? (
+          {searchIsCurrent && searchResults.length > 0 ? (
             <>
               <span aria-label="Search matches">
                 {searchIndex + 1} / {searchResults.length}
@@ -903,7 +806,7 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
                 ›
               </button>
             </>
-          ) : searchQuery && !searching ? (
+          ) : searchIsCurrent ? (
             <span aria-label="Search matches">0 / 0</span>
           ) : null}
         </form>
@@ -920,34 +823,53 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
           </nav>
         ) : null}
 
-        <div className={styles.pageViewport}>
+        <div
+          ref={setViewportEl}
+          className={styles.pageViewport}
+          data-reader-viewport=""
+          tabIndex={0}
+          aria-label="Document pages"
+          onScroll={handleScroll}
+          onPointerDown={() => {
+            pageLockRef.current = null
+          }}
+          onKeyDown={(event) => {
+            if (!event.ctrlKey && !event.metaKey) pageLockRef.current = null
+          }}
+        >
           {loading ? <p className={styles.loading}>Loading…</p> : null}
-          <div className={styles.pageLayer}>
-            <canvas ref={canvasRef} className={styles.canvas} />
-            <div
-              ref={textLayerRef}
-              className={styles.textLayer}
-              data-highlight-mode={highlightTool?.active ? 'active' : undefined}
-              onMouseUp={handleTextLayerMouseUp}
-              onClick={handleCitationClick}
-              onMouseOver={handleCitationMouseOver}
-              onMouseOut={handleCitationMouseOut}
-            />
-            <div className={styles.highlightOverlay} aria-hidden="true">
-              {overlays.map((overlay, index) => (
-                <div
-                  key={`${overlay.id}-${index}`}
-                  className={overlay.flash ? `${styles.highlightRect} ${styles.highlightRectFlash}` : styles.highlightRect}
-                  style={{
-                    left: overlay.left,
-                    top: overlay.top,
-                    width: overlay.width,
-                    height: overlay.height,
-                    background: overlay.color,
-                  }}
-                />
-              ))}
-            </div>
+          <div
+            ref={pagesRef}
+            className={styles.pages}
+            onMouseUp={handlePagesMouseUp}
+            onClick={handleCitationClick}
+            onMouseOver={handleCitationMouseOver}
+            onMouseOut={handleCitationMouseOut}
+          >
+            {doc
+              ? pageSizes.map((size, index) => {
+                  const n = index + 1
+                  return (
+                    <ReaderPage
+                      key={n}
+                      doc={doc}
+                      pageNumber={n}
+                      baseWidth={size.width}
+                      baseHeight={size.height}
+                      scale={scale}
+                      renderScale={renderScale}
+                      active={(n >= renderWindow.first && n <= renderWindow.last) || n === pageNumber}
+                      highlightMode={Boolean(highlightTool?.active)}
+                      referenceIndex={referenceIndex}
+                      highlights={highlightsByPage.get(n) ?? NO_HIGHLIGHTS}
+                      flashHighlightId={flashId}
+                      citationFlash={citationFlash?.page === n ? citationFlash.number : null}
+                      searchQuery={submittedQuery}
+                      searchFocusNonce={searchFocus?.page === n ? searchFocus.nonce : null}
+                    />
+                  )
+                })
+              : null}
             {hoveredCitation ? (
               <CitationTooltip text={hoveredCitation.text} left={hoveredCitation.left} top={hoveredCitation.top} />
             ) : null}
@@ -957,6 +879,7 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
                 y={activeSelection.y}
                 quote={activeSelection.quote}
                 page={activeSelection.page}
+                canHighlight={activeSelection.anchor !== null}
                 onAddToChat={handleMenuAddToChat}
                 onExplain={handleMenuExplain}
                 onHighlight={handleMenuHighlight}
@@ -969,6 +892,7 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
     </div>
   )
 }
+
 
 function OutlineList({ items, onSelect }: { items: OutlineItem[]; onSelect: (page: number) => void }): JSX.Element {
   return (

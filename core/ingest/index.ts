@@ -130,9 +130,11 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
     finalAuthors.every((a, i) => a === fetchedAuthors[i])
   const authorOrcids = authorsMatchFetched ? fetched.metadata?.authorOrcids : undefined
 
+  // Blank strings count as missing: an agent answering `"title": ""` must
+  // not produce an untitled paper.
   const title =
-    extracted.metadata.title ??
-    fetched.metadata?.title ??
+    nonBlank(extracted.metadata.title) ??
+    nonBlank(fetched.metadata?.title) ??
     (await guessPdfTitle(fetched.pdfBytes.slice())) ??
     fallbackTitle(classified)
 
@@ -175,12 +177,19 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
  * extension for local/URL PDFs, the identifier itself for arXiv/DOI. */
 export function fallbackTitle(classified: ClassifiedInput): string {
   if (classified.kind !== 'local_pdf' && classified.kind !== 'pdf_url') return classified.value
-  const withoutQuery = classified.value.split(/[?#]/)[0] ?? classified.value
-  const name = withoutQuery.split(/[\\/]/).filter(Boolean).pop() ?? ''
+  // Only URLs carry query strings/fragments; '?' and '#' are legal in file names.
+  const location = classified.kind === 'pdf_url' ? (classified.value.split(/[?#]/)[0] ?? classified.value) : classified.value
+  const name = location.split(/[\\/]/).filter(Boolean).pop() ?? ''
   const stem = name.replace(/\.pdf$/i, '')
+  if (classified.kind === 'local_pdf') return stem || classified.value
   try {
     return decodeURIComponent(stem) || classified.value
   } catch {
     return stem || classified.value
   }
+}
+
+function nonBlank(value: string | undefined): string | undefined {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : undefined
 }

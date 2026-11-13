@@ -111,6 +111,20 @@ describe('ingest', () => {
     }
   })
 
+  it('treats a blank agent title as missing and guesses from the PDF', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-'))
+    const db = openDb({ path: ':memory:' })
+    const blankTitle = JSON.stringify({ sections: [], metadata: { title: '   ', authors: [] } })
+    const client = new FakeClient([textUpdate(blankTitle), doneUpdate])
+
+    try {
+      const result = await ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client })
+      expect(result.title).toBe('Sample Paper Title')
+    } finally {
+      db.close()
+    }
+  })
+
   it('falls back to fetch-time metadata for fields a degraded agent extraction omits', async () => {
     tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-'))
     const db = openDb({ path: ':memory:' })
@@ -312,5 +326,9 @@ describe('fallbackTitle', () => {
   it('keeps arXiv ids and DOIs as-is', () => {
     expect(fallbackTitle({ kind: 'arxiv', slug: 'arxiv-1706.03762', value: '1706.03762' })).toBe('1706.03762')
     expect(fallbackTitle({ kind: 'doi', slug: 'doi-x', value: '10.1/x' })).toBe('10.1/x')
+  })
+
+  it('keeps "#" and "?" that are part of a local file name', () => {
+    expect(fallbackTitle({ kind: 'local_pdf', slug: 'local-c', value: '/papers/C#-notes?.pdf' })).toBe('C#-notes?')
   })
 })

@@ -16,7 +16,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AcpClient, AcpPromptRequest, AcpSession, AcpUpdate } from '../acp/client.js'
 import { getPaper, listPapers, restorePaper, trashPaper } from '../library/repo.js'
 import { openDb } from '../store/db.js'
-import { ingest } from './index.js'
+import { fallbackTitle, ingest } from './index.js'
 
 const FIXTURE_PDF = fileURLToPath(new URL('./fixtures/sample.pdf', import.meta.url))
 
@@ -121,9 +121,10 @@ describe('ingest', () => {
       const result = await ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client })
 
       // local_pdf has no fetch-time metadata either (fetch.ts: undefined for
-      // local_pdf/pdf_url) — falls all the way back to the classified value
-      // (the input path) so title is never empty.
-      expect(result.title).toBe(FIXTURE_PDF)
+      // local_pdf/pdf_url) — the title comes from the PDF's first page, not
+      // the input path, so the Library never lists a paper as "/tmp/x.pdf".
+      expect(result.title).toBe('Sample Paper Title')
+      expect(result.title).not.toBe(FIXTURE_PDF)
       expect(result.metadata.authors).toEqual([])
     } finally {
       db.close()
@@ -296,5 +297,20 @@ describe('ingest', () => {
     } finally {
       db.close()
     }
+  })
+})
+
+describe('fallbackTitle', () => {
+  it('uses the file name without directory or .pdf for local and URL PDFs', () => {
+    expect(fallbackTitle({ kind: 'local_pdf', slug: 'local-attn', value: '/tmp/papers/attn.PDF' })).toBe('attn')
+    expect(fallbackTitle({ kind: 'local_pdf', slug: 'local-x', value: 'C:\\papers\\x.pdf' })).toBe('x')
+    expect(
+      fallbackTitle({ kind: 'pdf_url', slug: 'pdf-a', value: 'https://example.org/files/My%20Paper.pdf?dl=1' }),
+    ).toBe('My Paper')
+  })
+
+  it('keeps arXiv ids and DOIs as-is', () => {
+    expect(fallbackTitle({ kind: 'arxiv', slug: 'arxiv-1706.03762', value: '1706.03762' })).toBe('1706.03762')
+    expect(fallbackTitle({ kind: 'doi', slug: 'doi-x', value: '10.1/x' })).toBe('10.1/x')
   })
 })

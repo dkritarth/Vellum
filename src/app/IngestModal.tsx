@@ -44,11 +44,18 @@ export function IngestModal({ isOpen, onClose, onSuccess }: IngestModalProps): J
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>): void {
     const file = event.target.files?.[0]
-    if (file) {
-      // In Electron renderer, File objects have a `path` property
-      const path = (file as unknown as { path?: string }).path || file.name
+    if (!file) return
+
+    // Clear the picker so choosing the same file again can retry after a failure.
+    event.target.value = ''
+    try {
+      const path = window.vellum?.getPathForFile?.(file)
+      if (!path) throw new Error('Selected file has no disk path.')
       setInput(path)
       setError(null)
+    } catch {
+      setInput('')
+      setError('Could not access this PDF. Choose the file again or enter its full path manually.')
     }
   }
 

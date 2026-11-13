@@ -99,7 +99,9 @@ describe('main process startup and preload contract', () => {
   })
 
   it('registers a main handler for every request advertised by the actual preload bridge', async () => {
-    const requests = Object.entries(electron.api).filter(([name]) => name !== 'onAskUpdate')
+    // File resolution stays in preload; it is not a main-process request.
+    const requests = Object.entries(electron.api).filter(([name]) =>
+      name !== 'onAskUpdate' && name !== 'getPathForFile')
     expect(requests.length).toBeGreaterThan(0)
     for (const [name, request] of requests) {
       await expect(Promise.resolve().then(() => request()), name).resolves.toBeUndefined()

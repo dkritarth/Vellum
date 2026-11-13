@@ -25,7 +25,7 @@ const SAVE_DEBOUNCE_MS = 500
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
-type SaveStatus = 'idle' | 'saving' | 'saved'
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'clearing' | 'cleared'
 
 interface NotesPanelProps {
   /** Slug of the currently open paper, if any. Undefined = no paper open. */
@@ -38,6 +38,7 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
   const [loadAttempt, setLoadAttempt] = useState(0)
   const canEdit = load.slug === slug && load.status === 'ready'
   const [status, setStatus] = useState<SaveStatus>('idle')
+  const [mutationError, setMutationError] = useState<'save' | 'clear' | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Ref-mirrored so the flush path (which runs from effect cleanups, outside
   // the render that produced the latest edit) always sees the current value,
@@ -79,6 +80,7 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
   useEffect(() => {
     paperGeneration.current += 1
     setStatus('idle')
+    setMutationError(null)
     setLoad({ slug, status: 'loading' })
     dirtyRef.current = false
 
@@ -124,6 +126,25 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
     }
   }, [flushPendingSave])
 
+  // Autosave and explicit retry share the same ownership checks. A new edit
+  // retires earlier results without changing the draft in the editor.
+  const saveNote = useCallback((paperSlug: string, next: string, generation: number, revision: number) => {
+    dirtyRef.current = false
+    setMutationError(null)
+    setStatus('saving')
+    window.vellum.notesSave({ slug: paperSlug, body: next })
+      .then(() => {
+        if (generation !== paperGeneration.current || revision !== editRevision.current) return
+        setStatus('saved')
+      })
+      .catch(() => {
+        if (generation !== paperGeneration.current || revision !== editRevision.current) return
+        dirtyRef.current = true
+        setStatus('idle')
+        setMutationError('save')
+      })
+  }, [])
+
   const clearNote = useCallback(() => {
     if (!slug || !canEdit) return
     if (saveTimer.current) {
@@ -135,16 +156,19 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
     const revision = ++editRevision.current
     dirtyRef.current = false
     setBody('')
-    setStatus('saving')
+    setMutationError(null)
+    setStatus('clearing')
     window.vellum
       .notesDelete(slug)
       .then(() => {
         if (generation !== paperGeneration.current || revision !== editRevision.current) return
-        setStatus('idle')
+        setStatus('cleared')
       })
       .catch(() => {
         if (generation !== paperGeneration.current || revision !== editRevision.current) return
         setBody(previousBody)
+        bodyRef.current = previousBody
+        setMutationError('clear')
         dirtyRef.current = true
         setStatus('idle')
       })
@@ -158,7 +182,7 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
         <button type="button" className={styles.clearButton} onClick={clearNote} disabled={!canEdit || !body}>
           Clear note
         </button>
-        <p className={styles.status}>{status === 'saving' ? 'Saving…' : status === 'saved' ? 'Saved' : ''}</p>
+        <p className={styles.status} aria-live="polite">{status === 'saving' ? 'Saving…' : status === 'saved' ? 'Saved' : status === 'clearing' ? 'Clearing…' : status === 'cleared' ? 'Cleared' : ''}</p>
       </div>
       {!canEdit && (load.slug !== slug || load.status === 'loading') && (
         <p className={styles.loadMessage} role="status">Loading note…</p>
@@ -168,6 +192,19 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
           <p role="alert">Could not load this note. Retry to recover saved text before editing.</p>
           <button type="button" className={styles.clearButton} onClick={() => setLoadAttempt((attempt) => attempt + 1)}>
             Retry
+          </button>
+        </div>
+      )}
+      {canEdit && mutationError && (
+        <div className={styles.loadMessage}>
+          <p role="alert">{mutationError === 'save'
+            ? 'Could not save this note. Your unsaved text is still in the editor.'
+            : 'Could not clear this note. Your text has been restored.'}</p>
+          <button type="button" className={styles.clearButton} onClick={() => {
+            if (mutationError === 'clear') clearNote()
+            else saveNote(slug, bodyRef.current, paperGeneration.current, ++editRevision.current)
+          }}>
+            {mutationError === 'clear' ? 'Retry Clear' : 'Retry save'}
           </button>
         </div>
       )}
@@ -189,20 +226,10 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
 
           if (saveTimer.current) clearTimeout(saveTimer.current)
           setStatus('idle')
+          setMutationError(null)
           saveTimer.current = setTimeout(() => {
-            dirtyRef.current = false
-            setStatus('saving')
-            window.vellum
-              .notesSave({ slug, body: next })
-              .then(() => {
-                if (generation !== paperGeneration.current || revision !== editRevision.current) return
-                setStatus('saved')
-              })
-              .catch(() => {
-                if (generation !== paperGeneration.current || revision !== editRevision.current) return
-                dirtyRef.current = true
-                setStatus('idle')
-              })
+            saveTimer.current = null
+            saveNote(slug, next, generation, revision)
           }, SAVE_DEBOUNCE_MS)
         }}
       />

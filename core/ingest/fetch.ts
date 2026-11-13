@@ -2,7 +2,7 @@
 //
 // Network boundary:
 //   - arXiv: metadata from the Atom API, PDF bytes from export.arxiv.org/pdf.
-//   - DOI: metadata from api.crossref.org/works, PDF bytes from doi.org.
+//   - DOI: metadata from api.crossref.org/works, candidate PDF response from doi.org.
 //   - pdf_url: PDF bytes straight from the URL, metadata empty.
 //   - local_pdf: PDF bytes straight off disk, metadata empty.
 //
@@ -12,11 +12,9 @@
 //      guess the title, author list, or year — we have the publisher record.
 //   2. An agent run (extract.ts) costs latency and tokens; fetch.ts is cheap
 //      HTTP GETs.
-//   3. For DOIs whose publisher PDF is open-access, fetching straight from
-//      doi.org gets the real paper. For closed DOIs, the publisher redirects
-//      behind auth, so fetchSource() for a DOI may throw — caller decides how
-//      to degrade (e.g. prompt the user for a local PDF or drop to metadata-
-//      only).
+//   3. DOI resolution may return a publisher landing page even for open-access
+//      papers. Reject explicit HTML before conversion and ask for a direct PDF
+//      URL or local file; DOI resolution does not promise PDF bytes.
 //
 // How to test manually without launching the UI:
 //   node -e "
@@ -273,6 +271,14 @@ export async function fetchPdfFromUrl(
     if (!res.ok) {
       await res.body?.cancel().catch(() => {})
       throw new Error(`${label} request failed: ${res.status} ${res.statusText}`)
+    }
+
+    const mediaType = res.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase()
+    if (mediaType === 'text/html' || mediaType === 'application/xhtml+xml') {
+      await res.body?.cancel().catch(() => {})
+      throw new Error(
+        `${label} resolved to a web page, not a PDF. Supply a direct PDF URL or download the PDF and import the local file.`,
+      )
     }
 
     // Check Content-Length header early if available

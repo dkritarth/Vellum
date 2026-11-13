@@ -23,6 +23,7 @@ import { addChatMessage, createChatSession, getChatMessages, getLatestChatSessio
 import { createHighlight, listHighlights } from '../highlights/repo.js'
 import { createCollection, assignPaperToCollection, listPaperCollections } from '../collections/repo.js'
 import { openDb } from '../store/db.js'
+import { getNote, upsertNote } from '../notes/repo.js'
 import { ingest } from './index.js'
 
 const FIXTURE_PDF = fileURLToPath(new URL('./fixtures/sample.pdf', import.meta.url))
@@ -707,6 +708,45 @@ describe('ingest', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
   }
+
+  it('leaves existing paper files, database and notes unchanged when a DOI returns HTML', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-'))
+    const db = openDb({ path: ':memory:' })
+    const doi = '10.1371/journal.pone.0000308'
+    stubCrossrefFetch(readFileSync(FIXTURE_PDF))
+
+    try {
+      const paper = await ingest(doi, {
+        db, dataDir: tmpDir, client: new FakeClient([textUpdate(AGENT_JSON), doneUpdate]),
+      })
+      const note = upsertNote(db, paper.slug, 'Keep this research note.')
+      const rows = listPapers(db)
+      const pdf = readFileSync(paper.paths.pdfPath)
+      const markdown = readFileSync(paper.paths.mdPath)
+      const database = db.serialize()
+      const client = new FakeClient()
+      vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+        if (url.includes('api.crossref.org/works/')) {
+          return new Response(CROSSREF_ORCID_BODY)
+        }
+        return new Response('<html>Publisher landing page</html>', {
+          headers: { 'content-type': 'text/html;charset=UTF-8' },
+        })
+      }))
+
+      await expect(ingest(doi, { db, dataDir: tmpDir, client }))
+        .rejects.toThrow(/DOI PDF resolved to a web page.*direct PDF URL/)
+      expect(client.session).toBeUndefined()
+      expect(listPapers(db)).toEqual(rows)
+      expect(getNote(db, paper.slug)).toEqual(note)
+      expect(db.serialize()).toEqual(database)
+      expect(readFileSync(paper.paths.pdfPath)).toEqual(pdf)
+      expect(readFileSync(paper.paths.mdPath)).toEqual(markdown)
+    } finally {
+      db.close()
+      vi.unstubAllGlobals()
+    }
+  })
 
   it('drops authorOrcids when agent-extracted authors diverge from the Crossref list they were aligned to', async () => {
     tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-'))

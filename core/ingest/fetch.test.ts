@@ -156,6 +156,26 @@ describe('fetchSource', () => {
     ])
   })
 
+  it('rejects a DOI publisher landing page with a direct-PDF or local-file remedy', async () => {
+    const landingPage = 'https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0000308'
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('api.crossref.org/works/')) {
+        return Response.json(CROSSREF_FIXTURE)
+      }
+      if (url.startsWith('https://doi.org/')) {
+        return new Response(null, { status: 302, headers: { location: landingPage } })
+      }
+      return new Response('<html>Publisher landing page</html>', {
+        headers: { 'content-type': 'text/html;charset=UTF-8' },
+      })
+    })
+
+    await expect(fetchSource({
+      kind: 'doi', slug: 'doi-plos', value: '10.1371/journal.pone.0000308',
+    }, { lookup: async () => [{ address: '93.184.216.34', family: 4 }] }))
+      .rejects.toThrow('DOI PDF resolved to a web page, not a PDF. Supply a direct PDF URL or download the PDF and import the local file.')
+  })
+
   it('fetches raw PDF bytes for a direct pdf_url with no metadata', async () => {
     fetchMock.mockImplementation((url: string) => {
       if (url === 'https://example.com/paper.pdf') {
@@ -242,6 +262,36 @@ describe('fetchPdfFromUrl security and resource limits', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
   })
+
+  it.each(['text/html', 'TeXt/HtMl; charset=UTF-8', 'application/xhtml+xml', 'Application/XHTML+XML; charset=utf-8'])(
+    'rejects %s without reading the body and cancels it', async (contentType) => {
+      const pull = vi.fn()
+      const cancel = vi.fn()
+      const body = new ReadableStream<Uint8Array>({ pull, cancel }, { highWaterMark: 0 })
+      fetchMock.mockResolvedValue(new Response(body, {
+        headers: { 'content-type': contentType },
+      }))
+
+      await expect(fetchPdfFromUrl('https://example.com/paper.pdf', 'PDF URL', {
+        lookup: async () => [{ address: '93.184.216.34', family: 4 }],
+      })).rejects.toThrow(/web page.*direct PDF URL.*import the local file/)
+      expect(pull).not.toHaveBeenCalled()
+      expect(cancel).toHaveBeenCalledOnce()
+    },
+  )
+
+  it.each([undefined, 'application/octet-stream', 'application/pdf; charset=binary'])(
+    'preserves PDF bytes with content type %s', async (contentType) => {
+      const pdf = new TextEncoder().encode('%PDF-1.4\n')
+      fetchMock.mockResolvedValue(new Response(pdf, {
+        headers: contentType ? { 'content-type': contentType } : {},
+      }))
+
+      await expect(fetchPdfFromUrl('https://example.com/paper.pdf', 'PDF URL', {
+        lookup: async () => [{ address: '93.184.216.34', family: 4 }],
+      })).resolves.toEqual(pdf)
+    },
+  )
 
   describe('SSRF protection', () => {
     it('rejects loopback IPv4 addresses', async () => {

@@ -8,7 +8,7 @@
 // at compile time, so this stays consistent with "renderer never imports
 // node" (the same pattern electron/preload.ts and src/vellum.d.ts already use
 // for IngestResult/VellumApi).
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ListPapersOptions, PaperRecord, PaperSortColumn } from '../../core/library/repo'
 import styles from './Library.module.css'
 
@@ -19,6 +19,9 @@ export interface LibraryProps {
   onClearCollectionFilter?: () => void
   /** [L2-04] Callback when a paper is moved to Trash. */
   onTrashPaper?: (slug: string) => void
+  /** Focus the title search box whenever this changes (and on mount when
+   * non-zero) — the sidebar's Search item. */
+  focusSearchNonce?: number
 }
 
 const SORT_OPTIONS: { value: PaperSortColumn; label: string }[] = [
@@ -35,7 +38,12 @@ export function Library({
   selectedCollectionName = null,
   onClearCollectionFilter,
   onTrashPaper,
+  focusSearchNonce = 0,
 }: LibraryProps): JSX.Element {
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (focusSearchNonce > 0) searchInputRef.current?.focus()
+  }, [focusSearchNonce])
   const [papers, setPapers] = useState<PaperRecord[]>([])
   const [paperCollections, setPaperCollections] = useState<Record<string, string[]>>({})
   const [status, setStatus] = useState<Status>('loading')
@@ -113,6 +121,7 @@ export function Library({
       )}
       <div className={styles.controls}>
         <input
+          ref={searchInputRef}
           type="search"
           aria-label="Search papers by title"
           placeholder="Search title…"

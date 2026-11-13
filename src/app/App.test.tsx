@@ -188,4 +188,49 @@ describe('App shell', () => {
     await user.click(screen.getByRole('button', { name: /open another paper/i }))
     expect(await screen.findByLabelText(/search papers by title/i)).toBeInTheDocument()
   })
+
+  it('keeps the sidebar highlight in sync with the visible view', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    const nav = screen.getByRole('navigation', { name: 'Primary' })
+    const current = () =>
+      Array.from(nav.querySelectorAll('[aria-current="page"], [aria-pressed="true"]')).map((el) => el.textContent)
+
+    expect(current()).toEqual(['Home'])
+
+    // Create opens a dialog; it never becomes the highlighted page.
+    await user.click(screen.getByRole('button', { name: 'Create' }))
+    await user.click(screen.getByRole('button', { name: /cancel/i }))
+    expect(current()).toEqual(['Home'])
+
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+    expect(current()).toEqual(['Search'])
+
+    await user.click(screen.getByRole('button', { name: 'Trash' }))
+    expect(current()).toEqual(['Trash'])
+
+    await user.click(screen.getByRole('button', { name: 'Usage' }))
+    expect(current()).toEqual(['Usage'])
+
+    await user.click(screen.getByRole('button', { name: 'Library' }))
+    expect(current()).toEqual(['Library'])
+
+    // Opening a paper shows the Reader, i.e. Home.
+    await user.click(await screen.findByText('Attention Is All You Need'))
+    expect(current()).toEqual(['Home'])
+  })
+
+  it('Search opens the Library with the title search focused', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+    const search = await screen.findByLabelText(/search papers by title/i)
+    expect(search).toHaveFocus()
+
+    // Clicking Search again while already in the Library re-focuses the box.
+    search.blur()
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+    expect(screen.getByLabelText(/search papers by title/i)).toHaveFocus()
+  })
 })

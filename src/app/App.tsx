@@ -8,7 +8,7 @@ import { Reader } from './Reader'
 import { ReaderToolbar } from './ReaderToolbar'
 import type { HighlightColor } from './ReaderToolbar'
 import { Sidebar } from './Sidebar'
-import type { NavItem } from './Sidebar'
+import type { FooterItem, NavItem } from './Sidebar'
 import { TabStrip } from './TabStrip'
 import type { PaperTab } from './TabStrip'
 import { RightPanel, type RightPanelTab } from './RightPanel'
@@ -51,6 +51,14 @@ export function App(): JSX.Element {
   const [selectedCollectionName, setSelectedCollectionName] = useState<string | null>(null)
   const [selectedChatSessionId, setSelectedChatSessionId] = useState<number | null>(null)
   const [chatBanner, setChatBanner] = useState<string | null>(null)
+  // Library reached via the Search nav item: highlight Search and focus the
+  // title search box. The nonce re-focuses it on repeat clicks.
+  const [libraryViaSearch, setLibraryViaSearch] = useState(false)
+  const [searchFocusNonce, setSearchFocusNonce] = useState(0)
+
+  const activeNavItem: NavItem | null =
+    view === 'reader' ? 'Home' : view === 'library' ? (libraryViaSearch ? 'Search' : 'Library') : null
+  const activeFooterItem: FooterItem | null = view === 'trash' ? 'Trash' : view === 'usage' ? 'Usage' : null
 
   async function handleSelectChatSession(session: ChatSessionSummary): Promise<void> {
     setSelectedChatSessionId(session.id)
@@ -71,6 +79,7 @@ export function App(): JSX.Element {
   function handleSelectCollection(id: number | null, name: string | null): void {
     setSelectedCollectionId(id)
     setSelectedCollectionName(name)
+    setLibraryViaSearch(false)
     setView('library')
   }
 
@@ -127,7 +136,12 @@ export function App(): JSX.Element {
   function handleNavChange(item: NavItem): void {
     if (item === 'Create') {
       setIsIngestOpen(true)
+    } else if (item === 'Search') {
+      setLibraryViaSearch(true)
+      setSearchFocusNonce((n) => n + 1)
+      setView('library')
     } else {
+      setLibraryViaSearch(false)
       setView(item === 'Library' ? 'library' : 'reader')
     }
   }
@@ -147,7 +161,10 @@ export function App(): JSX.Element {
         activeTabId={activeTabId}
         onSelectTab={selectTab}
         onCloseTab={closeTab}
-        onNewTab={() => setView('library')}
+        onNewTab={() => {
+          setLibraryViaSearch(false)
+          setView('library')
+        }}
       />
       <div className={styles.body}>
         <Sidebar
@@ -158,6 +175,8 @@ export function App(): JSX.Element {
           onSelectSession={handleSelectChatSession}
           onSelectTrash={() => setView('trash')}
           onSelectUsage={() => setView('usage')}
+          activeNavItem={activeNavItem}
+          activeFooterItem={activeFooterItem}
         />
         <main className={styles.centerPane} aria-label="Paper view">
           {chatBanner && (
@@ -177,6 +196,7 @@ export function App(): JSX.Element {
           ) : view === 'library' ? (
             <Library
               onOpenPaper={openPaper}
+              focusSearchNonce={libraryViaSearch ? searchFocusNonce : 0}
               selectedCollectionId={selectedCollectionId}
               selectedCollectionName={selectedCollectionName}
               onClearCollectionFilter={() => {

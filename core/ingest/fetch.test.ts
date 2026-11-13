@@ -93,6 +93,65 @@ describe('fetchSource', () => {
     expect(calledUrls.some((u) => u.includes('id_list=2401.12345'))).toBe(true)
   })
 
+  it('decodes predefined XML entities once in arXiv metadata after field extraction', async () => {
+    const xml = ARXIV_ATOM_FIXTURE
+      .replace('Attention Is All You Need, Again', 'Graphs &amp; Attention &quot;A&quot; &gt; B')
+      .replace('Jane Doe', 'A. O&apos;Neil')
+      .replace('John Smith', 'Literal &amp;apos; &amp;#65;')
+      .replace('This paper revisits attention mechanisms.', 'x &lt; y &lt;/summary&gt; &lt;tag&gt;')
+      .replace('NeurIPS 2024', '  Research &amp; Science\n 2024  ')
+    fetchMock.mockImplementation((url: string) => Promise.resolve(new Response(
+      url.includes('/api/query') ? new TextEncoder().encode(xml) : new Uint8Array([1, 2, 3]),
+    )))
+
+    const result = await fetchSource(
+      { kind: 'arxiv', slug: 'arxiv-2401.12345', value: '2401.12345' },
+      { lookup: async () => [{ address: '93.184.216.34', family: 4 }] },
+    )
+
+    expect(result.metadata).toEqual({
+      title: 'Graphs & Attention "A" > B',
+      authors: ["A. O'Neil", 'Literal &apos; &#65;'],
+      year: 2024,
+      venue: 'Research & Science 2024',
+      abstract: 'x < y </summary> <tag>',
+    })
+    expect(result.pdfBytes).toEqual(new Uint8Array([1, 2, 3]))
+  })
+
+  it.each([
+    ['decimal and hexadecimal', '&#65; &#000233; &#x3B1; &#x1F4DA;', 'A é α 📚'],
+    ['XML 1.0 boundaries', '&#32;&#xD7FF;&#xE000;&#xFFFD;&#x10000;&#x10FFFF;', '\uD7FF\uE000\uFFFD\u{10000}\u{10FFFF}'],
+    ['discouraged but legal characters', '&#x7F;&#x85;&#xFDD0;&#x1FFFE;', '\u007F\u0085\uFDD0\u{1FFFE}'],
+    ['whitespace references', ' A&#9;B&#10;C&#13;D ', 'A B C D'],
+    ['numeric escaped literals', '&#38;lt; &#x26;#65; &amp;#x41;', '&lt; &#65; &#x41;'],
+    ['unknown and malformed references', '&nbsp; &AMP; &#; &#x; &#X41; &#-1; &#xGG; &#12oops; &amp', '&nbsp; &AMP; &#; &#x; &#X41; &#-1; &#xGG; &#12oops; &amp'],
+    ['illegal XML characters', '&#0; &#8; &#11; &#12; &#14; &#31; &#xD800; &#xDFFF; &#xFFFE; &#xFFFF;', '&#0; &#8; &#11; &#12; &#14; &#31; &#xD800; &#xDFFF; &#xFFFE; &#xFFFF;'],
+    ['out-of-range references', '&#1114112; &#x110000; &#99999999999999999999999999999999999999999999;', '&#1114112; &#x110000; &#99999999999999999999999999999999999999999999;'],
+  ])('handles %s in arXiv XML text safely', async (_label, encoded, decoded) => {
+    const xml = ARXIV_ATOM_FIXTURE
+      .replace('Attention Is All You Need, Again', encoded)
+      .replace('Jane Doe', encoded)
+      .replace('This paper revisits attention mechanisms.', encoded)
+      .replace('NeurIPS 2024', encoded)
+    fetchMock.mockImplementation((url: string) => Promise.resolve(new Response(
+      url.includes('/api/query') ? new TextEncoder().encode(xml) : new Uint8Array([1]),
+    )))
+
+    const result = await fetchSource(
+      { kind: 'arxiv', slug: 'arxiv-2401.12345', value: '2401.12345' },
+      { lookup: async () => [{ address: '93.184.216.34', family: 4 }] },
+    )
+
+    expect(result.metadata).toEqual({
+      title: decoded,
+      authors: [decoded, 'John Smith'],
+      year: 2024,
+      venue: decoded,
+      abstract: decoded,
+    })
+  })
+
   it('fetches DOI metadata from Crossref and PDF bytes from the DOI URL', async () => {
     fetchMock.mockImplementation((url: string) => {
       if (url.includes('api.crossref.org/works/')) {

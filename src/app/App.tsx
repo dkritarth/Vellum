@@ -123,6 +123,12 @@ export function App(): JSX.Element {
     setView('reader')
   }
 
+  // Plain Library (not reached via Search): no Search highlight or focus.
+  function showLibrary(): void {
+    setLibraryViaSearch(false)
+    setView('library')
+  }
+
   // Close a tab. Closing the active one activates its right neighbour, else
   // its left one, else nothing (the Reader's empty state).
   function closeTab(id: string): void {
@@ -169,10 +175,7 @@ export function App(): JSX.Element {
         activeTabId={activeTabId}
         onSelectTab={selectTab}
         onCloseTab={closeTab}
-        onNewTab={() => {
-          setLibraryViaSearch(false)
-          setView('library')
-        }}
+        onNewTab={showLibrary}
       />
       <div className={styles.body}>
         <Sidebar
@@ -196,11 +199,11 @@ export function App(): JSX.Element {
           )}
           {view === 'trash' ? (
             <TrashView
-              onBackToLibrary={() => setView('library')}
+              onBackToLibrary={showLibrary}
             />
           ) : view === 'usage' ? (
             <UsageView
-              onBackToLibrary={() => setView('library')}
+              onBackToLibrary={showLibrary}
             />
           ) : view === 'library' ? (
             <Library

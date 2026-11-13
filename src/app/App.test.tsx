@@ -247,4 +247,17 @@ describe('App shell', () => {
     expect(screen.queryByText(/Filtered by collection:/)).not.toBeInTheDocument()
     expect(window.vellum.listPapers).toHaveBeenLastCalledWith(expect.objectContaining({ collectionId: undefined }))
   })
+
+  it('Back to Library from Trash shows the plain Library, not the Search state', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+    await user.click(screen.getByRole('button', { name: 'Trash' }))
+    await user.click(await screen.findByRole('button', { name: /back to library/i }))
+
+    const search = await screen.findByLabelText(/search papers by title/i)
+    expect(search).not.toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Library' })).toHaveAttribute('aria-current', 'page')
+  })
 })

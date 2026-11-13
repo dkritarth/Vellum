@@ -258,7 +258,7 @@ export function Library({
                 {collections.length > 0 && (
                   <select
                     className={styles.collectionSelect}
-                    aria-label={`Add ${paper.title} to a collection`}
+                    aria-label={`Add to collection: ${paper.title}`}
                     value=""
                     onChange={(event) => {
                       const id = Number(event.target.value)
@@ -279,7 +279,7 @@ export function Library({
                   <button
                     type="button"
                     className={styles.removeFromCollectionButton}
-                    aria-label={`Remove ${paper.title} from ${selectedCollectionName || 'this collection'}`}
+                    aria-label={`Remove from collection: ${paper.title}`}
                     onClick={() => void handleRemoveFromCollection(paper, selectedCollectionId)}
                   >
                     Remove from collection

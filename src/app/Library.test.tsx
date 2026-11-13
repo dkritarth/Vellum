@@ -183,7 +183,7 @@ describe('Library', () => {
     const user = userEvent.setup()
     render(<Library onOpenPaper={vi.fn()} />)
 
-    const select = await screen.findByRole('combobox', { name: 'Add Attention Is All You Need to a collection' })
+    const select = await screen.findByRole('combobox', { name: 'Add to collection: Attention Is All You Need' })
     // Nested collections are listed with their full path.
     expect(await screen.findByRole('option', { name: 'Computer Science / AI' })).toBeInTheDocument()
     await user.selectOptions(select, '2')
@@ -216,7 +216,7 @@ describe('Library', () => {
     const user = userEvent.setup()
     render(<Library onOpenPaper={vi.fn()} selectedCollectionId={7} selectedCollectionName="Reading" />)
 
-    await user.click(await screen.findByRole('button', { name: 'Remove Attention Is All You Need from Reading' }))
+    await user.click(await screen.findByRole('button', { name: 'Remove from collection: Attention Is All You Need' }))
 
     expect(collectionsRemove).toHaveBeenCalledWith({ paperSlug: 'arxiv-1706.03762', collectionId: 7 })
     await waitFor(() => expect(screen.queryByText('Attention Is All You Need')).not.toBeInTheDocument())

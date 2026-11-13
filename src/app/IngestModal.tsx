@@ -21,6 +21,8 @@ export function IngestModal({ isOpen, onClose, onSuccess }: IngestModalProps): J
     if (isOpen) {
       setInput('')
       setError(null)
+      // Also forget the native picker's file so re-picking it fires `change`.
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }, [isOpen])
 

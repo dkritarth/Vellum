@@ -187,3 +187,39 @@
   cursor: pointer;
   font-size: 12px;
 }
+
+.card[draggable='true'] {
+  cursor: grab;
+}
+
+.cardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+  margin-top: auto;
+}
+
+.collectionSelect,
+.removeFromCollectionButton {
+  max-width: 100%;
+  padding: 3px 6px;
+  border: 1px solid var(--vellum-border, #2a2a2a);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--vellum-text-dim, #8a8a8a);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.collectionSelect {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.collectionSelect:hover,
+.removeFromCollectionButton:hover {
+  color: var(--vellum-text, #eaeaea);
+  border-color: var(--vellum-accent, #6d8cff);
+}

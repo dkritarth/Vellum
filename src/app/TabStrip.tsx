@@ -14,18 +14,31 @@ interface TabStripProps {
   tabs?: PaperTab[]
   activeTabId?: string | null
   onSelectTab?: (id: string) => void
-  /** Close a tab (× button or middle-click). Omitted = tabs can't close. */
+  /** Close a tab (close button or middle-click). App decides which tab
+   * becomes active next. */
   onCloseTab?: (id: string) => void
+  /** "+" button — App opens the Library so another paper can be opened. */
+  onNewTab?: () => void
 }
 
-export function TabStrip({ tabs = [], activeTabId = null, onSelectTab, onCloseTab }: TabStripProps): JSX.Element {
+export function TabStrip({
+  tabs = [],
+  activeTabId = null,
+  onSelectTab,
+  onCloseTab,
+  onNewTab,
+}: TabStripProps): JSX.Element {
   return (
     <div className={styles.tabStrip} role="tablist" aria-label="Open papers">
       {tabs.length === 0 ? (
         <div className={styles.empty}>No papers open — open one from Library</div>
       ) : (
         tabs.map((tab) => (
-          <div key={tab.id} className={tab.id === activeTabId ? `${styles.tabItem} ${styles.tabActive}` : styles.tabItem}>
+          <div
+            key={tab.id}
+            role="presentation"
+            className={tab.id === activeTabId ? `${styles.tabItem} ${styles.tabActive}` : styles.tabItem}
+          >
             <button
               type="button"
               role="tab"
@@ -56,7 +69,14 @@ export function TabStrip({ tabs = [], activeTabId = null, onSelectTab, onCloseTa
           </div>
         ))
       )}
-      <button type="button" className={styles.newTabButton} aria-label="New tab" disabled>
+      <button
+        type="button"
+        className={styles.newTabButton}
+        aria-label="Open another paper"
+        title="Open another paper from the Library"
+        disabled={!onNewTab}
+        onClick={onNewTab}
+      >
         +
       </button>
     </div>

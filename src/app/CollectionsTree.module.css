@@ -219,3 +219,15 @@
   cursor: pointer;
   font-size: 11px;
 }
+
+.dropTarget {
+  outline: 1px dashed var(--vellum-accent, #6d8cff);
+  outline-offset: -1px;
+  background: rgba(109, 140, 255, 0.15);
+}
+
+.treeItem:focus-visible,
+.allPapersItem:focus-visible {
+  outline: 2px solid var(--vellum-accent, #6d8cff);
+  outline-offset: -2px;
+}

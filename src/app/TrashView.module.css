@@ -1,7 +1,12 @@
 .container {
+  /* Fill the center pane (a flex row) and scroll inside it; border-box keeps
+     the padding from pushing the window into a second, page-level scroll. */
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  height: 100%;
   padding: 24px 32px;
   background-color: var(--color-bg, #0f1117);
   color: var(--color-text, #f1f5f9);

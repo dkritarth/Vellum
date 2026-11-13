@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import { friendlyIpcError } from './ipcError'
 import styles from './IngestModal.module.css'
 
 export interface IngestModalProps {
@@ -25,6 +26,17 @@ export function IngestModal({ isOpen, onClose, onSuccess }: IngestModalProps): J
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [isOpen, loading, onClose])
 
+  // Each opening starts clean: the modal stays mounted while closed, so
+  // without this a failed attempt's input and error reappear next time.
+  useEffect(() => {
+    if (isOpen) {
+      setInput('')
+      setError(null)
+      // Also forget the native picker's file so re-picking it fires `change`.
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }, [isOpen])
+
   if (!isOpen) return null
 
   async function handleSubmit(event?: FormEvent): Promise<void> {
@@ -48,8 +60,7 @@ export function IngestModal({ isOpen, onClose, onSuccess }: IngestModalProps): J
       onSuccess({ slug: result.slug, title: result.title })
     } catch (err: unknown) {
       setLoading(false)
-      const msg = err instanceof Error ? err.message : String(err)
-      setError(msg)
+      setError(friendlyIpcError(err, 'Could not add this paper.'))
     }
   }
 

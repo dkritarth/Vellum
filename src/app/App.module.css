@@ -13,6 +13,8 @@
     sans-serif;
   background: var(--vellum-bg, #101010);
   color: var(--vellum-text, #eaeaea);
+  /* The shell is exactly one viewport tall; panes scroll themselves. */
+  overflow: hidden;
 }
 
 .shell {

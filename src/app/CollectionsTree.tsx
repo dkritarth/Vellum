@@ -1,16 +1,34 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CollectionTreeItem } from '../../electron/preload'
 import styles from './CollectionsTree.module.css'
+import { PAPER_DRAG_TYPE } from './Library'
 
 export interface CollectionsTreeProps {
   selectedCollectionId: number | null
   onSelectCollection: (id: number | null, name: string | null) => void
+  /** A Library card was dropped on a collection and assigned to it. */
+  onPaperAssigned?: (collectionId: number) => void
+}
+
+/** Enter/Space on the row itself (not a nested button or input) selects it. */
+function selectOnKey(event: React.KeyboardEvent, select: () => void): void {
+  if (event.target !== event.currentTarget) return
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault()
+    select()
+  }
+}
+
+function carriesPaper(event: React.DragEvent): boolean {
+  return Array.from(event.dataTransfer?.types ?? []).includes(PAPER_DRAG_TYPE)
 }
 
 export function CollectionsTree({
   selectedCollectionId,
   onSelectCollection,
+  onPaperAssigned,
 }: CollectionsTreeProps): JSX.Element {
+  const [dropTargetId, setDropTargetId] = useState<number | null>(null)
   const [tree, setTree] = useState<CollectionTreeItem[]>([])
   const [loading, setLoading] = useState(true)
   const [creatingParentId, setCreatingParentId] = useState<number | null | 'root'>(null)
@@ -128,6 +146,21 @@ export function CollectionsTree({
     }
   }
 
+  async function handleDrop(event: React.DragEvent, collectionId: number): Promise<void> {
+    setDropTargetId(null)
+    if (!carriesPaper(event)) return
+    event.preventDefault()
+    const paperSlug = event.dataTransfer.getData(PAPER_DRAG_TYPE)
+    if (!paperSlug) return
+    try {
+      await window.vellum.collectionsAssign({ paperSlug, collectionId })
+      await refreshTree()
+      onPaperAssigned?.(collectionId)
+    } catch (err) {
+      console.error('Failed to add paper to collection', err)
+    }
+  }
+
   function renderTreeNodes(nodes: CollectionTreeItem[], depth = 0): JSX.Element[] {
     return nodes.map((node) => {
       const isSelected = selectedCollectionId === node.id
@@ -165,9 +198,23 @@ export function CollectionsTree({
             </div>
           ) : (
             <div
-              className={`${styles.treeItem} ${isSelected ? styles.treeItemActive : ''}`}
+              className={`${styles.treeItem} ${isSelected ? styles.treeItemActive : ''} ${
+                dropTargetId === node.id ? styles.dropTarget : ''
+              }`}
               style={{ paddingLeft: `${depth * 14 + 6}px` }}
               onClick={() => onSelectCollection(node.id, node.name)}
+              onKeyDown={(event) => selectOnKey(event, () => onSelectCollection(node.id, node.name))}
+              tabIndex={0}
+              onDragOver={(event) => {
+                if (!carriesPaper(event)) return
+                event.preventDefault()
+                event.dataTransfer.dropEffect = 'copy'
+                if (dropTargetId !== node.id) setDropTargetId(node.id)
+              }}
+              onDragLeave={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTargetId(null)
+              }}
+              onDrop={(event) => void handleDrop(event, node.id)}
               role="treeitem"
               aria-selected={isSelected}
             >
@@ -291,6 +338,8 @@ export function CollectionsTree({
       <div
         className={`${styles.allPapersItem} ${selectedCollectionId === null ? styles.allPapersActive : ''}`}
         onClick={() => onSelectCollection(null, null)}
+        onKeyDown={(event) => selectOnKey(event, () => onSelectCollection(null, null))}
+        tabIndex={0}
         role="treeitem"
         aria-selected={selectedCollectionId === null}
       >

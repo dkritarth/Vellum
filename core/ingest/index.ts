@@ -28,7 +28,7 @@ import type { PaperRecord } from '../library/repo.js'
 import { getPaper, upsertPaper } from '../library/repo.js'
 import { classifyInput } from './classify.js'
 import type { ClassifiedInput, InputKind } from './classify.js'
-import { convertPdfToMarkdown } from './convert.js'
+import { convertPdfToMarkdown, guessPdfTitle } from './convert.js'
 import { extractPaper } from './extract.js'
 import { fetchSource } from './fetch.js'
 import { recordPaperSource, resolvePaperSource } from './source-identity.js'
@@ -142,8 +142,7 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
 
     // Prefer the agent's paper.md-derived metadata (extract.ts); fall back to
     // the raw fetch-time metadata (arXiv/Crossref) for whatever the agent
-    // didn't find, and finally to the classified input value so `title` is
-    // never empty even in a fully degraded extraction.
+    // didn't find.
     const finalAuthors = extracted.metadata.authors ?? fetched.metadata?.authors ?? []
 
     // ORCIDs are a fetch-only signal (Crossref), positionally aligned to
@@ -162,8 +161,18 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
       finalAuthors.every((a, i) => a === fetchedAuthors[i])
     const authorOrcids = authorsMatchFetched ? fetched.metadata?.authorOrcids : undefined
 
+    // Blank strings count as missing: an agent answering `"title": ""` must
+    // not produce an untitled paper. Without agent or fetch metadata, guess the
+    // title from the PDF's first page, then fall back to the file name so the
+    // title is never empty and never a raw filesystem path.
+    const title =
+      nonBlank(extracted.metadata.title) ??
+      nonBlank(fetched.metadata?.title) ??
+      (await guessPdfTitle(fetched.pdfBytes.slice())) ??
+      fallbackTitle(classified)
+
     const metadata: IngestMetadata = {
-      title: extracted.metadata.title ?? fetched.metadata?.title ?? classified.value,
+      title,
       authors: finalAuthors,
       year: extracted.metadata.year ?? fetched.metadata?.year,
       venue: extracted.metadata.venue ?? fetched.metadata?.venue,
@@ -209,4 +218,25 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
       console.warn(`ingest: candidate files retained at ${staging}`, error)
     })
   }
+}
+
+/** Last-resort display title: a file name without its directory or `.pdf`
+ * extension for local/URL PDFs, the identifier itself for arXiv/DOI. */
+export function fallbackTitle(classified: ClassifiedInput): string {
+  if (classified.kind !== 'local_pdf' && classified.kind !== 'pdf_url') return classified.value
+  // Only URLs carry query strings/fragments; '?' and '#' are legal in file names.
+  const location = classified.kind === 'pdf_url' ? (classified.value.split(/[?#]/)[0] ?? classified.value) : classified.value
+  const name = location.split(/[\\/]/).filter(Boolean).pop() ?? ''
+  const stem = name.replace(/\.pdf$/i, '')
+  if (classified.kind === 'local_pdf') return stem || classified.value
+  try {
+    return decodeURIComponent(stem) || classified.value
+  } catch {
+    return stem || classified.value
+  }
+}
+
+function nonBlank(value: string | undefined): string | undefined {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : undefined
 }

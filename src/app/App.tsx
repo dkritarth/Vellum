@@ -8,7 +8,7 @@ import { Reader } from './Reader'
 import { ReaderToolbar } from './ReaderToolbar'
 import type { HighlightColor } from './ReaderToolbar'
 import { Sidebar } from './Sidebar'
-import type { NavItem } from './Sidebar'
+import type { FooterItem, NavItem } from './Sidebar'
 import { TabStrip } from './TabStrip'
 import type { PaperTab } from './TabStrip'
 import { RightPanel, type RightPanelTab } from './RightPanel'
@@ -52,6 +52,17 @@ export function App(): JSX.Element {
   const [selectedChatSessionId, setSelectedChatSessionId] = useState<number | null>(null)
   const [deletedSessionIds, setDeletedSessionIds] = useState<readonly number[]>([])
   const [chatBanner, setChatBanner] = useState<string | null>(null)
+  // Library reached via the Search nav item: highlight Search and focus the
+  // title search box. The nonce re-focuses it on repeat clicks.
+  const [libraryViaSearch, setLibraryViaSearch] = useState(false)
+  const [searchFocusNonce, setSearchFocusNonce] = useState(0)
+  // Bumped when a paper is dropped on a sidebar collection so the Library
+  // re-reads tags and the filtered list.
+  const [libraryRefreshNonce, setLibraryRefreshNonce] = useState(0)
+
+  const activeNavItem: NavItem | null =
+    view === 'reader' ? 'Home' : view === 'library' ? (libraryViaSearch ? 'Search' : 'Library') : null
+  const activeFooterItem: FooterItem | null = view === 'trash' ? 'Trash' : view === 'usage' ? 'Usage' : null
 
   // App owns navigation. A lookup may commit only while its request is current.
   const chatNavigation = useRef<{ sessionId: number } | null>(null)
@@ -90,6 +101,7 @@ export function App(): JSX.Element {
   function handleSelectCollection(id: number | null, name: string | null): void {
     setSelectedCollectionId(id)
     setSelectedCollectionName(name)
+    setLibraryViaSearch(false)
     navigateView('library')
   }
 
@@ -132,15 +144,21 @@ export function App(): JSX.Element {
     navigateView('reader')
   }
 
-  // Closing the active tab activates its right neighbour (or the left one
-  // when it was last); closing the only tab leaves the empty Reader.
+  // Plain Library (not reached via Search): no Search highlight or focus.
+  function showLibrary(): void {
+    setLibraryViaSearch(false)
+    navigateView('library')
+  }
+
+  // Close a tab. Closing the active one activates its right neighbour, else
+  // its left one, else nothing (the Reader's empty state).
   function closeTab(id: string): void {
     const index = tabs.findIndex((tab) => tab.id === id)
     if (index === -1) return
     const remaining = tabs.filter((tab) => tab.id !== id)
     setTabs(remaining)
     if (activeTabId === id) {
-      const next = remaining[Math.min(index, remaining.length - 1)]
+      const next = remaining[index] ?? remaining[index - 1] ?? null
       setActiveTabId(next ? next.id : null)
     }
   }
@@ -148,7 +166,17 @@ export function App(): JSX.Element {
   function handleNavChange(item: NavItem): void {
     if (item === 'Create') {
       setIsIngestOpen(true)
+    } else if (item === 'Search') {
+      setLibraryViaSearch(true)
+      setSearchFocusNonce((n) => n + 1)
+      navigateView('library')
     } else {
+      setLibraryViaSearch(false)
+      if (item === 'Library') {
+        // The Library item means "all papers"; collection rows filter.
+        setSelectedCollectionId(null)
+        setSelectedCollectionName(null)
+      }
       navigateView(item === 'Library' ? 'library' : 'reader')
     }
   }
@@ -163,7 +191,13 @@ export function App(): JSX.Element {
 
   return (
     <div className={styles.shell}>
-      <TabStrip tabs={tabs} activeTabId={activeTabId} onSelectTab={selectTab} onCloseTab={closeTab} />
+      <TabStrip
+        tabs={tabs}
+        activeTabId={activeTabId}
+        onSelectTab={selectTab}
+        onCloseTab={closeTab}
+        onNewTab={showLibrary}
+      />
       <div className={styles.body}>
         <Sidebar
           onNavChange={handleNavChange}
@@ -174,6 +208,9 @@ export function App(): JSX.Element {
           onSessionDeleted={handleSessionDeleted}
           onSelectTrash={() => navigateView('trash')}
           onSelectUsage={() => navigateView('usage')}
+          activeNavItem={activeNavItem}
+          activeFooterItem={activeFooterItem}
+          onPaperAssigned={() => setLibraryRefreshNonce((n) => n + 1)}
         />
         <main className={styles.centerPane} aria-label="Paper view">
           {chatBanner && (
@@ -185,15 +222,17 @@ export function App(): JSX.Element {
           <div className={styles.centerContent}>
             {view === 'trash' ? (
               <TrashView
-                onBackToLibrary={() => navigateView('library')}
+                onBackToLibrary={showLibrary}
               />
             ) : view === 'usage' ? (
               <UsageView
-                onBackToLibrary={() => navigateView('library')}
+                onBackToLibrary={showLibrary}
               />
             ) : view === 'library' ? (
               <Library
                 onOpenPaper={openPaper}
+                focusSearchNonce={libraryViaSearch ? searchFocusNonce : 0}
+                refreshNonce={libraryRefreshNonce}
                 selectedCollectionId={selectedCollectionId}
                 selectedCollectionName={selectedCollectionName}
                 onClearCollectionFilter={() => {

@@ -23,7 +23,8 @@
     "test:gate:usage": "node test/usage-live.mjs",
     "dist": "electron-vite build && electron-rebuild --force --only better-sqlite3 && electron-builder --linux --publish never",
     "test:gate:reader": "node test/reader-gate.mjs",
-    "test:gate:reader-scroll-zoom": "node test/reader-scroll-zoom-gate.mjs"
+    "test:gate:reader-scroll-zoom": "node test/reader-scroll-zoom-gate.mjs",
+    "test:gate:app-ux": "node test/app-ux-live.mjs"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.2.1",

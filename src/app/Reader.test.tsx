@@ -17,6 +17,7 @@ import {
   clampScale,
   countOccurrences,
   expandCitationNumbers,
+  clearReaderViewState,
   injectCitationMarkers,
   rangeFromAnchor,
   Reader,
@@ -69,6 +70,8 @@ vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
       this.items = opts.textContentSource.items
     }
 
+    cancel(): void {}
+
     render(): Promise<void> {
       for (const item of this.items) {
         const span = document.createElement('span')
@@ -84,6 +87,10 @@ vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
 vi.mock('pdfjs-dist/legacy/build/pdf.worker.mjs?url', () => ({ default: 'worker-url' }))
 
 beforeEach(() => {
+  clearReaderViewState()
+  // jsdom has no 2d canvas context and logs "Not implemented" for
+  // getContext; return null quietly (ReaderPage skips the raster then).
+  HTMLCanvasElement.prototype.getContext = (() => null) as typeof HTMLCanvasElement.prototype.getContext
   getDocumentMock.mockReset()
   getDocumentMock.mockReturnValue({ promise: Promise.resolve(fakePdfDoc()) })
 
@@ -425,16 +432,14 @@ describe('Reader with a loaded document', () => {
   })
 })
 
-// Locates the rendered text-layer div: DOM order in Reader.tsx's pageLayer is
-// <canvas />, <div (text layer) />, <div (highlight overlay) /> — no
-// data-testid is added to production code for this, so tests navigate that
-// fixed structural order instead.
-function getTextLayer(container: HTMLElement): HTMLElement {
-  return container.querySelector('canvas')!.nextElementSibling as HTMLElement
+// Each page slot (ReaderPage) carries data-page-number and holds its own
+// text layer and overlay container.
+function getTextLayer(container: HTMLElement, page = 1): HTMLElement {
+  return container.querySelector(`[data-page-number="${page}"] [data-text-layer]`) as HTMLElement
 }
 
-function getOverlayContainer(container: HTMLElement): HTMLElement {
-  return getTextLayer(container).nextElementSibling as HTMLElement
+function getOverlayContainer(container: HTMLElement, page = 1): HTMLElement {
+  return container.querySelector(`[data-page-number="${page}"] [data-highlight-overlay]`) as HTMLElement
 }
 
 describe('Reader highlight capture [P2-02]', () => {
@@ -534,7 +539,7 @@ describe('Reader jump/flash seam [P2-02]', () => {
     // Navigated to the jump target's page.
     await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('2 of 2'))
 
-    const overlayContainer = getOverlayContainer(container)
+    const overlayContainer = getOverlayContainer(container, 2)
     await waitFor(() => expect(overlayContainer.children.length).toBe(1))
 
     // Flash applies a second CSS-module class (`highlightRect` +
@@ -704,5 +709,230 @@ describe('Reader selection actions [R1-05]', () => {
     // Clicking Add to chat calls callback with quote and page number
     fireEvent.click(addToChat)
     expect(onAddToChat).toHaveBeenCalledWith('Introduction', 1)
+  })
+})
+
+function selectText(textLayer: HTMLElement, start: number, end: number): void {
+  const textNode = textLayer.querySelector('span')!.firstChild!
+  const range = document.createRange()
+  range.setStart(textNode, start)
+  range.setEnd(textNode, end)
+  const selection = window.getSelection()!
+  selection.removeAllRanges()
+  selection.addRange(range)
+}
+
+describe('Reader continuous pages (#198)', () => {
+  it('lays out one slot per page, each with its own text layer', async () => {
+    const { container } = render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(container.querySelectorAll('[data-page-slot]')).toHaveLength(2))
+    await waitFor(() => expect(getTextLayer(container, 2)?.textContent).toBe('Vellum reads PDFs offline'))
+    expect(getTextLayer(container, 1).textContent).toBe('Introduction to Vellum')
+  })
+
+  it('sends a selection on page 2 to chat with page 2', async () => {
+    const onAddToChat = vi.fn()
+    const { container } = render(<Reader slug="my-paper" onAddToChat={onAddToChat} />)
+    await waitFor(() => expect(getTextLayer(container, 2)?.querySelector('span')).not.toBeNull())
+
+    selectText(getTextLayer(container, 2), 0, 6)
+    fireEvent.mouseUp(getTextLayer(container, 2))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add to chat' }))
+    expect(onAddToChat).toHaveBeenCalledWith('Vellum', 2)
+  })
+
+  it('creates a highlight on page 2 and draws it only on page 2', async () => {
+    window.vellum.highlightsCreate = vi.fn().mockImplementation(async (input: { page: number; anchor: string }) => ({
+      id: 'h2',
+      paperSlug: 'my-paper',
+      page: input.page,
+      color: 'blue',
+      quote: 'Vellum',
+      anchor: input.anchor,
+      createdAt: 't',
+    }))
+    const { container } = render(<Reader slug="my-paper" highlightTool={{ active: true, color: 'blue' }} />)
+    await waitFor(() => expect(getTextLayer(container, 2)?.querySelector('span')).not.toBeNull())
+
+    selectText(getTextLayer(container, 2), 0, 6)
+    fireEvent.mouseUp(getTextLayer(container, 2))
+
+    await waitFor(() =>
+      expect(window.vellum.highlightsCreate).toHaveBeenCalledWith(expect.objectContaining({ page: 2, quote: 'Vellum' })),
+    )
+    await waitFor(() => expect(getOverlayContainer(container, 2).querySelectorAll('[data-highlight-id]')).toHaveLength(1))
+    expect(getOverlayContainer(container, 1).querySelectorAll('[data-highlight-id]')).toHaveLength(0)
+  })
+
+  it('offers Ask/Explain but no highlight swatches for a selection spanning pages', async () => {
+    const { container } = render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(getTextLayer(container, 2)?.querySelector('span')).not.toBeNull())
+
+    const range = document.createRange()
+    range.setStart(getTextLayer(container, 1).querySelector('span')!.firstChild!, 0)
+    range.setEnd(getTextLayer(container, 2).querySelector('span')!.firstChild!, 6)
+    window.getSelection()!.removeAllRanges()
+    window.getSelection()!.addRange(range)
+    fireEvent.mouseUp(getTextLayer(container, 2))
+
+    expect(await screen.findByRole('button', { name: 'Explain' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Highlight yellow' })).toBeNull()
+  })
+})
+
+describe('Reader pinch and keyboard zoom (#199)', () => {
+  function viewport(container: HTMLElement): HTMLElement {
+    return container.querySelector('[data-reader-viewport]') as HTMLElement
+  }
+
+  it('zooms on Ctrl+wheel (trackpad pinch) and blocks the browser zoom', async () => {
+    const { container } = render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2'))
+
+    const pinchOut = new WheelEvent('wheel', { deltaY: -10, ctrlKey: true, bubbles: true, cancelable: true })
+    act(() => {
+      viewport(container).dispatchEvent(pinchOut)
+    })
+    expect(pinchOut.defaultPrevented).toBe(true)
+    expect(screen.getByLabelText('Zoom')).toHaveTextContent('111%')
+    // The page slot carries the new scale for its text layer.
+    const slot = container.querySelector('[data-page-number="1"]') as HTMLElement
+    expect(slot.style.getPropertyValue('--total-scale-factor')).toBe('1.105')
+  })
+
+  it('leaves a plain wheel as a scroll', async () => {
+    const { container } = render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2'))
+
+    const scroll = new WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true })
+    act(() => {
+      viewport(container).dispatchEvent(scroll)
+    })
+    expect(scroll.defaultPrevented).toBe(false)
+    expect(screen.getByLabelText('Zoom')).toHaveTextContent('100%')
+  })
+
+  it('handles Ctrl/Cmd + = - 0 while focus is in the reader or on body', async () => {
+    const { container } = render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2'))
+
+    viewport(container).focus()
+    fireEvent.keyDown(viewport(container), { key: '=', ctrlKey: true })
+    expect(screen.getByLabelText('Zoom')).toHaveTextContent('125%')
+    fireEvent.keyDown(document.body, { key: '=', metaKey: true })
+    expect(screen.getByLabelText('Zoom')).toHaveTextContent('150%')
+    fireEvent.keyDown(viewport(container), { key: '-', ctrlKey: true })
+    expect(screen.getByLabelText('Zoom')).toHaveTextContent('125%')
+    fireEvent.keyDown(viewport(container), { key: '0', ctrlKey: true })
+    expect(screen.getByLabelText('Zoom')).toHaveTextContent('100%')
+  })
+
+  it('ignores zoom keys typed while focus is outside the reader', async () => {
+    const outside = document.createElement('textarea')
+    document.body.appendChild(outside)
+    render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2'))
+
+    outside.focus()
+    fireEvent.keyDown(outside, { key: '=', ctrlKey: true })
+    expect(screen.getByLabelText('Zoom')).toHaveTextContent('100%')
+    outside.remove()
+  })
+})
+
+describe('Reader search hits and clearing', () => {
+  it('marks hits on every rendered page and clears them when the query is edited or Escaped', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(getTextLayer(container, 2)?.querySelector('span')).not.toBeNull())
+
+    const input = screen.getByLabelText('Search in document')
+    await user.type(input, 'vellum{Enter}')
+    await waitFor(() => expect(screen.getByLabelText('Search matches')).toHaveTextContent('1 / 2'))
+    expect(getOverlayContainer(container, 1).querySelectorAll('[data-search-hit]')).toHaveLength(1)
+    expect(getOverlayContainer(container, 2).querySelectorAll('[data-search-hit]')).toHaveLength(1)
+
+    // Enter again on the same query steps to the next match.
+    await user.type(input, '{Enter}')
+    await waitFor(() => expect(screen.getByLabelText('Search matches')).toHaveTextContent('2 / 2'))
+
+    // Editing the query drops the stale count and hit marks.
+    await user.type(input, 'x')
+    expect(screen.queryByLabelText('Search matches')).toBeNull()
+    expect(container.querySelectorAll('[data-search-hit]')).toHaveLength(0)
+
+    await user.type(input, '{Escape}')
+    expect(input).toHaveValue('')
+  })
+})
+
+describe('injectCitationMarkers idempotency', () => {
+  it('does not nest markers when run twice over the same text layer', () => {
+    const container = document.createElement('div')
+    container.innerHTML = '<span>see [1] and [2]</span>'
+    const index: ReferenceIndex = new Map([
+      [1, { number: 1, page: 2, text: 'A' }],
+      [2, { number: 2, page: 2, text: 'B' }],
+    ])
+    injectCitationMarkers(container, index)
+    injectCitationMarkers(container, index)
+    expect(container.querySelectorAll('button')).toHaveLength(2)
+    expect(container.querySelector('button button')).toBeNull()
+    expect(container.textContent).toBe('see [1] and [2]')
+  })
+})
+
+describe('Reader remembers zoom per paper (#202)', () => {
+  it('restores a paper\'s zoom when it is reopened', async () => {
+    const user = userEvent.setup()
+    const first = render(<Reader slug="paper-a" />)
+    await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2'))
+    await user.click(screen.getByRole('button', { name: 'Zoom in' }))
+    await user.click(screen.getByRole('button', { name: 'Zoom in' }))
+    expect(screen.getByLabelText('Zoom')).toHaveTextContent('150%')
+    first.unmount()
+
+    render(<Reader slug="paper-a" />)
+    await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2'))
+    expect(screen.getByLabelText('Zoom')).toHaveTextContent('150%')
+  })
+
+  it('opens a different paper at its own zoom, not the previous paper\'s', async () => {
+    const user = userEvent.setup()
+    const { rerender } = render(<Reader slug="paper-a" />)
+    await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2'))
+    await user.click(screen.getByRole('button', { name: 'Zoom in' }))
+    expect(screen.getByLabelText('Zoom')).toHaveTextContent('125%')
+
+    rerender(<Reader slug="paper-b" />)
+    await waitFor(() => expect(screen.getByLabelText('Zoom')).toHaveTextContent('100%'))
+    rerender(<Reader slug="paper-a" />)
+    await waitFor(() => expect(screen.getByLabelText('Zoom')).toHaveTextContent('125%'))
+  })
+})
+
+describe('Reader selection menu lifecycle', () => {
+  it('closes a stale menu when a new selection starts outside any text layer', async () => {
+    const { container } = render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(getTextLayer(container, 1)?.querySelector('span')).not.toBeNull())
+
+    selectText(getTextLayer(container, 1), 0, 12)
+    fireEvent.mouseUp(getTextLayer(container, 1))
+    expect(await screen.findByRole('button', { name: 'Explain' })).toBeInTheDocument()
+
+    // New selection anchored in the page column itself (e.g. a drag that
+    // began in the gap between pages).
+    const pages = container.querySelector('[data-page-slot]')!.parentElement!
+    const gap = document.createTextNode('gap text')
+    pages.appendChild(gap)
+    const range = document.createRange()
+    range.setStart(gap, 0)
+    range.setEnd(getTextLayer(container, 2).querySelector('span')!.firstChild!, 3)
+    window.getSelection()!.removeAllRanges()
+    window.getSelection()!.addRange(range)
+    fireEvent.mouseUp(pages)
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Explain' })).toBeNull())
   })
 })

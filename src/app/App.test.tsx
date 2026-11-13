@@ -120,6 +120,21 @@ describe('App shell', () => {
     expect(screen.queryByLabelText(/search papers by title/i)).not.toBeInTheDocument()
   })
 
+  it('closes the active paper tab and falls back to the empty Reader (#202)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'Library' }))
+    await user.click(await screen.findByText('Attention Is All You Need'))
+    expect(screen.getByRole('tab', { name: 'Attention Is All You Need' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Close Attention Is All You Need' }))
+
+    expect(screen.queryByRole('tab', { name: 'Attention Is All You Need' })).not.toBeInTheDocument()
+    expect(screen.getByText(/No papers open/i)).toBeInTheDocument()
+    expect(screen.getByText('No paper open')).toBeInTheDocument()
+  })
+
   it('clicking Create opens IngestModal, and ingesting a paper opens it into a new tab', async () => {
     const user = userEvent.setup()
     render(<App />)

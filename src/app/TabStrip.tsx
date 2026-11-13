@@ -14,25 +14,46 @@ interface TabStripProps {
   tabs?: PaperTab[]
   activeTabId?: string | null
   onSelectTab?: (id: string) => void
+  /** Close a tab (× button or middle-click). Omitted = tabs can't close. */
+  onCloseTab?: (id: string) => void
 }
 
-export function TabStrip({ tabs = [], activeTabId = null, onSelectTab }: TabStripProps): JSX.Element {
+export function TabStrip({ tabs = [], activeTabId = null, onSelectTab, onCloseTab }: TabStripProps): JSX.Element {
   return (
     <div className={styles.tabStrip} role="tablist" aria-label="Open papers">
       {tabs.length === 0 ? (
         <div className={styles.empty}>No papers open — open one from Library</div>
       ) : (
         tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={tab.id === activeTabId}
-            className={tab.id === activeTabId ? `${styles.tab} ${styles.tabActive}` : styles.tab}
-            onClick={() => onSelectTab?.(tab.id)}
-          >
-            {tab.title}
-          </button>
+          <div key={tab.id} className={tab.id === activeTabId ? `${styles.tabItem} ${styles.tabActive}` : styles.tabItem}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab.id === activeTabId}
+              className={styles.tab}
+              title={tab.title}
+              onClick={() => onSelectTab?.(tab.id)}
+              onAuxClick={(event) => {
+                if (event.button === 1 && onCloseTab) {
+                  event.preventDefault()
+                  onCloseTab(tab.id)
+                }
+              }}
+            >
+              {tab.title}
+            </button>
+            {onCloseTab ? (
+              <button
+                type="button"
+                className={styles.closeButton}
+                aria-label={`Close ${tab.title}`}
+                title="Close tab"
+                onClick={() => onCloseTab(tab.id)}
+              >
+                ×
+              </button>
+            ) : null}
+          </div>
         ))
       )}
       <button type="button" className={styles.newTabButton} aria-label="New tab" disabled>

@@ -164,54 +164,56 @@ export function App(): JSX.Element {
         />
         <main className={styles.centerPane} aria-label="Paper view">
           {chatBanner && (
-            <div role="alert" style={{ background: '#742a2a', color: '#fff', padding: '6px 12px', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div role="alert" className={styles.chatBanner}>
               <span>{chatBanner}</span>
-              <button type="button" onClick={() => setChatBanner(null)} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}>✕</button>
+              <button type="button" aria-label="Dismiss chat navigation error" onClick={() => setChatBanner(null)} className={styles.dismissBanner}>✕</button>
             </div>
           )}
-          {view === 'trash' ? (
-            <TrashView
-              onBackToLibrary={() => navigateView('library')}
-            />
-          ) : view === 'usage' ? (
-            <UsageView
-              onBackToLibrary={() => navigateView('library')}
-            />
-          ) : view === 'library' ? (
-            <Library
-              onOpenPaper={openPaper}
-              selectedCollectionId={selectedCollectionId}
-              selectedCollectionName={selectedCollectionName}
-              onClearCollectionFilter={() => {
-                setSelectedCollectionId(null)
-                setSelectedCollectionName(null)
-                navigateView('library')
-              }}
-              onTrashPaper={(slug) => {
-                setTabs((current) => current.filter((tab) => tab.id !== slug))
-                if (activeTabId === slug) {
-                  const remaining = tabs.filter((tab) => tab.id !== slug)
-                  setActiveTabId(remaining.length > 0 ? remaining[remaining.length - 1].id : null)
-                }
-              }}
-            />
-          ) : (
-            <>
-              <ReaderToolbar
-                active={highlightActive}
-                color={highlightColor}
-                onToggle={() => setHighlightActive((current) => !current)}
-                onColorChange={setHighlightColor}
+          <div className={styles.centerContent}>
+            {view === 'trash' ? (
+              <TrashView
+                onBackToLibrary={() => navigateView('library')}
               />
-              <Reader
-                slug={activeTabId ?? undefined}
-                highlightTool={{ active: highlightActive, color: highlightColor }}
-                jumpTarget={jumpTarget}
-                onAddToChat={handleAddToChat}
-                onExplain={handleExplain}
+            ) : view === 'usage' ? (
+              <UsageView
+                onBackToLibrary={() => navigateView('library')}
               />
-            </>
-          )}
+            ) : view === 'library' ? (
+              <Library
+                onOpenPaper={openPaper}
+                selectedCollectionId={selectedCollectionId}
+                selectedCollectionName={selectedCollectionName}
+                onClearCollectionFilter={() => {
+                  setSelectedCollectionId(null)
+                  setSelectedCollectionName(null)
+                  navigateView('library')
+                }}
+                onTrashPaper={(slug) => {
+                  setTabs((current) => current.filter((tab) => tab.id !== slug))
+                  if (activeTabId === slug) {
+                    const remaining = tabs.filter((tab) => tab.id !== slug)
+                    setActiveTabId(remaining.length > 0 ? remaining[remaining.length - 1].id : null)
+                  }
+                }}
+              />
+            ) : (
+              <>
+                <ReaderToolbar
+                  active={highlightActive}
+                  color={highlightColor}
+                  onToggle={() => setHighlightActive((current) => !current)}
+                  onColorChange={setHighlightColor}
+                />
+                <Reader
+                  slug={activeTabId ?? undefined}
+                  highlightTool={{ active: highlightActive, color: highlightColor }}
+                  jumpTarget={jumpTarget}
+                  onAddToChat={handleAddToChat}
+                  onExplain={handleExplain}
+                />
+              </>
+            )}
+          </div>
         </main>
         <RightPanel
           slug={activeTabId ?? undefined}

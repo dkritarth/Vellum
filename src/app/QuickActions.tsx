@@ -7,5 +7,5 @@ const ACTIONS = [
 ] as const
 
 export function QuickActions({ disabled, onPrompt }: { disabled: boolean; onPrompt: (prompt: string) => void }): JSX.Element {
-  return <div className={styles.actions} aria-label="Quick actions">{ACTIONS.map(([label, prompt]) => <button key={label} type="button" disabled={disabled} onClick={() => onPrompt(prompt)}>{label}</button>)}</div>
+  return <div className={styles.actions} role="group" aria-label="Quick actions">{ACTIONS.map(([label, prompt]) => <button key={label} type="button" disabled={disabled} onClick={() => onPrompt(prompt)}>{label}</button>)}</div>
 }

@@ -11,7 +11,7 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import type { Database } from 'better-sqlite3'
@@ -43,6 +43,7 @@ import type { NoteRecord } from '../core/notes/repo.js'
 import { createHighlight, deleteHighlight, listHighlights } from '../core/highlights/repo.js'
 import type { HighlightRecord } from '../core/highlights/repo.js'
 import { openDb } from '../core/store/db.js'
+import { resolveRuntimePaths } from './paths.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -68,27 +69,18 @@ function resolvePreloadPath(): string {
   return join(__dirname, '../preload/index.js')
 }
 
-function resolveDataRoot(): string {
-  const override = process.env['VELLUM_DATA_DIR'] ?? process.env['VELLUM_DATA_ROOT']
-  if (typeof override === 'string' && override.trim() !== '') {
-    return resolve(override.trim())
-  }
-  return resolve(process.cwd(), 'data')
+function runtimePaths() {
+  return resolveRuntimePaths({
+    isPackaged: app.isPackaged,
+    userData: app.isPackaged ? app.getPath('userData') : '',
+    cwd: process.cwd(),
+    resourcesPath: process.resourcesPath,
+    mainDirectory: __dirname,
+  }, process.env)
 }
 
-// Preload the better-sqlite3 native addon under a canonical absolute path
-// resolved from this module's directory (not process.cwd()). This ensures
-// Node's module cache has the .node file registered before any later
-// better-sqlite3 require, preventing the bindings package from falling back
-// to process.cwd() during module-root detection (which fails when Electron
-// is launched with a cwd other than the repo root).
-const _nativeBindingPath = resolve(__dirname, '../resources/native/better_sqlite3.electron.node')
-let _preloadedBetterSqlite3: ReturnType<typeof require> | undefined
-try {
-  _preloadedBetterSqlite3 = require(_nativeBindingPath)
-} catch {
-  // If the .node is missing (e.g. development without prebuilt binary),
-  // we let openDb() handle the fallback via resolveNativeBinding().
+function resolveDataRoot(): string {
+  return runtimePaths().dataRoot
 }
 
 function createWindow(): void {
@@ -117,8 +109,8 @@ function createWindow(): void {
 // Placeholder handler proves the preload bridge works end-to-end.
 ipcMain.handle('vellum:ping', () => 'pong')
 
-// [P1-09] Reader's only file-access seam: reads data/papers/<slug>/paper.pdf
-// relative to cwd (same convention as core/store/db.ts's DEFAULT_DB_PATH).
+// [P1-09] Reader's only file-access seam: reads papers/<slug>/paper.pdf
+// from the same data root used by ingest and the database.
 // Returns null (not a thrown error) for a missing/invalid slug or file so
 // the renderer can render its empty state instead of crashing.
 ipcMain.handle('vellum:read-paper-file', async (_event, slug: unknown): Promise<ArrayBuffer | null> => {
@@ -137,11 +129,14 @@ ipcMain.handle('vellum:read-paper-file', async (_event, slug: unknown): Promise<
 // (schema-migrated via core/store/db.ts's openDb()) rather than at module
 // load — keeps `import`ing main.ts side-effect-free for tests, and means the
 // data/ dir isn't created until a paper is actually ingested.
-// Uses the preloaded native binding (resolved from __dirname, not process.cwd())
-// so the database works regardless of the cwd Electron was launched with.
+// Electron uses an explicit native resource; missing/incompatible resources
+// fail at their actual path instead of silently trying a repository fallback.
 let db: Database | undefined
 function getDb(): Database {
-  if (!db) db = openDb({ path: join(resolveDataRoot(), 'app.db'), nativeBinding: _preloadedBetterSqlite3 ? _nativeBindingPath : undefined })
+  if (!db) db = openDb({
+    path: join(resolveDataRoot(), 'app.db'),
+    nativeBinding: process.versions.electron ? runtimePaths().nativeBinding : undefined,
+  })
   return db
 }
 

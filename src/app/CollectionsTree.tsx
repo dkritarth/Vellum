@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CollectionTreeItem } from '../../electron/preload'
 import styles from './CollectionsTree.module.css'
 
@@ -22,24 +22,38 @@ export function CollectionsTree({
   // persistent failure renders one stable message rather than a new one per tick.
   const [loadError, setLoadError] = useState<string | null>(null)
 
+  // Initial load, polls, and mutation reloads share one publication owner.
+  const mounted = useRef(false)
+  const refreshSequence = useRef(0)
+
   async function refreshTree(): Promise<void> {
+    if (!mounted.current) return
+    const sequence = ++refreshSequence.current
+    const isCurrent = () => mounted.current && sequence === refreshSequence.current
     try {
       if (window.vellum?.collectionsTree) {
         const data = await window.vellum.collectionsTree()
+        if (!isCurrent()) return
         setTree(data)
         setLoadError(null)
       }
     } catch (err) {
+      if (!isCurrent()) return
       setLoadError(`Could not load collections: ${errorMessage(err)}`)
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
   }
 
   useEffect(() => {
+    mounted.current = true
     void refreshTree()
     const interval = setInterval(refreshTree, 1000)
-    return () => clearInterval(interval)
+    return () => {
+      mounted.current = false
+      ++refreshSequence.current
+      clearInterval(interval)
+    }
   }, [])
 
   async function handleCreateSubmit(): Promise<void> {

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { StrictMode } from 'react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CollectionsTree } from './CollectionsTree'
 
@@ -196,5 +197,135 @@ describe('CollectionsTree [L2-01]', () => {
       expect(onSelect).toHaveBeenCalledWith(null, null)
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     })
+  })
+})
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (error: Error) => void
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej })
+  return { promise, resolve, reject }
+}
+
+describe('CollectionsTree refresh ownership', () => {
+  const created = { id: 3, name: 'New research', parentId: null, paperCount: 0, children: [] }
+  afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers() })
+
+  for (const outcome of ['success', 'error']) {
+    it(`keeps created collection and selection after obsolete initial ${outcome}`, async () => {
+      const old = deferred<typeof created[]>()
+      window.vellum = {
+        ...window.vellum,
+        collectionsTree: vi.fn().mockReturnValueOnce(old.promise).mockResolvedValue([created]),
+        collectionsCreate: vi.fn().mockResolvedValue(created),
+      }
+      const onSelect = vi.fn()
+      render(<CollectionsTree selectedCollectionId={null} onSelectCollection={onSelect} />)
+      fireEvent.click(screen.getByRole('button', { name: 'New Collection' }))
+      fireEvent.change(screen.getByPlaceholderText('Collection name...'), { target: { value: created.name } })
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+      await act(async () => {})
+      expect(screen.getByText(created.name)).toBeVisible()
+      expect(onSelect).toHaveBeenCalledWith(created.id, created.name)
+      await act(async () => {
+        if (outcome === 'success') old.resolve([])
+        else old.reject(new Error('Obsolete failure'))
+      })
+      expect(screen.getByText(created.name)).toBeVisible()
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
+  }
+
+  it('keeps loading until the latest overlapping poll settles, preserves its error, then recovers', async () => {
+    vi.useFakeTimers()
+    const initial = deferred<typeof created[]>()
+    const current = deferred<typeof created[]>()
+    window.vellum.collectionsTree = vi.fn()
+      .mockReturnValueOnce(initial.promise)
+      .mockReturnValueOnce(current.promise)
+      .mockResolvedValue([created])
+    render(<CollectionsTree selectedCollectionId={null} onSelectCollection={vi.fn()} />)
+    await act(async () => { vi.advanceTimersByTime(1000) })
+    await act(async () => { initial.resolve([]) })
+    expect(screen.getByText('Loading collections...')).toBeVisible()
+    expect(screen.queryByText(/No collections yet/)).not.toBeInTheDocument()
+    await act(async () => { current.reject(new Error('Current failure')) })
+    expect(screen.getByRole('alert')).toHaveTextContent('Current failure')
+    expect(screen.queryByText('Loading collections...')).not.toBeInTheDocument()
+    await act(async () => { vi.advanceTimersByTime(1000) })
+    expect(screen.getByText(created.name)).toBeVisible()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('does not let an obsolete successful poll dismiss a current failure', async () => {
+    vi.useFakeTimers()
+    const old = deferred<typeof created[]>()
+    window.vellum.collectionsTree = vi.fn()
+      .mockResolvedValueOnce([created])
+      .mockReturnValueOnce(old.promise)
+      .mockRejectedValue(new Error('Latest failure'))
+    render(<CollectionsTree selectedCollectionId={null} onSelectCollection={vi.fn()} />)
+    await act(async () => {})
+    await act(async () => { vi.advanceTimersByTime(2000) })
+    expect(screen.getByRole('alert')).toHaveTextContent('Latest failure')
+    await act(async () => { old.resolve([]) })
+    expect(screen.getByRole('alert')).toHaveTextContent('Latest failure')
+    expect(screen.getByText(created.name)).toBeVisible()
+  })
+
+  for (const mutation of ['rename', 'delete']) {
+    it(`ignores an obsolete ${mutation} refresh after a newer poll`, async () => {
+      vi.useFakeTimers()
+      const old = deferred<typeof created[]>()
+      const renamed = { ...created, name: 'Renamed research' }
+      const latest = mutation === 'rename' ? [renamed] : []
+      window.vellum.collectionsTree = vi.fn().mockResolvedValueOnce([created])
+        .mockReturnValueOnce(old.promise).mockResolvedValue(latest)
+      window.vellum.collectionsRename = vi.fn().mockResolvedValue(undefined)
+      window.vellum.collectionsDelete = vi.fn().mockResolvedValue(undefined)
+      vi.spyOn(window, 'confirm').mockReturnValue(true)
+      const onSelect = vi.fn()
+      render(<CollectionsTree selectedCollectionId={created.id} onSelectCollection={onSelect} />)
+      await act(async () => {})
+      fireEvent.click(screen.getByRole('button', { name: `${mutation === 'rename' ? 'Rename' : 'Delete'} ${created.name}` }))
+      if (mutation === 'rename') {
+        fireEvent.change(screen.getByDisplayValue(created.name), { target: { value: renamed.name } })
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+      }
+      await act(async () => {})
+      await act(async () => { vi.advanceTimersByTime(1000) })
+      await act(async () => { old.resolve([created]) })
+      expect(screen.queryByText(created.name)).not.toBeInTheDocument()
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      expect(onSelect).toHaveBeenCalledWith(...(mutation === 'rename' ? [created.id, renamed.name] : [null, null]))
+      if (mutation === 'rename') expect(screen.getByText(renamed.name)).toBeVisible()
+      else expect(screen.getByText(/No collections yet/)).toBeVisible()
+    })
+  }
+
+  it('retires requests across effect cleanup and remount', async () => {
+    vi.useFakeTimers()
+    const old = deferred<typeof created[]>()
+    const list = vi.fn().mockReturnValueOnce(old.promise).mockResolvedValue([created])
+    window.vellum.collectionsTree = list
+    const first = render(<CollectionsTree selectedCollectionId={null} onSelectCollection={vi.fn()} />)
+    first.unmount()
+    render(<CollectionsTree selectedCollectionId={null} onSelectCollection={vi.fn()} />)
+    await act(async () => { old.reject(new Error('Unmounted failure')) })
+    expect(screen.getByText(created.name)).toBeVisible()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await act(async () => { vi.advanceTimersByTime(1000) })
+    expect(list).toHaveBeenCalledTimes(3)
+  })
+
+  it('retires the first StrictMode effect request when its effect restarts', async () => {
+    const old = deferred<typeof created[]>()
+    window.vellum.collectionsTree = vi.fn().mockReturnValueOnce(old.promise).mockResolvedValue([created])
+    render(<StrictMode><CollectionsTree selectedCollectionId={null} onSelectCollection={vi.fn()} /></StrictMode>)
+    await act(async () => {})
+    expect(screen.getByText(created.name)).toBeVisible()
+    await act(async () => { old.resolve([]) })
+    expect(screen.getByText(created.name)).toBeVisible()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

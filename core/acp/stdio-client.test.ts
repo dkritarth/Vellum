@@ -8,7 +8,7 @@
 //    session/update routing) without requiring a live, signed-in adapter CLI
 //    on PATH. See core/acp/README.md for the separate *live* smoke test.
 
-import { spawn, type ChildProcessByStdio } from 'node:child_process'
+import { spawn, spawnSync, type ChildProcessByStdio } from 'node:child_process'
 import type { Readable, Writable } from 'node:stream'
 import { describe, expect, it } from 'vitest'
 
@@ -383,6 +383,65 @@ describe('StdioAcpClient', () => {
 })
 
 describe('buildAdapterEnv', () => {
+  it('delivers a trimmed Codex model and existing config to a real subprocess without mutating source', () => {
+    const sourceEnv = Object.freeze({
+      VELLUM_CODEX_MODEL: '  model "quoted" \n name  ',
+      CODEX_CONFIG: '{"model":"old","service_tier":"default","nested":{"keep":true}}',
+    })
+    const child = spawnSync(process.execPath, ['-e', 'process.stdout.write(process.env.CODEX_CONFIG)'], {
+      env: buildAdapterEnv(sourceEnv, 'codex'),
+      encoding: 'utf8',
+    })
+    expect(child.status).toBe(0)
+    expect(JSON.parse(child.stdout)).toEqual({
+      model: 'model "quoted" \n name',
+      service_tier: 'default',
+      nested: { keep: true },
+    })
+    expect(sourceEnv.CODEX_CONFIG).toBe('{"model":"old","service_tier":"default","nested":{"keep":true}}')
+  })
+
+  it('creates Codex config when absent without introducing unrelated defaults', () => {
+    const sourceEnv = Object.freeze({ VELLUM_CODEX_MODEL: '  gpt-6.1-sol  ' })
+    expect(buildAdapterEnv(sourceEnv, 'codex')).toEqual({
+      ...sourceEnv,
+      CODEX_CONFIG: '{"model":"gpt-6.1-sol"}',
+    })
+    expect(sourceEnv).not.toHaveProperty('CODEX_CONFIG')
+  })
+
+  it.each([undefined, '', ' \n '])('preserves raw config with no override (%j)', (model) => {
+    const sourceEnv = { VELLUM_CODEX_MODEL: model, CODEX_CONFIG: 'invalid but untouched' }
+    expect(buildAdapterEnv(sourceEnv, 'codex')).toEqual(sourceEnv)
+    expect(buildAdapterArgs('codex', sourceEnv)).toEqual([])
+  })
+
+  it.each(['{"secret":"do-not-echo"', 'null', '[]', '"do-not-echo"', '42', 'true', ''])(
+    'rejects invalid config safely when merging (%j)',
+    (config) => {
+      const sourceEnv = Object.freeze({ VELLUM_CODEX_MODEL: 'gpt-6.1-sol', CODEX_CONFIG: config })
+      let error: unknown
+      try {
+        buildAdapterEnv(sourceEnv, 'codex')
+      } catch (caught) {
+        error = caught
+      }
+      expect(error).toBeInstanceOf(Error)
+      if (!(error instanceof Error)) throw new Error('Expected a config validation error')
+      expect(error.message).toBe(
+        'Cannot apply VELLUM_CODEX_MODEL: CODEX_CONFIG must be a JSON object',
+      )
+      expect(error).not.toHaveProperty('cause')
+      expect(sourceEnv.CODEX_CONFIG).toBe(config)
+    },
+  )
+
+  it('leaves Claude config untouched even with a model override and invalid JSON', () => {
+    const sourceEnv = Object.freeze({ VELLUM_CODEX_MODEL: 'gpt-6.1-sol', CODEX_CONFIG: 'invalid' })
+    expect(buildAdapterEnv(sourceEnv, 'claude')).toEqual(sourceEnv)
+    expect(buildAdapterArgs('claude', sourceEnv)).toEqual([])
+  })
+
   it('strips CLAUDECODE and CLAUDE_CODE_SSE_PORT from the adapter child env', () => {
     const sourceEnv = {
       CLAUDECODE: '1',
@@ -403,7 +462,7 @@ describe('buildAdapterEnv', () => {
 })
 
 describe('buildAdapterArgs', () => {
-  it('passes an explicit Codex model override through the first-party adapter config interface', () => {
+  it('passes an explicit Codex model override through legacy adapter argv', () => {
     expect(buildAdapterArgs('codex', { VELLUM_CODEX_MODEL: 'gpt-5.5' })).toEqual([
       '-c',
       'model="gpt-5.5"',

@@ -17,11 +17,10 @@ import Database from 'better-sqlite3'
 import { MIGRATIONS, runMigrations } from '../store/migrate.js'
 
 import type { AcpClient, AcpPromptRequest, AcpSession, AcpUpdate } from '../acp/client.js'
-import { getPaper, listPapers, upsertPaper, restorePaper, trashPaper } from '../library/repo.js'
-import { getNote, upsertNote } from '../notes/repo.js'
-import { addChatMessage, createChatSession, getChatMessages, getLatestChatSession } from '../chat/repo.js'
+import { getPaper, listPapers, restorePaper, trashPaper, upsertPaper } from '../library/repo.js'
 import { createHighlight, listHighlights } from '../highlights/repo.js'
-import { createCollection, assignPaperToCollection, listPaperCollections } from '../collections/repo.js'
+import { addChatMessage, createChatSession, getChatMessages, getChatSession, getLatestChatSession } from '../chat/repo.js'
+import { assignPaperToCollection, createCollection, listPaperCollections } from '../collections/repo.js'
 import { openDb } from '../store/db.js'
 import { getNote, upsertNote } from '../notes/repo.js'
 import { ingest } from './index.js'
@@ -883,6 +882,63 @@ describe('ingest', () => {
       expect(pdfBytesLen).toBeGreaterThan(0)
     } finally {
       db.close()
+    }
+  })
+
+  it('re-ingests legacy aliases without losing research or reconciling historical generic imports', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-'))
+    const dbPath = join(tmpDir, 'app.db')
+    let db = openDb({ path: dbPath })
+    const pdf = readFileSync(FIXTURE_PDF)
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === 'https://export.arxiv.org/api/query?id_list=math%2F0309136') {
+        return new Response('<feed><entry><title>Regular points in affine Springer fibers</title><author><name>Author</name></author><published>2003-09-01</published></entry></feed>')
+      }
+      if (url === 'https://export.arxiv.org/pdf/math%2F0309136') {
+        return new Response(new Uint8Array(pdf))
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    }))
+
+    try {
+      // A pre-fix generic import remains independently addressable, with its
+      // original files and research. No implicit migration is part of ingest.
+      const generic = await ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client: new FakeClient() })
+      upsertPaper(db, { ...getPaper(db, generic.slug)!, slug: 'pdf-0309136' })
+      const genericPaper = getPaper(db, 'pdf-0309136')
+      const genericNote = upsertNote(db, 'pdf-0309136', 'Historical PDF research')
+      const first = await ingest('math.AG/0309136', { db, dataDir: tmpDir, client: new FakeClient() })
+      expect(first.slug).toBe('arxiv-math-0309136')
+      expect(first.title).toBe('Regular points in affine Springer fibers')
+      const note = upsertNote(db, first.slug, 'Keep canonical research')
+      const highlight = createHighlight(db, {
+        id: 'legacy-highlight', paperSlug: first.slug, page: 1, color: 'yellow',
+        quote: 'Sample', anchor: '{}', createdAt: '2026-11-05T00:00:00.000Z',
+      })
+      const chat = createChatSession(db, { paperSlug: first.slug, backend: 'codex' })
+      const message = addChatMessage(db, { sessionId: chat.id, role: 'user', content: 'Explain this result' })
+      const collection = createCollection(db, { name: 'Legacy research' })
+      assignPaperToCollection(db, { paperSlug: first.slug, collectionId: collection.id })
+
+      const second = await ingest('https://arxiv.org/pdf/math/0309136.pdf', {
+        db, dataDir: tmpDir, client: new FakeClient(),
+      })
+      expect(second.paths).toEqual(first.paths)
+      expect(second.slug).toBe(first.slug)
+      db.close()
+      db = openDb({ path: dbPath })
+      expect(listPapers(db).filter(p => p.arxivId === 'math/0309136')).toHaveLength(1)
+      expect(getNote(db, first.slug)).toEqual(note)
+      expect(listHighlights(db, first.slug)).toEqual([highlight])
+      expect(getChatSession(db, chat.id)).toEqual(chat)
+      expect(getChatMessages(db, chat.id)).toEqual([message])
+      expect(listPaperCollections(db, first.slug)).toEqual([collection])
+      expect(getPaper(db, 'pdf-0309136')).toEqual(genericPaper)
+      expect(getNote(db, 'pdf-0309136')).toEqual(genericNote)
+      expect(readFileSync(generic.paths.pdfPath)).toEqual(pdf)
+    } finally {
+      db.close()
+      vi.unstubAllGlobals()
     }
   })
 })

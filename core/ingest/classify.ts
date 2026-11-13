@@ -21,11 +21,17 @@ export interface ClassifiedInput {
   value: string
 }
 
-// Matches bare arXiv ids (old and new style) and arxiv.org URLs.
+// Matches modern arXiv ids and arxiv.org URLs.
 // New style: 4 digits . 4-5 digits, optional version suffix (vN).
 const ARXIV_ID_RE = /^(\d{4}\.\d{4,5})(v\d+)?$/
 const ARXIV_URL_RE =
   /^https?:\/\/(?:www\.)?arxiv\.org\/(?:abs|pdf)\/(?<id>\d{4}\.\d{4,5})(?<version>v\d+)?(?:\.pdf)?\/?$/i
+
+// Legacy archive[.subject]/YYMMNNN identifiers. Subject class is redundant
+// identity and must be removed for arXiv API metadata lookup.
+const LEGACY_ARXIV_RE =
+  /^(?<archive>[a-z]+(?:-[a-z]+)*)(?:\.[a-z]{2})?\/(?<number>\d{2}(?:0[1-9]|1[0-2])(?!000)\d{3})(?<version>v[1-9]\d*)?(?:\.pdf)?$/i
+const LEGACY_ARXIV_URL_RE = /^https?:\/\/(?:www\.)?arxiv\.org\/(?:abs|pdf)\/(.+?)\/?$/i
 
 // DOI: "10.<registrant>/<suffix>" per the DOI handbook, bare or as a URL.
 const DOI_BARE_RE = /^10\.\d{4,9}\/\S+$/
@@ -65,6 +71,14 @@ export function classifyInput(raw: string): ClassifiedInput {
   }
   if (ARXIV_ID_RE.test(trimmed)) {
     return { kind: 'arxiv', slug: `arxiv-${trimmed}`, value: trimmed }
+  }
+
+  const legacyId = trimmed.match(LEGACY_ARXIV_URL_RE)?.[1] ?? trimmed
+  const legacyMatch = legacyId.match(LEGACY_ARXIV_RE)
+  if (legacyMatch?.groups) {
+    const { archive, number, version = '' } = legacyMatch.groups
+    const id = `${archive.toLowerCase()}/${number}${version.toLowerCase()}`
+    return { kind: 'arxiv', slug: `arxiv-${id.replace('/', '-')}`, value: id }
   }
 
   const doiUrlMatch = trimmed.match(DOI_URL_RE)

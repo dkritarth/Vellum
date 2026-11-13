@@ -41,16 +41,22 @@ export function Library({
   const [status, setStatus] = useState<Status>('loading')
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<PaperSortColumn>('addedAt')
-  const handleTrashPaper = async (e: React.MouseEvent, slug: string): Promise<void> => {
+  const [actionError, setActionError] = useState<string | null>(null)
+  const handleTrashPaper = async (
+    e: React.MouseEvent,
+    paper: Pick<PaperRecord, 'slug' | 'title'>,
+  ): Promise<void> => {
     e.stopPropagation()
     try {
       if (window.vellum?.paperTrash) {
-        await window.vellum.paperTrash(slug)
+        await window.vellum.paperTrash(paper.slug)
       }
-      setPapers((prev) => prev.filter((p) => p.slug !== slug))
-      onTrashPaper?.(slug)
+      setActionError(null)
+      setPapers((prev) => prev.filter((p) => p.slug !== paper.slug))
+      onTrashPaper?.(paper.slug)
     } catch (err) {
       console.error('Failed to move paper to trash:', err)
+      setActionError(`Could not move "${paper.title}" to Trash: ${errorMessage(err)}`)
     }
   }
 
@@ -132,6 +138,20 @@ export function Library({
         </select>
       </div>
 
+      {actionError && (
+        <div className={styles.actionError} role="alert">
+          <span>{actionError}</span>
+          <button
+            type="button"
+            className={styles.dismissButton}
+            aria-label="Dismiss error"
+            onClick={() => setActionError(null)}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {status === 'error' ? (
         <p className={styles.empty}>Could not load your library.</p>
       ) : status === 'ready' && papers.length === 0 ? (
@@ -159,7 +179,7 @@ export function Library({
                   className={styles.trashCardButton}
                   aria-label={`Move ${paper.title} to trash`}
                   title="Move to trash"
-                  onClick={(e) => void handleTrashPaper(e, paper.slug)}
+                  onClick={(e) => void handleTrashPaper(e, paper)}
                 >
                   🗑️
                 </button>
@@ -188,6 +208,13 @@ export function Library({
       )}
     </div>
   )
+}
+
+// Electron wraps main-process throws as "Error invoking remote method '<channel>': Error: <msg>";
+// show only <msg> to the user.
+function errorMessage(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err)
+  return message.replace(/^Error invoking remote method '[^']*': (?:Error: )?/, '')
 }
 
 function formatAuthors(authors: string[]): string {

@@ -108,6 +108,20 @@ describe('ChatsList [L2-02]', () => {
     })
   })
 
+  it('shows a visible error and keeps the chat when deleting fails', async () => {
+    window.vellum.chatDeleteSession = vi.fn().mockRejectedValue(new Error('database is locked')) as any
+    render(<ChatsList selectedSessionId={null} onSelectSession={vi.fn()} />)
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Delete chat Explain Transformer architecture' }),
+    )
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/could not delete chat "Explain Transformer architecture"/i)
+    expect(alert).toHaveTextContent(/database is locked/)
+    expect(screen.getByText('Explain Transformer architecture')).toBeInTheDocument()
+  })
+
   it('filters sessions by search input', async () => {
     const onSelect = vi.fn()
     render(<ChatsList selectedSessionId={null} onSelectSession={onSelect} />)

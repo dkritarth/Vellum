@@ -118,4 +118,58 @@ describe('CollectionsTree [L2-01]', () => {
       expect(onSelect).toHaveBeenCalledWith(null, null)
     })
   })
+
+  it('shows a visible error and keeps the input when creating fails', async () => {
+    window.vellum.collectionsCreate = vi.fn().mockRejectedValue(new Error('parent not found')) as any
+    const onSelect = vi.fn()
+    render(<CollectionsTree selectedCollectionId={null} onSelectCollection={onSelect} />)
+    await screen.findByText('Computer Science')
+
+    fireEvent.click(screen.getByRole('button', { name: 'New Collection' }))
+    fireEvent.change(screen.getByPlaceholderText('Collection name...'), { target: { value: 'Databases' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/could not create collection/i)
+    expect(alert).toHaveTextContent(/parent not found/)
+    expect(screen.getByDisplayValue('Databases')).toBeInTheDocument()
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('shows a visible error when renaming fails', async () => {
+    window.vellum.collectionsRename = vi.fn().mockRejectedValue(new Error('Collection 1 not found')) as any
+    render(<CollectionsTree selectedCollectionId={null} onSelectCollection={vi.fn()} />)
+    await screen.findByText('Computer Science')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rename Computer Science' }))
+    fireEvent.change(screen.getByDisplayValue('Computer Science'), { target: { value: 'Informatics' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/could not rename collection/i)
+    expect(alert).toHaveTextContent(/Collection 1 not found/)
+  })
+
+  it('shows a visible error and keeps selection when deleting fails, then clears it on success', async () => {
+    window.vellum.collectionsDelete = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('disk I/O error'))
+      .mockResolvedValue(undefined) as any
+    const onSelect = vi.fn()
+    render(<CollectionsTree selectedCollectionId={2} onSelectCollection={onSelect} />)
+    await screen.findByText('AI')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete AI' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/could not delete collection "AI"/i)
+    expect(alert).toHaveTextContent(/disk I\/O error/)
+    expect(onSelect).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete AI' }))
+    await waitFor(() => {
+      expect(onSelect).toHaveBeenCalledWith(null, null)
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
+  })
 })

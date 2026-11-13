@@ -31,6 +31,7 @@ export function ChatsList({ selectedSessionId, onSelectSession, onSessionDeleted
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [focusedIndex, setFocusedIndex] = useState<number>(-1)
   const listRef = useRef<HTMLUListElement>(null)
 
@@ -75,10 +76,14 @@ export function ChatsList({ selectedSessionId, onSelectSession, onSessionDeleted
     if (!confirmed) return
     try {
       await window.vellum.chatDeleteSession(session.id)
+      setActionError(null)
       onSessionDeleted?.(session.id)
       await refreshSessions.current?.()
     } catch (err) {
       console.error('Failed to delete chat session:', err)
+      setActionError(
+        `Could not delete chat "${session.title}": ${errorMessage(err)}`,
+      )
     }
   }
 
@@ -115,6 +120,20 @@ export function ChatsList({ selectedSessionId, onSelectSession, onSessionDeleted
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
+
+      {actionError && (
+        <div className={styles.actionError} role="alert">
+          <span>{actionError}</span>
+          <button
+            type="button"
+            className={styles.dismissButton}
+            aria-label="Dismiss chat error"
+            onClick={() => setActionError(null)}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {error ? (
         <div className={styles.errorState} role="alert">
@@ -188,4 +207,11 @@ export function ChatsList({ selectedSessionId, onSelectSession, onSessionDeleted
       )}
     </div>
   )
+}
+
+// Electron wraps main-process throws as "Error invoking remote method '<channel>': Error: <msg>";
+// show only <msg> to the user.
+function errorMessage(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err)
+  return message.replace(/^Error invoking remote method '[^']*': (?:Error: )?/, '')
 }

@@ -165,3 +165,25 @@
   flex-direction: column;
   gap: 8px;
 }
+
+.actionError {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(252, 129, 129, 0.08);
+  border: 1px solid rgba(252, 129, 129, 0.4);
+  border-radius: 6px;
+  font-size: 13px;
+  color: #fc8181;
+}
+
+.dismissButton {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+}

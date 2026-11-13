@@ -17,6 +17,7 @@ export function CollectionsTree({
   const [newCollectionName, setNewCollectionName] = useState('')
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editingName, setEditingName] = useState('')
+  const [actionError, setActionError] = useState<string | null>(null)
 
   async function refreshTree(): Promise<void> {
     try {
@@ -44,12 +45,14 @@ export function CollectionsTree({
     const parentId = creatingParentId === 'root' ? null : creatingParentId
     try {
       const created = await window.vellum.collectionsCreate({ name, parentId })
+      setActionError(null)
       setNewCollectionName('')
       setCreatingParentId(null)
       await refreshTree()
       onSelectCollection(created.id, created.name)
     } catch (err) {
       console.error('Failed to create collection', err)
+      setActionError(`Could not create collection "${name}": ${errorMessage(err)}`)
     }
   }
 
@@ -59,6 +62,7 @@ export function CollectionsTree({
 
     try {
       await window.vellum.collectionsRename({ id, name })
+      setActionError(null)
       setEditingId(null)
       setEditingName('')
       await refreshTree()
@@ -67,6 +71,7 @@ export function CollectionsTree({
       }
     } catch (err) {
       console.error('Failed to rename collection', err)
+      setActionError(`Could not rename collection to "${name}": ${errorMessage(err)}`)
     }
   }
 
@@ -77,12 +82,14 @@ export function CollectionsTree({
 
     try {
       await window.vellum.collectionsDelete(id)
+      setActionError(null)
       if (selectedCollectionId === id) {
         onSelectCollection(null, null)
       }
       await refreshTree()
     } catch (err) {
       console.error('Failed to delete collection', err)
+      setActionError(`Could not delete collection "${name}": ${errorMessage(err)}`)
     }
   }
 
@@ -232,6 +239,20 @@ export function CollectionsTree({
         </button>
       </div>
 
+      {actionError && (
+        <div className={styles.actionError} role="alert">
+          <span>{actionError}</span>
+          <button
+            type="button"
+            className={styles.dismissButton}
+            aria-label="Dismiss collection error"
+            onClick={() => setActionError(null)}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <div
         className={`${styles.allPapersItem} ${selectedCollectionId === null ? styles.allPapersActive : ''}`}
         onClick={() => onSelectCollection(null, null)}
@@ -284,4 +305,11 @@ export function CollectionsTree({
       )}
     </div>
   )
+}
+
+// Electron wraps main-process throws as "Error invoking remote method '<channel>': Error: <msg>";
+// show only <msg> to the user.
+function errorMessage(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err)
+  return message.replace(/^Error invoking remote method '[^']*': (?:Error: )?/, '')
 }

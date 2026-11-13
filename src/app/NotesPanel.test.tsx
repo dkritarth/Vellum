@@ -66,6 +66,7 @@ describe('NotesPanel', () => {
 
     const textarea = screen.getByRole('textbox', { name: /note/i }) as HTMLTextAreaElement
     expect(textarea.value).toBe('')
+    expect(textarea).toBeEnabled()
   })
 
   it('autosaves edits after a debounce, keyed to the open paper', async () => {
@@ -140,34 +141,122 @@ describe('NotesPanel', () => {
     expect(notesSave).toHaveBeenCalledWith({ slug: 'p1', body: 'edited before unmount' })
   })
 
-  it.each(['resolve', 'reject', 'resolve after autosave'] as const)(
-    'preserves typing during a delayed load (%s) and saves it when switching papers', async (outcome) => {
-      let resolveRead!: (note: { body: string }) => void
-      let rejectRead!: (error: Error) => void
-      notesGet.mockReturnValueOnce(new Promise((resolve, reject) => {
-        resolveRead = resolve
-        rejectRead = reject
-      }))
+  it('blocks failed-read replacement and retries the original saved note', async () => {
+    let stored = 'Existing research note with important evidence'
+    notesGet.mockRejectedValueOnce(new Error('SQLite read failed'))
+      .mockRejectedValueOnce(new Error('read failed again'))
+      .mockImplementation(async () => ({ body: stored }))
+    notesSave.mockImplementation(async ({ body }: { body: string }) => { stored = body })
+    render(<NotesPanel slug="p1" />)
+    await flushPromises()
+    const editor = screen.getByRole('textbox', { name: /note/i })
+    fireEvent.change(editor, { target: { value: 'replacement for unread note' } })
+    await act(async () => { vi.advanceTimersByTime(1000) })
+    expect(stored).toBe('Existing research note with important evidence')
+    expect(editor).toBeDisabled()
+    expect(screen.getByRole('button', { name: /clear note/i })).toBeDisabled()
+    expect(screen.getByRole('alert')).toHaveTextContent(/could not load/i)
+    fireEvent.click(screen.getByRole('button', { name: /clear note/i }))
+    expect(notesSave).not.toHaveBeenCalled()
+    expect(notesDelete).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }))
+    await flushPromises()
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(editor).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }))
+    await flushPromises()
+    expect(editor).toBeEnabled()
+    expect(editor).toHaveValue(stored)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(notesSave).not.toHaveBeenCalled()
+    fireEvent.change(editor, { target: { value: 'intentional loaded edit' } })
+    await act(async () => { vi.advanceTimersByTime(500) })
+    expect(stored).toBe('intentional loaded edit')
+  })
+
+  it.each(['switch', 'unmount'] as const)(
+    'blocks editing and persistence while initial read is pending, then %s', async (exit) => {
+      const read = deferred<{ body: string }>()
+      notesGet.mockReturnValueOnce(read.promise)
+      const { rerender, unmount } = render(<NotesPanel slug="p1" />)
+      const editor = screen.getByRole('textbox', { name: /note/i })
+      expect(screen.getByRole('status')).toHaveTextContent('Loading note…')
+      expect(editor).toBeDisabled()
+      expect(screen.getByRole('button', { name: /clear note/i })).toBeDisabled()
+      fireEvent.change(editor, { target: { value: 'blocked loading edit' } })
+      fireEvent.click(screen.getByRole('button', { name: /clear note/i }))
+      await act(async () => { vi.advanceTimersByTime(1000) })
+      expect(editor).toHaveValue('')
+      if (exit === 'switch') rerender(<NotesPanel slug="p2" />)
+      else unmount()
+      await act(async () => { read.resolve({ body: 'unread original' }) })
+      expect(notesSave).not.toHaveBeenCalled()
+      expect(notesDelete).not.toHaveBeenCalled()
+      if (exit === 'switch') expect(screen.getByRole('textbox', { name: /note/i })).toHaveValue('')
+    },
+  )
+
+  it('enables a true empty editor after retry finds no saved note', async () => {
+    notesGet.mockRejectedValueOnce(new Error('read failed')).mockResolvedValueOnce(null)
+    render(<NotesPanel slug="p1" />)
+    await flushPromises()
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }))
+    await flushPromises()
+    expect(screen.getByRole('textbox', { name: /note/i })).toBeEnabled()
+    expect(screen.getByRole('textbox', { name: /note/i })).toHaveValue('')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByText('Loading note…')).not.toBeInTheDocument()
+    expect(notesSave).not.toHaveBeenCalled()
+  })
+
+  it.each(['resolve', 'reject'] as const)(
+    'retires retry %s after switch and revisit, preserving loaded edits', async (outcome) => {
+      const retry = deferred<{ body: string }>()
+      notesGet.mockRejectedValueOnce(new Error('first read failed'))
+        .mockReturnValueOnce(retry.promise)
+        .mockResolvedValueOnce({ body: 'B original' })
+        .mockResolvedValueOnce({ body: 'A current' })
       const { rerender } = render(<NotesPanel slug="p1" />)
-
-      fireEvent.change(screen.getByRole('textbox', { name: /note/i }), {
-        target: { value: 'typed while loading' },
-      })
-      if (outcome === 'resolve after autosave') {
-        await act(async () => { vi.advanceTimersByTime(500) })
-      }
-      await act(async () => {
-        if (outcome === 'reject') rejectRead(new Error('read failed'))
-        else resolveRead({ body: 'old persisted note' })
-      })
-
-      expect(screen.getByRole('textbox', { name: /note/i })).toHaveValue('typed while loading')
-      if (outcome !== 'resolve after autosave') expect(notesSave).not.toHaveBeenCalled()
-
+      await flushPromises()
+      fireEvent.click(screen.getByRole('button', { name: /retry/i }))
+      await flushPromises()
+      expect(screen.getByRole('textbox', { name: /note/i })).toBeDisabled()
       rerender(<NotesPanel slug="p2" />)
       await flushPromises()
-      expect(screen.getByRole('textbox', { name: /note/i })).toHaveValue('')
-      expect(notesSave).toHaveBeenCalledWith({ slug: 'p1', body: 'typed while loading' })
+      expect(screen.getByRole('textbox', { name: /note/i })).toHaveValue('B original')
+      rerender(<NotesPanel slug="p1" />)
+      await flushPromises()
+      fireEvent.change(screen.getByRole('textbox', { name: /note/i }), { target: { value: 'A current edit' } })
+      await act(async () => {
+        if (outcome === 'resolve') retry.resolve({ body: 'obsolete A' })
+        else retry.reject(new Error('obsolete error'))
+      })
+      expect(screen.getByRole('textbox', { name: /note/i })).toHaveValue('A current edit')
+      expect(screen.getByRole('textbox', { name: /note/i })).toBeEnabled()
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      rerender(<NotesPanel slug="p2" />)
+      await flushPromises()
+      expect(notesSave).toHaveBeenCalledTimes(1)
+      expect(notesSave).toHaveBeenCalledWith({ slug: 'p1', body: 'A current edit' })
+    },
+  )
+
+  it.each(['resolve', 'reject'] as const)(
+    'retires retry %s after unmount without a write', async (outcome) => {
+      const retry = deferred<{ body: string }>()
+      notesGet.mockRejectedValueOnce(new Error('read failed')).mockReturnValueOnce(retry.promise)
+      const { unmount } = render(<NotesPanel slug="p1" />)
+      await flushPromises()
+      fireEvent.click(screen.getByRole('button', { name: /retry/i }))
+      await flushPromises()
+      unmount()
+      await act(async () => {
+        if (outcome === 'resolve') retry.resolve({ body: 'original' })
+        else retry.reject(new Error('late error'))
+      })
+      expect(notesSave).not.toHaveBeenCalled()
+      expect(notesDelete).not.toHaveBeenCalled()
     },
   )
 

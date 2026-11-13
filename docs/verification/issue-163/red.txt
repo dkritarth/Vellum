@@ -1,0 +1,33 @@
+
+> vellum@0.1.0 test
+> vitest run src/app/NotesPanel.test.tsx
+
+
+ RUN  v2.1.9 /home/dandapat/.t3/worktrees/Vellum/t3-caffbec5
+
+ ❯ src/app/NotesPanel.test.tsx (21 tests | 1 failed) 267ms
+   × NotesPanel > blocks failed-read replacement and retries the original saved note 14ms
+     → expected 'replacement for unread note' to be 'Existing research note with important…' // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/app/NotesPanel.test.tsx > NotesPanel > blocks failed-read replacement and retries the original saved note
+AssertionError: expected 'replacement for unread note' to be 'Existing research note with important…' // Object.is equality
+
+Expected: "Existing research note with important evidence"
+Received: "replacement for unread note"
+
+ ❯ src/app/NotesPanel.test.tsx:154:20
+    152|     fireEvent.change(editor, { target: { value: 'replacement for unrea…
+    153|     await act(async () => { vi.advanceTimersByTime(1000) })
+    154|     expect(stored).toBe('Existing research note with important evidenc…
+       |                    ^
+    155|     expect(editor).toBeDisabled()
+    156|     expect(screen.getByRole('button', { name: /clear note/i })).toBeDi…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 20 passed (21)
+   Start at  09:49:38
+   Duration  1.15s (transform 110ms, setup 0ms, collect 206ms, tests 267ms, environment 351ms, prepare 87ms)

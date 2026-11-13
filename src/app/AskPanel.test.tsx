@@ -40,6 +40,119 @@ afterEach(() => {
 })
 
 describe('AskPanel', () => {
+  it('restores active turn snapshot and replays only newer queued events after retry', async () => {
+    const user = userEvent.setup()
+    let resolveRetry!: (value: unknown) => void
+    askOpen.mockRejectedValueOnce(new Error('read failed'))
+      .mockReturnValueOnce(new Promise(resolve => { resolveRetry = resolve }))
+    render(<AskPanel slug="p1" targetSessionId={42} />)
+    await user.click(await screen.findByRole('button', { name: 'Retry' }))
+    await act(async () => {
+      emit({ requestId: 'restored', event: { kind: 'text', text: 'snapshot', sequence: 1 } })
+      emit({ requestId: 'restored', event: { kind: 'text', text: ' continuation', sequence: 2 } })
+      emit({ requestId: 'other', event: { kind: 'text', text: 'wrong request', sequence: 3 } })
+      resolveRetry({ session: { id: 42, backend: 'codex' }, messages: [], activeTurn: { requestId: 'restored', chatSessionId: 42, text: 'snapshot', sequence: 1 } })
+    })
+    expect(await screen.findByText('snapshot continuation')).toBeInTheDocument()
+    expect(screen.getByLabelText('Ask a question')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'New chat' })).toBeDisabled()
+    await act(async () => emit({ requestId: 'restored', event: { kind: 'done', sequence: 3, message: { id: 9, role: 'assistant', content: 'Final restored answer' } } }))
+    expect(await screen.findByText('Final restored answer')).toBeInTheDocument()
+    expect(screen.getByLabelText('Ask a question')).toBeEnabled()
+    expect(askStart).not.toHaveBeenCalled()
+    expect(askNewChat).not.toHaveBeenCalled()
+  })
+
+  it.each([false, true])('retains pending selection through retry (autoSend=%s)', async (autoSend) => {
+    const user = userEvent.setup()
+    askOpen.mockRejectedValueOnce(new Error('read failed'))
+    const prompt = { text: 'Quoted line\nSecond line', nonce: 19, autoSend }
+    const view = render(<AskPanel slug="p1" injectedPrompt={prompt} />)
+    await user.click(await screen.findByRole('button', { name: 'Retry' }))
+    if (autoSend) await waitFor(() => expect(askStart).toHaveBeenCalledWith({ chatSessionId: 1, slug: 'p1', text: prompt.text }))
+    else {
+      await waitFor(() => expect(screen.getByLabelText('Ask a question')).toHaveValue(prompt.text))
+      expect(screen.getByLabelText('Ask a question')).toHaveFocus()
+      await user.keyboard('{Shift>}{Enter}{/Shift}Follow-up{Enter}')
+      expect(askStart).toHaveBeenCalledWith({ chatSessionId: 1, slug: 'p1', text: prompt.text + '\nFollow-up' })
+    }
+    view.rerender(<AskPanel slug="p1" injectedPrompt={prompt} />)
+    expect(askStart).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    ['resolve', 'p1'], ['reject', 'p1'], ['resolve', 'p2'], ['reject', 'p2'],
+  ] as const)('ignores stale retry %s after navigation to %s and revisit', async (outcome, destinationSlug) => {
+    const user = userEvent.setup()
+    let resolveRetry!: (value: unknown) => void
+    let rejectRetry!: (error: Error) => void
+    askOpen.mockRejectedValueOnce(new Error('read failed'))
+      .mockReturnValueOnce(new Promise((resolve, reject) => { resolveRetry = resolve; rejectRetry = reject }))
+    const view = render(<AskPanel slug="p1" targetSessionId={42} />)
+    await user.click(await screen.findByRole('button', { name: 'Retry' }))
+    askOpen.mockResolvedValue({ session: { id: 43, backend: 'codex' }, messages: [{ id: 10, role: 'assistant', content: 'Other session' }] })
+    view.rerender(<AskPanel slug={destinationSlug} targetSessionId={43} />)
+    await screen.findByText('Other session')
+    askOpen.mockResolvedValue({ session: { id: 42, backend: 'codex' }, messages: [{ id: 11, role: 'assistant', content: 'Revisited history' }] })
+    view.rerender(<AskPanel slug="p1" targetSessionId={42} />)
+    await screen.findByText('Revisited history')
+    await user.type(screen.getByLabelText('Ask a question'), 'Keep draft')
+    await act(async () => {
+      if (outcome === 'resolve') resolveRetry({ session: { id: 42, backend: 'claude' }, messages: [{ id: 12, role: 'assistant', content: 'Stale snapshot' }] })
+      else rejectRetry(new Error('Stale failure'))
+    })
+    expect(screen.getByText('Revisited history')).toBeInTheDocument()
+    expect(screen.getByLabelText('Ask a question')).toHaveValue('Keep draft')
+    expect(screen.queryByText('Stale snapshot')).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Model backend')).toHaveValue('codex')
+  })
+
+  it('refreshes a deleted requested session whose retry snapshot arrives late', async () => {
+    const user = userEvent.setup()
+    let resolveRetry!: (value: unknown) => void
+    askOpen.mockRejectedValueOnce(new Error('read failed'))
+      .mockReturnValueOnce(new Promise(resolve => { resolveRetry = resolve }))
+    const view = render(<AskPanel slug="p1" targetSessionId={42} />)
+    await user.click(await screen.findByRole('button', { name: 'Retry' }))
+    view.rerender(<AskPanel slug="p1" targetSessionId={42} deletedSessionIds={[42]} />)
+    askOpen.mockResolvedValue({ session: { id: 43, backend: 'codex' }, messages: [] })
+    await act(async () => resolveRetry({ session: { id: 42, backend: 'codex' }, messages: [{ id: 12, role: 'assistant', content: 'Deleted history' }] }))
+    await waitFor(() => expect(screen.getByLabelText('Ask a question')).toBeEnabled())
+    expect(askOpen).toHaveBeenLastCalledWith('p1')
+    expect(screen.queryByText('Deleted history')).not.toBeInTheDocument()
+    expect(askNewChat).not.toHaveBeenCalled()
+  })
+
+  it('retries failed requested history explicitly, including repeated failure, without creating a chat', async () => {
+    const user = userEvent.setup()
+    let resolveRetry!: (value: unknown) => void
+    askOpen.mockRejectedValueOnce(new Error('read failed'))
+      .mockRejectedValueOnce(new Error('read failed again'))
+      .mockReturnValueOnce(new Promise(resolve => { resolveRetry = resolve }))
+    const view = render(<AskPanel slug="p1" targetSessionId={42} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('read failed')
+    expect(screen.getByLabelText('Ask a question')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'New chat' })).toBeDisabled()
+    view.rerender(<AskPanel slug="p1" targetSessionId={42} />)
+    expect(askOpen).toHaveBeenCalledTimes(1)
+    const retry = screen.getByRole('button', { name: 'Retry' })
+    retry.focus()
+    await user.keyboard('{Enter}')
+    expect(await screen.findByRole('alert')).toHaveTextContent('read failed again')
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Ask a question')).toBeDisabled()
+    await act(async () => resolveRetry({ session: { id: 42, backend: 'codex' }, messages: [{ id: 9, role: 'assistant', content: 'Saved research' }] }))
+    expect(await screen.findByText('Saved research')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Ask a question')).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'New chat' })).toBeEnabled()
+    expect(askOpen.mock.calls).toEqual(Array(3).fill([{ slug: 'p1', sessionId: 42 }]))
+    expect(askNewChat).not.toHaveBeenCalled()
+    expect(askStart).not.toHaveBeenCalled()
+  })
+
   it('inserts paragraphs with Shift+Enter and submits once with Enter', async () => {
     const user = userEvent.setup()
     render(<AskPanel slug="p1" />)

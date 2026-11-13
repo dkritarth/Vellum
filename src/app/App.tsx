@@ -45,6 +45,8 @@ export function App(): JSX.Element {
   const [highlightActive, setHighlightActive] = useState(false)
   const [highlightColor, setHighlightColor] = useState<HighlightColor>('yellow')
   const [jumpTarget, setJumpTarget] = useState<{ page: number; highlightId: string; nonce: number } | null>(null)
+  // Invalidation counts only; durable highlight records remain in storage.
+  const [highlightRevisions, setHighlightRevisions] = useState<Record<string, number>>({})
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('Ask')
   const [injectedPrompt, setInjectedPrompt] = useState<InjectedPrompt | null>(null)
   const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null)
@@ -189,6 +191,10 @@ export function App(): JSX.Element {
     setJumpTarget({ page: highlight.page, highlightId: highlight.id, nonce: Date.now() })
   }
 
+  function handleHighlightCreated(paperSlug: string): void {
+    setHighlightRevisions((current) => ({ ...current, [paperSlug]: (current[paperSlug] ?? 0) + 1 }))
+  }
+
   return (
     <div className={styles.shell}>
       <TabStrip
@@ -260,6 +266,7 @@ export function App(): JSX.Element {
                   slug={activeTabId ?? undefined}
                   highlightTool={{ active: highlightActive, color: highlightColor }}
                   jumpTarget={jumpTarget}
+                  onHighlightCreated={handleHighlightCreated}
                   onAddToChat={handleAddToChat}
                   onExplain={handleExplain}
                 />
@@ -272,6 +279,7 @@ export function App(): JSX.Element {
           activeTab={rightPanelTab}
           onTabChange={setRightPanelTab}
           onJumpToHighlight={jumpToHighlight}
+          highlightsRevision={activeTabId ? highlightRevisions[activeTabId] ?? 0 : 0}
           injectedPrompt={injectedPrompt}
           targetSessionId={selectedChatSessionId}
           deletedSessionIds={deletedSessionIds}

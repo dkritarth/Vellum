@@ -302,14 +302,22 @@ function timeoutAfter(ms: number, message: string): { promise: Promise<never>; c
 }
 
 class StdioAcpSession implements AcpSession {
-  // Set only while a prompt() call is in flight — one prompt at a time per
-  // session, mirroring the ACP protocol (a session has one active turn).
+  // Set only while a turn is in flight — one turn at a time per session,
+  // mirroring the ACP protocol (a session has one active turn).
   private queue: UpdateQueue | undefined
   private disposed = false
   private disposePromise: Promise<void> | undefined
   // Set only while a prompt() call is in flight; cleared by dispose() too so
   // an external dispose mid-turn doesn't leave a dangling timer.
   private turnTimeout: { cancel(): void; reset(): void } | undefined
+  // ACP allows one active turn per session, and `route()` can only feed one
+  // queue. Overlapping prompt() calls wait here until every earlier turn has
+  // settled (done / error / timeout / dispose) before sending their own.
+  private turnTail: Promise<void> = Promise.resolve()
+  private releaseWaiters: (() => void) | undefined
+  private readonly disposedSignal = new Promise<void>((resolve) => {
+    this.releaseWaiters = resolve
+  })
 
   constructor(
     private readonly connection: ClientSideConnection,
@@ -334,6 +342,29 @@ class StdioAcpSession implements AcpSession {
       return
     }
 
+    // Reserve this turn's slot. The slot is released when the turn settles
+    // on the wire, not when the consumer stops iterating, so an abandoned
+    // iterator cannot let the next turn overlap one still running.
+    const previousTurn = this.turnTail
+    let releaseTurn!: () => void
+    this.turnTail = new Promise<void>((resolve) => {
+      releaseTurn = resolve
+    })
+    let started = false
+    try {
+      await Promise.race([previousTurn, this.disposedSignal])
+      if (this.disposed) {
+        yield { kind: 'error', data: { message: 'session disposed' } }
+        return
+      }
+      started = true
+      yield* this.runTurn(req, releaseTurn)
+    } finally {
+      if (!started) releaseTurn()
+    }
+  }
+
+  private async *runTurn(req: AcpPromptRequest, releaseTurn: () => void): AsyncGenerator<AcpUpdate> {
     const queue = new UpdateQueue()
     this.queue = queue
 
@@ -349,6 +380,7 @@ class StdioAcpSession implements AcpSession {
         timeout.cancel()
         queue.push({ kind: 'done', data: { stopReason: res.stopReason, ...(res.usage ? { usage: res.usage } : {}) } })
         queue.close()
+        releaseTurn()
       })
       .catch((err: unknown) => {
         if (settled) return
@@ -356,6 +388,7 @@ class StdioAcpSession implements AcpSession {
         timeout.cancel()
         queue.push({ kind: 'error', data: { message: err instanceof Error ? err.message : String(err) } })
         queue.close()
+        releaseTurn()
       })
 
     // Turn timeout: if neither branch above settles first, force-fail the
@@ -367,6 +400,7 @@ class StdioAcpSession implements AcpSession {
       settled = true
       queue.push({ kind: 'error', data: { message: err.message } })
       queue.close()
+      releaseTurn()
       void this.dispose().catch(() => undefined)
     })
 
@@ -381,6 +415,7 @@ class StdioAcpSession implements AcpSession {
   async dispose(): Promise<void> {
     if (this.disposePromise) return this.disposePromise
     this.disposed = true
+    this.releaseWaiters?.()
     this.turnTimeout?.cancel()
     this.turnTimeout = undefined
     this.queue?.close()

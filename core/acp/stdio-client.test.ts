@@ -108,6 +108,9 @@ rl.on('line', (line) => {
     // 'stall' never answers session/prompt, simulating an adapter that hangs
     // mid-turn (e.g. an errored codex-acp turn, or any other stall).
     if (mode === 'stall') return
+    // 'crash-mid-turn' accepts the prompt, then dies without answering it
+    // (an adapter crash or OOM kill in the middle of a turn).
+    if (mode === 'crash-mid-turn') process.exit(9)
     send({
       jsonrpc: '2.0',
       method: 'session/update',
@@ -336,6 +339,35 @@ describe('StdioAcpClient', () => {
 
     expect(await second).toEqual([{ kind: 'error', data: { message: 'session disposed' } }])
     await first
+  }, 10_000)
+
+  it('ends an in-flight prompt() with an error, not a silent end, when the session is disposed mid-turn', async () => {
+    // ChatManager treats an iterator that ends without `error` as a finished
+    // turn and persists the partial text as the assistant reply. Disposal
+    // mid-turn (New chat, paper removal, app shutdown) must say so.
+    const client = new StdioAcpClient(spawnFakeAgent('stall'), { turnMs: 30_000 })
+    const session = await client.newSession('codex')
+    const updates = collect(session.prompt({ text: 'hi' }))
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    await session.dispose()
+
+    expect(await updates).toEqual([{ kind: 'error', data: { message: 'session disposed' } }])
+  }, 10_000)
+
+  it('reports the adapter exit diagnostic when the adapter dies mid-turn', async () => {
+    // Idle budget far above the test's patience: the error must come from
+    // the child exiting, not from the idle timer eventually firing.
+    const client = new StdioAcpClient(spawnFakeAgent('crash-mid-turn'), { turnMs: 30_000 })
+    const session = await client.newSession('codex')
+    try {
+      const updates = await collect(session.prompt({ text: 'hi' }))
+      expect(updates).toEqual([
+        { kind: 'error', data: { message: "ACP adapter 'codex-acp' exited with code 9" } },
+      ])
+    } finally {
+      await session.dispose()
+    }
   }, 10_000)
 
   it('fails newSession() via the handshake timeout when the adapter never answers initialize', async () => {

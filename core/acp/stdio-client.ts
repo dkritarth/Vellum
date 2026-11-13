@@ -324,7 +324,20 @@ class StdioAcpSession implements AcpSession {
     private readonly sessionId: string,
     private readonly child: AdapterChildProcess,
     private readonly turnMs: number,
+    private readonly childFailureMessage: () => string | undefined,
   ) {}
+
+  /** Error text for a rejected `session/prompt`. A JSON-RPC error from a
+   * live adapter is reported as-is. When the transport closed because the
+   * adapter process died, the SDK only says "ACP connection closed"; wait
+   * (bounded) for the child's exit and prefer its exit-code/signal
+   * diagnostic, mirroring what `newSession` does for handshake failures. */
+  private async promptFailureMessage(err: unknown): Promise<string> {
+    const fallback = err instanceof Error ? err.message : String(err)
+    if (!this.connection.signal.aborted) return fallback
+    await waitForChildExit(this.child, PROCESS_EXIT_GRACE_MS)
+    return this.childFailureMessage() ?? fallback
+  }
 
   /** Routes a `session/update` notification to the in-flight prompt's queue,
    * if this is that session and a prompt is actually in flight. Called
@@ -382,11 +395,12 @@ class StdioAcpSession implements AcpSession {
         queue.close()
         releaseTurn()
       })
-      .catch((err: unknown) => {
+      .catch(async (err: unknown) => {
         if (settled) return
         settled = true
         timeout.cancel()
-        queue.push({ kind: 'error', data: { message: err instanceof Error ? err.message : String(err) } })
+        const message = await this.promptFailureMessage(err)
+        queue.push({ kind: 'error', data: { message } })
         queue.close()
         releaseTurn()
       })
@@ -418,6 +432,10 @@ class StdioAcpSession implements AcpSession {
     this.releaseWaiters?.()
     this.turnTimeout?.cancel()
     this.turnTimeout = undefined
+    // A consumer whose iterator just ends treats the turn as complete (the
+    // chat manager persists the partial text as the reply). Disposal
+    // interrupts the turn, so say so explicitly before closing.
+    this.queue?.push({ kind: 'error', data: { message: 'session disposed' } })
     this.queue?.close()
     this.queue = undefined
     this.disposePromise = terminateAdapter(this.child)
@@ -490,7 +508,7 @@ export class StdioAcpClient implements AcpClient {
       ])
       handshake.cancel()
       const turnMs = this.timeouts.turnMs ?? DEFAULT_TURN_TIMEOUT_MS
-      session = new StdioAcpSession(connection, newSessionResult.sessionId, child, turnMs)
+      session = new StdioAcpSession(connection, newSessionResult.sessionId, child, turnMs, tracker.message)
       return session
     } catch (err) {
       handshake.cancel()

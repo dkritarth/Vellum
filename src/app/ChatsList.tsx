@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChatSessionSummary } from '../../core/chat/repo'
+import { BACKEND_LABELS, isChatBackend } from './ModelSelector'
 import styles from './ChatsList.module.css'
 
 interface ChatsListProps {
@@ -117,7 +118,9 @@ export function ChatsList({ selectedSessionId, onSelectSession }: ChatsListProps
                 ? styles.badgeClaude
                 : session.backend === 'codex'
                   ? styles.badgeCodex
-                  : styles.badgeGeneric
+                  : session.backend === 'antigravity'
+                    ? styles.badgeAntigravity
+                    : styles.badgeGeneric
 
             return (
               <li
@@ -154,7 +157,7 @@ export function ChatsList({ selectedSessionId, onSelectSession }: ChatsListProps
                 </div>
 
                 <div className={styles.itemMeta}>
-                  <span className={`${styles.badge} ${backendClass}`}>{session.backend}</span>
+                  <span className={`${styles.badge} ${backendClass}`}>{isChatBackend(session.backend) ? BACKEND_LABELS[session.backend] : session.backend}</span>
                   <span className={styles.msgCount}>
                     {session.messageCount} {session.messageCount === 1 ? 'turn' : 'turns'}
                   </span>

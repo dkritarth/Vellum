@@ -138,6 +138,11 @@
   color: #68d391;
 }
 
+.badgeAntigravity {
+  background-color: rgba(99, 179, 237, 0.2);
+  color: #90cdf4;
+}
+
 .badgeGeneric {
   background-color: rgba(160, 174, 192, 0.2);
   color: #cbd5e0;

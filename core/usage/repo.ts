@@ -1,5 +1,5 @@
 import type { Database } from 'better-sqlite3'
-import type { AcpBackend } from '../acp/client.js'
+import { ACP_BACKENDS, type AcpBackend } from '../acp/client.js'
 
 export interface UsageRecord {
   id?: number
@@ -199,35 +199,23 @@ export function listUsageRecords(
  * token counts and costs return `null` ("Unavailable"), NEVER 0.
  */
 export function getUsageSummary(db: Database): UsageSummary {
-  const backends: AcpBackend[] = ['claude', 'codex']
-  const backendSummaries: Record<AcpBackend, BackendUsageSummary> = {
-    claude: {
-      backend: 'claude',
-      turnsCount: 0,
-      turnsWithMetrics: 0,
-      totalInputTokens: null,
-      totalOutputTokens: null,
-      totalTokens: null,
-      contextUsedLatest: null,
-      contextSizeLatest: null,
-      totalCost: null,
-      costCurrency: null,
-      lastRecordedAt: null,
-    },
-    codex: {
-      backend: 'codex',
-      turnsCount: 0,
-      turnsWithMetrics: 0,
-      totalInputTokens: null,
-      totalOutputTokens: null,
-      totalTokens: null,
-      contextUsedLatest: null,
-      contextSizeLatest: null,
-      totalCost: null,
-      costCurrency: null,
-      lastRecordedAt: null,
-    },
-  }
+  const backends = ACP_BACKENDS
+  const emptySummary = (backend: AcpBackend): BackendUsageSummary => ({
+    backend,
+    turnsCount: 0,
+    turnsWithMetrics: 0,
+    totalInputTokens: null,
+    totalOutputTokens: null,
+    totalTokens: null,
+    contextUsedLatest: null,
+    contextSizeLatest: null,
+    totalCost: null,
+    costCurrency: null,
+    lastRecordedAt: null,
+  })
+  const backendSummaries = Object.fromEntries(
+    backends.map((backend) => [backend, emptySummary(backend)]),
+  ) as Record<AcpBackend, BackendUsageSummary>
 
   let grandTotalTurns = 0
   let grandTurnsWithMetrics = 0

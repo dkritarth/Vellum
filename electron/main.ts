@@ -18,7 +18,7 @@ import type { Database } from 'better-sqlite3'
 
 import { StdioAcpClient } from '../core/acp/stdio-client.js'
 import type { AskOpenResult, AskStartParams, AskStreamEvent } from '../core/chat/manager.js'
-import type { AcpBackend } from '../core/acp/client.js'
+import { ACP_BACKENDS, isAcpBackend, type AcpBackend } from '../core/acp/client.js'
 import { ChatManager } from '../core/chat/manager.js'
 import { getChatSession } from '../core/chat/repo.js'
 import { ingest } from '../core/ingest/index.js'
@@ -409,8 +409,8 @@ ipcMain.handle('vellum:chat-rename-session', (_event, params: unknown): void => 
 // "New chat" action: fresh chat_sessions row + disposes any cached ACP
 // session for this paper so the agent has no memory of the prior thread.
 function requireBackend(value: unknown, channel: string): AcpBackend {
-  if (value === 'claude' || value === 'codex') return value
-  throw new Error(`${channel}: backend must be 'claude' or 'codex'`)
+  if (isAcpBackend(value)) return value
+  throw new Error(`${channel}: backend must be one of ${ACP_BACKENDS.map((b) => `'${b}'`).join(', ')}`)
 }
 
 function parseAskNewChatParams(value: unknown): { slug: string; backend: AcpBackend } {
@@ -575,11 +575,11 @@ function parseQuestionsParams(slugOrParams: unknown, maybeBackend?: unknown): { 
   if (typeof slugOrParams === 'object' && slugOrParams !== null) {
     const candidate = slugOrParams as Record<string, unknown>
     const slug = requireSlug(candidate['slug'], 'vellum:questions')
-    const backend = candidate['backend'] === 'codex' ? 'codex' : 'claude'
+    const backend = isAcpBackend(candidate['backend']) ? candidate['backend'] : 'claude'
     return { slug, backend }
   }
   const slug = requireSlug(slugOrParams, 'vellum:questions')
-  const backend = maybeBackend === 'codex' ? 'codex' : 'claude'
+  const backend = isAcpBackend(maybeBackend) ? maybeBackend : 'claude'
   return { slug, backend }
 }
 

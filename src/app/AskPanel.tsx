@@ -15,7 +15,7 @@ import { SuggestedQuestions } from './SuggestedQuestions'
 //   3. "New chat": `askNewChat(slug)` starts a fresh session + fresh agent
 //      conversation (main process disposes the cached ACP session).
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ModelSelector } from './ModelSelector'
+import { ModelSelector, isChatBackend } from './ModelSelector'
 import type { ChatBackend } from './ModelSelector'
 import { QuickActions } from './QuickActions'
 import styles from './AskPanel.module.css'
@@ -75,7 +75,7 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId }: AskPanelProp
       .then((result) => {
         if (cancelled) return
         setSessionId(result.session.id)
-        setBackend(result.session.backend === 'codex' ? 'codex' : 'claude')
+        setBackend(isChatBackend(result.session.backend) ? result.session.backend : 'claude')
         setMessages(
           result.messages.map((m) => ({
             id: m.id,
@@ -168,7 +168,7 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId }: AskPanelProp
       .askNewChat({ slug, backend: nextBackend })
       .then((result) => {
         setSessionId(result.session.id)
-        setBackend(result.session.backend === 'codex' ? 'codex' : 'claude')
+        setBackend(isChatBackend(result.session.backend) ? result.session.backend : 'claude')
         setMessages([])
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))

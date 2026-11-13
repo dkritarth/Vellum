@@ -30,7 +30,8 @@
 // (The DOI above is open-access and has rich, multi-author, multi-affiliation
 // metadata (AlphaFold, Nature, 2021, 34 authors). Both kinds fetched clean.
 
-import { readFile } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { open } from 'node:fs/promises'
 import type { ClassifiedInput } from './classify'
 import { assertSafeUrl, type DnsLookupFn } from './ssrf'
 
@@ -364,8 +365,38 @@ export async function fetchSource(
       return { pdfBytes, metadata: undefined }
     }
     case 'local_pdf': {
-      const pdfBytes = new Uint8Array(await readFile(input.value))
-      return { pdfBytes, metadata: undefined }
+      const maxBytes = options?.maxBytes ?? DEFAULT_MAX_PDF_BYTES
+      // Nonblocking open lets us reject FIFOs without waiting for a writer.
+      const handle = await open(input.value, constants.O_RDONLY | constants.O_NONBLOCK)
+      try {
+        const stat = await handle.stat()
+        if (!stat.isFile()) throw new Error('Local PDF must be a regular file')
+        if (stat.size > maxBytes) {
+          throw new Error(`Local PDF exceeds maximum allowed size of ${maxBytes} bytes`)
+        }
+        const chunks: Uint8Array[] = []
+        let totalBytes = 0
+        while (true) {
+          // Read at most one byte past the cap, even if the file grows after stat.
+          const chunk = new Uint8Array(Math.min(64 * 1024, maxBytes - totalBytes + 1))
+          const { bytesRead } = await handle.read(chunk, 0, chunk.byteLength, null)
+          if (bytesRead === 0) break
+          totalBytes += bytesRead
+          if (totalBytes > maxBytes) {
+            throw new Error(`Local PDF exceeds maximum allowed size of ${maxBytes} bytes`)
+          }
+          chunks.push(bytesRead === chunk.byteLength ? chunk : chunk.slice(0, bytesRead))
+        }
+        const pdfBytes = new Uint8Array(totalBytes)
+        let offset = 0
+        for (const chunk of chunks) {
+          pdfBytes.set(chunk, offset)
+          offset += chunk.byteLength
+        }
+        return { pdfBytes, metadata: undefined }
+      } finally {
+        await handle.close()
+      }
     }
   }
 }

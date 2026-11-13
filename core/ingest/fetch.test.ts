@@ -1,9 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync, truncateSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import * as fs from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
-import { fetchSource, fetchPdfFromUrl } from './fetch'
+import { fetchSource, fetchPdfFromUrl, DEFAULT_MAX_PDF_BYTES } from './fetch'
 import type { ClassifiedInput } from './classify'
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  return { ...actual, open: vi.fn(actual.open) }
+})
 
 const ARXIV_ATOM_FIXTURE = `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
@@ -248,6 +255,130 @@ describe('fetchSource', () => {
         lookup: async () => [{ address: '93.184.216.34', family: 4 }],
       }),
     ).rejects.toThrow(/arXiv API.*timed out after 50ms/)
+  })
+})
+
+describe('fetchSource local PDF limits', () => {
+  let dir: string
+  let input: ClassifiedInput
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'vellum-local-limit-'))
+    input = { kind: 'local_pdf', slug: 'local-paper', value: join(dir, 'paper.pdf') }
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('rejects a regular file one byte over the configured cap', async () => {
+    writeFileSync(input.value, new Uint8Array([1, 2, 3, 4, 5]))
+    await expect(fetchSource(input, { maxBytes: 4 })).rejects.toThrow(
+      'Local PDF exceeds maximum allowed size of 4 bytes',
+    )
+  })
+
+  it.each([3, 4])('preserves all %i bytes at or below a four-byte cap', async (size) => {
+    const bytes = new Uint8Array([1, 2, 3, 4]).slice(0, size)
+    writeFileSync(input.value, bytes)
+    await expect(fetchSource(input, { maxBytes: 4 })).resolves.toEqual({
+      pdfBytes: bytes, metadata: undefined,
+    })
+  })
+
+  it('accepts an empty regular file at a zero-byte cap', async () => {
+    writeFileSync(input.value, '')
+    expect((await fetchSource(input, { maxBytes: 0 })).pdfBytes).toHaveLength(0)
+  })
+
+  it('rejects a sparse file above the default 50 MiB cap and closes without reading', async () => {
+    writeFileSync(input.value, '')
+    truncateSync(input.value, DEFAULT_MAX_PDF_BYTES + 1)
+    const handle = await fs.open(input.value, 'r')
+    vi.mocked(fs.open).mockResolvedValueOnce(handle)
+    const read = vi.spyOn(handle, 'read')
+    try {
+      await expect(fetchSource(input)).rejects.toThrow('maximum allowed size of 52428800 bytes')
+      expect(read).not.toHaveBeenCalled()
+      expect(handle.fd).toBe(-1)
+    } finally {
+      await handle.close()
+    }
+  })
+
+  it('rejects a directory before reading and closes its handle', async () => {
+    // Windows rejects opening directories itself; exercise handle cleanup on POSIX.
+    if (process.platform === 'win32') {
+      await expect(fetchSource({ ...input, value: dir })).rejects.toThrow()
+      return
+    }
+    const handle = await fs.open(dir, 'r')
+    vi.mocked(fs.open).mockResolvedValueOnce(handle)
+    const read = vi.spyOn(handle, 'read')
+    try {
+      await expect(fetchSource({ ...input, value: dir })).rejects.toThrow('must be a regular file')
+      expect(read).not.toHaveBeenCalled()
+      expect(handle.fd).toBe(-1)
+    } finally {
+      await handle.close()
+    }
+  })
+
+  it.skipIf(process.platform === 'win32')('rejects a FIFO without waiting for a writer', async () => {
+    execFileSync('mkfifo', [input.value])
+    await expect(fetchSource(input)).rejects.toThrow('must be a regular file')
+  })
+
+  it.each(['stat', 'read'] as const)('closes the handle when %s fails', async (operation) => {
+    writeFileSync(input.value, 'paper')
+    const handle = await fs.open(input.value, 'r')
+    vi.mocked(fs.open).mockResolvedValueOnce(handle)
+    vi.spyOn(handle, operation).mockRejectedValueOnce(new Error('disk failure'))
+    try {
+      await expect(fetchSource(input)).rejects.toThrow('disk failure')
+      expect(handle.fd).toBe(-1)
+    } finally {
+      await handle.close()
+    }
+  })
+
+  it('propagates a missing-file error', async () => {
+    await expect(fetchSource(input)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('preserves bytes across multiple reads and closes on success', async () => {
+    const bytes = new Uint8Array(65_537).fill(7)
+    bytes[65_536] = 9
+    writeFileSync(input.value, bytes)
+    const handle = await fs.open(input.value, 'r')
+    vi.mocked(fs.open).mockResolvedValueOnce(handle)
+    try {
+      expect((await fetchSource(input, { maxBytes: bytes.length })).pdfBytes).toEqual(bytes)
+      expect(handle.fd).toBe(-1)
+    } finally {
+      await handle.close()
+    }
+  })
+
+  it('rejects growth beyond the cap after the size check and closes the file', async () => {
+    writeFileSync(input.value, new Uint8Array([1, 2, 3, 4]))
+    const handle = await fs.open(input.value, 'r')
+    const stat = await handle.stat()
+    vi.mocked(fs.open).mockResolvedValueOnce(handle)
+    vi.spyOn(handle, 'stat').mockImplementationOnce(async () => {
+      // Deterministic filesystem race: grow the real file after capturing its size.
+      writeFileSync(input.value, new Uint8Array([1, 2, 3, 4, 5]))
+      return stat
+    })
+    try {
+      await expect(fetchSource(input, { maxBytes: 4 })).rejects.toThrow(
+        'Local PDF exceeds maximum allowed size of 4 bytes',
+      )
+      expect(handle.fd).toBe(-1)
+    } finally {
+      await handle.close()
+    }
   })
 })
 

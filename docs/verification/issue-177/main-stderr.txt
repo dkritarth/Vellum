@@ -1,0 +1,8 @@
+[819840:1106/150349.241949:ERROR:object_proxy.cc(576)] Failed to call method: org.freedesktop.DBus.StartServiceByName: object_path= /org/freedesktop/DBus: org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the network connection was broken.
+Error occurred in handler for 'vellum:highlights-delete': Error: issue-177 controlled delete failure
+    at state.release (eval at evaluate (:311:30), <anonymous>:14:44)
+    at eval (eval at evaluate (:311:30), <anonymous>:1:37)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+Debugger ending on ws://127.0.0.1:35955/e13cb8e9-aad9-4adf-a8a2-80a5ffd97cac
+For help, see: https://nodejs.org/en/docs/inspector

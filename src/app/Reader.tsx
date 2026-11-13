@@ -195,6 +195,8 @@ interface ReaderProps {
    * re-jumping to the same target (clicked twice in a row) re-trigger the
    * effect even though `page`/`highlightId` didn't change. */
   jumpTarget?: { page: number; highlightId: string; nonce: number } | null
+  /** Active paper invalidation count after a persisted highlight change. */
+  highlightsRevision?: number
   /** Successful persisted creation, scoped to the originating paper. Never sent on failure. */
   onHighlightCreated?: (paperSlug: string) => void
   /** [R1-05] Callback when user clicks 'Add to chat' on selected text */
@@ -252,8 +254,50 @@ interface ActiveSelection {
   anchor: HighlightAnchor | null
 }
 
-export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain, onHighlightCreated }: ReaderProps): JSX.Element {
+type HighlightInput = Parameters<Window['vellum']['highlightsCreate']>[0]
+
+// One save intent captures its original context. Identity retires late UI work;
+// persistence can still finish and notify the originating paper.
+interface HighlightSave {
+  input: HighlightInput
+  status: 'pending' | 'failed'
+}
+
+/** Page, text layer, quote and single-page anchor of a live selection, or null
+ * when it does not start inside one of this reader's text layers. */
+function selectionContext(
+  selection: Selection,
+  pages: HTMLElement | null,
+): { page: number; layer: HTMLElement; quote: string; anchor: HighlightAnchor | null; range: Range } | null {
+  if (selection.isCollapsed || selection.rangeCount === 0) return null
+  const range = selection.getRangeAt(0)
+  const startNode = range.startContainer
+  const startEl = startNode instanceof Element ? startNode : startNode.parentElement
+  const layer = startEl?.closest<HTMLElement>('[data-text-layer]')
+  const page = Number(layer?.closest<HTMLElement>('[data-page-slot]')?.dataset.pageNumber)
+  if (!layer || !pages?.contains(layer) || !page) return null
+  const quote = selection.toString().trim()
+  if (!quote) return null
+  const anchor = layer.contains(range.endContainer) ? anchorFromRange(layer, range) : null
+  return { page, layer, quote, anchor, range }
+}
+
+export function Reader({
+  slug,
+  highlightTool,
+  jumpTarget,
+  onAddToChat,
+  onExplain,
+  onHighlightCreated,
+  highlightsRevision = 0,
+}: ReaderProps): JSX.Element {
   const [activeSelection, setActiveSelection] = useState<ActiveSelection | null>(null)
+  const [highlightSave, setHighlightSave] = useState<HighlightSave | null>(null)
+  const currentSave = useRef<HighlightSave | null>(null)
+  const pendingSelections = useRef(new Set<string>())
+  const retryRef = useRef<HTMLButtonElement>(null)
+  // Each highlight refresh owns its result. Local creations also retire outstanding reads.
+  const highlightRequest = useRef(0)
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [pageSizes, setPageSizes] = useState<PageSize[]>([])
   const [pageNumber, setPageNumber] = useState(1)
@@ -403,19 +447,61 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
       }
     })()
 
-    void window.vellum
-      .highlightsList(slug)
-      .then((records) => {
-        if (!cancelled) setHighlights(records)
-      })
-      .catch(() => {
-        if (!cancelled) setHighlights([])
-      })
-
     return () => {
       cancelled = true
     }
   }, [slug])
+
+  useEffect(() => {
+    const version = ++highlightRequest.current
+    if (!slug) return
+    const isCurrent = (): boolean => slugRef.current === slug && highlightRequest.current === version
+    void window.vellum
+      .highlightsList(slug)
+      .then((records) => {
+        if (isCurrent()) setHighlights(records)
+      })
+      .catch(() => {
+        if (isCurrent()) setHighlights([])
+      })
+    return () => {
+      highlightRequest.current += 1
+    }
+  }, [slug, highlightsRevision])
+
+  function retireHighlightSave(): void {
+    currentSave.current = null
+    setHighlightSave(null)
+  }
+
+  // A paper switch or re-rasterised zoom retires the captured save context
+  // (its text layer is replaced). Scrolling alone keeps it: pages stay mounted.
+  useEffect(() => {
+    retireHighlightSave()
+    return () => {
+      currentSave.current = null
+    }
+  }, [slug, renderScale])
+
+  useEffect(() => {
+    function handleSelectionChange(): void {
+      const input = currentSave.current?.input
+      const selection = window.getSelection()
+      // Clicking Retry may collapse selection; captured intent must survive that.
+      if (!input || !selection || selection.isCollapsed || selection.rangeCount === 0) return
+      const context = selectionContext(selection, pagesRef.current)
+      if (
+        !context ||
+        context.page !== input.page ||
+        input.anchor !== JSON.stringify(context.anchor) ||
+        input.quote !== context.quote
+      ) {
+        retireHighlightSave()
+      }
+    }
+    document.addEventListener('selectionchange', handleSelectionChange)
+    return () => document.removeEventListener('selectionchange', handleSelectionChange)
+  }, [])
 
   // Measure page slots and derive (a) which pages mount a canvas/text layer
   // and (b), for scroll-driven updates, the "N of M" page indicator.
@@ -574,6 +660,7 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
 
   function goToPage(next: number): void {
     const target = clampPage(next, numPages)
+    retireHighlightSave()
     setActiveSelection(null)
     setPageNumber(target)
     pageLockRef.current = target
@@ -619,40 +706,29 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
     if (!slug) return
     if ((event.target as HTMLElement).closest('[role="toolbar"]')) return
     const selection = window.getSelection()
-    if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+    const context = selection ? selectionContext(selection, pagesRef.current) : null
+    if (!context) {
       setActiveSelection(null)
       return
     }
+    const { page, quote, anchor, range } = context
 
-    const range = selection.getRangeAt(0)
-    const startNode = range.startContainer
-    const startEl = startNode instanceof Element ? startNode : startNode.parentElement
-    const layer = startEl?.closest<HTMLElement>('[data-text-layer]')
-    const page = Number(layer?.closest<HTMLElement>('[data-page-slot]')?.dataset.pageNumber)
-    if (!layer || !pagesRef.current?.contains(layer) || !page) {
-      setActiveSelection(null)
+    // Mouseup on the selection already being saved (or awaiting Retry) is not a new intent.
+    const previous = currentSave.current?.input
+    if (
+      previous &&
+      previous.slug === slug &&
+      previous.page === page &&
+      previous.quote === quote &&
+      previous.anchor === JSON.stringify(anchor)
+    ) {
       return
     }
-
-    const quote = selection.toString().trim()
-    if (!quote) {
-      setActiveSelection(null)
-      return
-    }
-    const anchor = layer.contains(range.endContainer) ? anchorFromRange(layer, range) : null
+    retireHighlightSave()
 
     if (highlightTool?.active) {
       if (!anchor) return
-      const color = highlightTool.color
-      void window.vellum
-        .highlightsCreate({ slug, page, color, quote, anchor: JSON.stringify(anchor) })
-        .then((record) => {
-          onHighlightCreated?.(record.paperSlug)
-          setHighlights((current) => [...current, record])
-          selection.removeAllRanges()
-          setActiveSelection(null)
-        })
-        .catch(() => undefined)
+      saveHighlight({ slug, page, color: highlightTool.color, quote, anchor: JSON.stringify(anchor) })
       return
     }
 
@@ -664,18 +740,41 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
     setActiveSelection({ x: left + rangeRect.width / 2, y: top, quote, page, anchor })
   }
 
-  function handleMenuHighlight(color: HighlightColor): void {
-    if (!slug || !activeSelection?.anchor) return
-    const { page, quote, anchor } = activeSelection
+  function saveHighlight(input: HighlightInput): void {
+    const key = JSON.stringify([input.slug, input.page, input.quote, input.anchor])
+    if (currentSave.current?.status === 'pending' || pendingSelections.current.has(key)) return
+    pendingSelections.current.add(key)
+    const operation: HighlightSave = { input, status: 'pending' }
+    currentSave.current = operation
+    setHighlightSave(operation)
+    setActiveSelection(null)
     void window.vellum
-      .highlightsCreate({ slug, page, color, quote, anchor: JSON.stringify(anchor) })
+      .highlightsCreate(input)
       .then((record) => {
+        pendingSelections.current.delete(key)
         onHighlightCreated?.(record.paperSlug)
-        setHighlights((current) => [...current, record])
+        if (slugRef.current === record.paperSlug) {
+          highlightRequest.current += 1
+          setHighlights((current) => [...current, record])
+        }
+        if (currentSave.current !== operation) return
+        if (document.activeElement === retryRef.current) viewportRef.current?.focus()
         window.getSelection()?.removeAllRanges()
-        setActiveSelection(null)
+        retireHighlightSave()
       })
-      .catch(() => undefined)
+      .catch(() => {
+        pendingSelections.current.delete(key)
+        if (currentSave.current !== operation) return
+        const failed: HighlightSave = { input, status: 'failed' }
+        currentSave.current = failed
+        setHighlightSave(failed)
+      })
+  }
+
+  function handleMenuHighlight(color: HighlightColor): void {
+    if (!slug || !activeSelection?.anchor || currentSave.current) return
+    const { page, quote, anchor } = activeSelection
+    saveHighlight({ slug, page, color, quote, anchor: JSON.stringify(anchor) })
   }
 
   function handleMenuAddToChat(): void {
@@ -900,6 +999,24 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
         </form>
       </div>
 
+      {highlightSave ? (
+        <div className={styles.highlightSave}>
+          <p role={highlightSave.status === 'failed' ? 'alert' : 'status'}>
+            {highlightSave.status === 'failed'
+              ? 'Highlight was not saved. Retry to save this selection.'
+              : 'Saving highlight…'}
+          </p>
+          <button
+            ref={retryRef}
+            type="button"
+            aria-label="Retry saving highlight"
+            disabled={highlightSave.status === 'pending'}
+            onClick={() => saveHighlight(highlightSave.input)}
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
       <div className={styles.body}>
         {tocOpen ? (
           <nav className={styles.toc} aria-label="Table of contents">

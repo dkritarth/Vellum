@@ -1,0 +1,233 @@
+
+> vellum@0.1.0 test
+> vitest run
+
+
+ RUN  v2.1.9 /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4
+
+ ✓ core/store/migrate.test.ts (10 tests) 28ms
+ ✓ core/chat/repo.test.ts (9 tests) 28ms
+ ✓ core/questions/repo.test.ts (6 tests) 37ms
+ ✓ core/usage/repo.test.ts (6 tests) 36ms
+ ✓ core/ingest/fetch.test.ts (18 tests) 128ms
+ ✓ core/chat/manager.test.ts (13 tests) 92ms
+ ✓ core/ingest/extract.test.ts (13 tests) 13ms
+ ✓ electron/main.test.ts (15 tests) 377ms
+ ✓ core/collections/repo.test.ts (6 tests) 51ms
+ ✓ core/highlights/repo.test.ts (7 tests) 42ms
+ ✓ core/ingest/classify.test.ts (15 tests) 20ms
+ ✓ core/ingest/convert.test.ts (3 tests) 158ms
+ ✓ core/ingest/summary.test.ts (1 test) 4ms
+ ✓ core/acp/stdio-client.test.ts (20 tests) 918ms
+ ✓ core/library/repo.test.ts (68 tests) 1295ms
+   ✓ repo > Trash and Purge operations [L2-04] > preserves the trashed paper and its original files when another connection holds the write lock 315ms
+   ✓ repo > Trash and Purge operations [L2-04] > restores original files and research state when the database commit fails 820ms
+ ✓ core/notes/repo.test.ts (8 tests) 956ms
+   ✓ notes repo > persists across restart (reopen DB) 927ms
+stderr | src/app/Reader.test.tsx > Reader with a loaded document > reads paper bytes via window.vellum only (never fs/node)
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+stderr | src/app/Reader.test.tsx > Reader with a loaded document > paginates with page nav, disabling at bounds
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+ ✓ core/ingest/index.test.ts (7 tests) 1464ms
+   ✓ ingest > keeps a re-ingested paper in Trash until explicit restore, persisting both states across reopen 1170ms
+stderr | src/app/Reader.test.tsx > Reader with a loaded document > paginates with page nav, disabling at bounds
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+stderr | src/app/Reader.test.tsx > Reader with a loaded document > paginates with page nav, disabling at bounds
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+stderr | src/app/Reader.test.tsx > Reader with a loaded document > zooms in/out within bounds
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+stderr | src/app/Reader.test.tsx > Reader with a loaded document > zooms in/out within bounds
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+ ✓ core/store/db.test.ts (3 tests) 1326ms
+   ✓ openDb > creates the containing directory if missing, at a temp path 834ms
+   ✓ openDb > applying schema twice (two opens of the same file) is idempotent 481ms
+stderr | src/app/Reader.test.tsx > Reader with a loaded document > zooms in/out within bounds
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+stderr | src/app/Reader.test.tsx > Reader with a loaded document > zooms in/out within bounds
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+stderr | src/app/Reader.test.tsx > Reader with a loaded document > opens the TOC and navigates to a resolved outline entry
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+stderr | src/app/Reader.test.tsx > Reader with a loaded document > opens the TOC and navigates to a resolved outline entry
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+stderr | src/app/Reader.test.tsx > Reader with a loaded document > searches the document and cycles through page matches
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+stderr | src/app/Reader.test.tsx > Reader with a loaded document > searches the document and cycles through page matches
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+stderr | src/app/Reader.test.tsx > Reader with a loaded document > shows 0 / 0 for a query with no matches
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+ ✓ src/app/UsageView.test.tsx (7 tests) 395ms
+stderr | src/app/Reader.test.tsx > Reader highlight capture [P2-02] > creates a highlight from a text-layer selection while the highlight tool is active, and renders the returned record as an overlay
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+stderr | src/app/Reader.test.tsx > Reader highlight capture [P2-02] > does not create a highlight on mouseup when the highlight tool is inactive
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+ ✓ src/app/AnnotationsPanel.test.tsx (22 tests) 998ms
+stderr | src/app/Reader.test.tsx > Reader jump/flash seam [P2-02] > navigates to the jump target page, flashes the highlight, then clears the flash after FLASH_DURATION_MS
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+stderr | src/app/Reader.test.tsx > Reader jump/flash seam [P2-02] > navigates to the jump target page, flashes the highlight, then clears the flash after FLASH_DURATION_MS
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+stderr | src/app/Reader.test.tsx > Reader inline citation click-through [P2-03] > renders a resolved [n] marker as a clickable button and jumps to its reference page on click
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+stderr | src/app/Reader.test.tsx > Reader inline citation click-through [P2-03] > renders a resolved [n] marker as a clickable button and jumps to its reference page on click
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+stderr | src/app/Reader.test.tsx > Reader inline citation click-through [P2-03] > shows the reference text in a tooltip on hover
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+ ✓ src/app/AskPanel.test.tsx (11 tests) 1038ms
+   ✓ AskPanel > sends a turn, streams chunks into a growing reply, then finalizes on done 372ms
+stderr | src/app/Reader.test.tsx > Reader inline citation click-through [P2-03] > leaves [n] markers as plain text when no references section is found (feature stays inert, no crash)
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+stderr | src/app/Reader.test.tsx > Reader highlight overlay + citation marker interaction [P2-02 x P2-03] > still resolves the highlight overlay rect after injectCitationMarkers splits the page text nodes
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+stderr | src/app/Reader.test.tsx > Reader selection actions [R1-05] > opens SelectionMenu on mouseup with selected text, triggering onAddToChat and onExplain
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/code/Vellum/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4/src/app/Reader.tsx:629:28 undefined
+
+ ✓ src/app/Reader.test.tsx (39 tests) 1295ms
+ ✓ src/app/NotesPanel.test.tsx (12 tests) 389ms
+ ✓ src/app/App.annotations.test.tsx (5 tests) 1579ms
+   ✓ shows saved quote, page and color immediately in the already open Annotations tab 557ms
+   ✓ refreshes after each creation from both selection actions and highlight mode 345ms
+ ✓ src/app/SuggestedQuestions.test.tsx (6 tests) 308ms
+ ✓ src/app/Library.test.tsx (9 tests) 642ms
+ ✓ src/app/DetailsPanel.test.tsx (6 tests) 238ms
+ ✓ src/app/RightPanel.test.tsx (8 tests) 570ms
+ ✓ src/app/App.test.tsx (6 tests) 1205ms
+ ✓ src/app/TrashView.test.tsx (6 tests) 423ms
+ ✓ src/app/ChatsList.test.tsx (5 tests) 340ms
+ ✓ src/app/CollectionsTree.test.tsx (5 tests) 587ms
+ ✓ src/app/App.annotation-delete.test.tsx (11 tests) 3385ms
+   ✓ removes the rendered Reader overlay when its annotation is deleted 515ms
+   ✓ deletes only the selected overlay and retains other creations and the open list 329ms
+   ✓ scopes a late outgoing deletion to its paper and loads the deletion on return 468ms
+   ✓ keeps current overlays when an outgoing creation completes 368ms
+ ✓ src/app/ReaderToolbar.test.tsx (4 tests) 303ms
+ ✓ src/app/IngestModal.test.tsx (5 tests) 657ms
+ ✓ src/app/SelectionMenu.test.tsx (2 tests) 185ms
+ ✓ src/app/Sidebar.test.tsx (8 tests) 717ms
+ ✓ src/app/App.highlight-retry.test.tsx (12 tests) 3599ms
+   ✓ recovers repeated menu save failures with captured context and one persisted result 805ms
+   ✓ recovers repeated highlight mode save failures with captured context and one persisted result 566ms
+   ✓ retires failed retry on a jump to the same page 315ms
+ ✓ src/app/TabStrip.test.tsx (3 tests) 132ms
+ ✓ src/app/AskInput.test.tsx (3 tests) 165ms
+ ✓ src/app/WorkspaceSwitcher.test.tsx (2 tests) 130ms
+ ✓ src/app/CitationTooltip.test.tsx (1 test) 65ms
+ ✓ src/app/ModelSelector.test.tsx (1 test) 131ms
+ ✓ src/app/OrcidBadge.test.tsx (1 test) 65ms
+
+ Test Files  44 passed (44)
+      Tests  428 passed (428)
+   Start at  15:31:10
+   Duration  6.59s (transform 2.01s, setup 0ms, collect 10.70s, tests 26.51s, environment 15.23s, prepare 4.50s)

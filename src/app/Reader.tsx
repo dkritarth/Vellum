@@ -348,7 +348,14 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
           setError('No PDF found for this paper.')
           return
         }
-        const pdf = await getDocument({ data: bytes }).promise
+        const pdf = await getDocument({
+          data: bytes,
+          standardFontDataUrl: new URL('./pdfjs/standard_fonts/', document.baseURI).href,
+          wasmUrl: new URL('./pdfjs/wasm/', document.baseURI).href,
+          // Workers cannot fetch file:// resources. PDF.js's display factory
+          // uses local XHR, preserving the existing CSP and renderer isolation.
+          useWorkerFetch: false,
+        }).promise
         if (cancelled) return
 
         // Every page's unscaled size up front, so the scroll column has its

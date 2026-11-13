@@ -936,3 +936,27 @@ describe('Reader selection menu lifecycle', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Explain' })).toBeNull())
   })
 })
+
+// #132: same document entry must resolve in dev HTTP and installed file:// apps.
+describe('local PDF resources', () => {
+  it.each([
+    ['http://localhost:5173/', 'http://localhost:5173/pdfjs/'],
+    ['file:///opt/Vellum/resources/app.asar/out/renderer/index.html', 'file:///opt/Vellum/resources/app.asar/out/renderer/pdfjs/'],
+  ])('loads fonts and decoders relative to %s', async (base, resources) => {
+    const element = document.createElement('base')
+    element.href = base
+    document.head.append(element)
+    try {
+      render(<Reader slug="resource-paper" />)
+      await waitFor(() => expect(getDocumentMock).toHaveBeenCalled())
+      expect(getDocumentMock).toHaveBeenCalledWith({
+        data: expect.any(ArrayBuffer),
+        standardFontDataUrl: resources + 'standard_fonts/',
+        wasmUrl: resources + 'wasm/',
+        useWorkerFetch: false,
+      })
+    } finally {
+      element.remove()
+    }
+  })
+})

@@ -1,10 +1,11 @@
 // Live Electron gate for Reader continuous scroll + zoom (#198, #199).
 //
 // Usage (after `npm run build`):
-//   xvfb-run -a node test/reader-scroll-zoom-gate.mjs [path/to/multi-page.pdf]
+//   xvfb-run -a node test/reader-scroll-zoom-gate.mjs path/to/multi-page.pdf
 //
-// Defaults to the bundled fixture. For the full check use a real paper, e.g.
-// arXiv 1706.03762 (15 pages) downloaded to a temp dir. Screenshots land in
+// Needs a real paper with at least 3 pages, e.g. arXiv 1706.03762 (15
+// pages) downloaded to a temp dir. The bundled fixtures are too short to
+// exercise scrolling. Screenshots land in
 // test-artifacts/reader-scroll-zoom-<timestamp>/ on success and failure.
 import assert from 'node:assert'
 import fs from 'node:fs'
@@ -17,7 +18,11 @@ import {
   cleanupIsolatedApp,
 } from './harness.mjs'
 
-const pdfPath = path.resolve(process.argv[2] || path.join(ROOT, 'core/ingest/fixtures/sample.pdf'))
+if (!process.argv[2]) {
+  console.error('usage: node test/reader-scroll-zoom-gate.mjs path/to/multi-page.pdf (>= 3 pages)')
+  process.exit(2)
+}
+const pdfPath = path.resolve(process.argv[2])
 const shotsDir = path.join(ROOT, 'test-artifacts', `reader-scroll-zoom-${new Date().toISOString().replace(/[:.]/g, '-')}`)
 fs.mkdirSync(shotsDir, { recursive: true })
 
@@ -111,6 +116,7 @@ async function run() {
     const numPages = Number(s.indicator.split(' of ')[1])
     console.log(`1. ${s.numSlots} page slots, ${s.rendered.length} rendered, indicator "${s.indicator}"`)
     assert.strictEqual(s.numSlots, numPages, 'one slot per page')
+    assert(numPages >= 3, `gate needs a PDF with at least 3 pages, got ${numPages}`)
     if (numPages > 4) assert(s.rendered.length < numPages, 'pages far from the viewport must not render')
     assertAligned(s, 'initial')
     await shot('01-initial')

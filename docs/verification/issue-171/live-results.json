@@ -1,0 +1,26 @@
+{
+  "results": [
+    "Empty tree, keyboard New Collection, autofocus/Escape cancellation",
+    "Visible nested create, real-paper child filter, cancel retains filter, ancestor delete returns all papers",
+    "Visible nested create, real-paper deep filter, cancel retains filter, ancestor delete returns all papers",
+    "Deleting another subtree preserves unrelated real-paper filter",
+    "switch-out: latest selection reconciled after controlled before-deletion hold",
+    "switch-in: latest selection reconciled after controlled before-deletion hold",
+    "switch-all: latest selection reconciled after controlled before-deletion hold",
+    "ack: latest selection reconciled after controlled after-deletion hold",
+    "Controlled deletion failure preserves subtree/filter/paper and useful feedback; retry clears error/filter",
+    "Direct selected deletion still clears filter",
+    "Full restart preserves unrelated collection/membership, real paper, note/history and exact PDF/markdown hashes; filter usable again"
+  ],
+  "pdfBytes": 2215244,
+  "markdownCharacters": 39605,
+  "hashes": [
+    "bdfaa68d8984f0dc02beaca527b76f207d99b666d31d1da728ee0728182df697",
+    "54c5d19767eab70f0de281b7bba5f9e3317b47c4ec6c829aae3e77609d8ac6a2"
+  ],
+  "isolatedData": "/data/dandapat/.tmp/vellum171-B5lKPx",
+  "consoleErrors": [
+    "[error] Failed to delete collection Error: Error invoking remote method 'vellum:collections-delete': Error: issue171 controlled disk I/O error"
+  ],
+  "expectedInjectedErrors": 1
+}

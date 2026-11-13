@@ -277,6 +277,10 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
   const [referenceIndex, setReferenceIndex] = useState<ReferenceIndex>(new Map())
   const [citationFlash, setCitationFlash] = useState<{ page: number; number: number } | null>(null)
   const [hoveredCitation, setHoveredCitation] = useState<{ text: string; left: number; top: number } | null>(null)
+  // Page where the current text selection started. It stays mounted even
+  // when scrolled out of the render window, so a long drag-selection (or
+  // an open selection menu) keeps its anchor text.
+  const [pinnedPage, setPinnedPage] = useState<number | null>(null)
 
   const numPages = pageSizes.length
   const [viewportEl, setViewportEl] = useState<HTMLDivElement | null>(null)
@@ -325,6 +329,13 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
     setHoveredCitation(null)
     setActiveSelection(null)
     pageLockRef.current = null
+    setPinnedPage(null)
+    // A scroll frame queued for the previous paper must not save its
+    // position under the new slug.
+    if (scrollFrameRef.current !== null) {
+      cancelAnimationFrame(scrollFrameRef.current)
+      scrollFrameRef.current = null
+    }
 
     if (!slug) return
 
@@ -342,19 +353,19 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
 
         // Every page's unscaled size up front, so the scroll column has its
         // full, correct height before any page renders (#198).
-        const sizes: PageSize[] = []
-        for (let n = 1; n <= pdf.numPages; n += 1) {
-          const page = await pdf.getPage(n)
-          if (cancelled) return
-          const viewport = page.getViewport({ scale: 1 })
-          sizes.push({ width: viewport.width, height: viewport.height })
-        }
-        const saved = viewStateBySlug.get(slug)
-        if (saved) {
-          scaleRef.current = saved.scale
-          setScale(saved.scale)
-          setRenderScale(saved.scale)
-        }
+        // Requested in parallel: one worker round-trip each.
+        const sizes: PageSize[] = await Promise.all(
+          Array.from({ length: pdf.numPages }, async (_, i) => {
+            const viewport = (await pdf.getPage(i + 1)).getViewport({ scale: 1 })
+            return { width: viewport.width, height: viewport.height }
+          }),
+        )
+        if (cancelled) return
+        // Zoom is per paper: the remembered one, else the default.
+        const restoredScale = viewStateBySlug.get(slug)?.scale ?? DEFAULT_SCALE
+        scaleRef.current = restoredScale
+        setScale(restoredScale)
+        setRenderScale(restoredScale)
         setPageSizes(sizes)
         setDoc(pdf)
         setLoading(false)
@@ -608,9 +619,11 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
     const startNode = range.startContainer
     const startEl = startNode instanceof Element ? startNode : startNode.parentElement
     const layer = startEl?.closest<HTMLElement>('[data-text-layer]')
-    if (!layer || !pagesRef.current?.contains(layer)) return
-    const page = Number(layer.closest<HTMLElement>('[data-page-slot]')?.dataset.pageNumber)
-    if (!page) return
+    const page = Number(layer?.closest<HTMLElement>('[data-page-slot]')?.dataset.pageNumber)
+    if (!layer || !pagesRef.current?.contains(layer) || !page) {
+      setActiveSelection(null)
+      return
+    }
 
     const quote = selection.toString().trim()
     if (!quote) {
@@ -905,6 +918,11 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
           <div
             ref={pagesRef}
             className={styles.pages}
+            onMouseDown={(event) => {
+              if ((event.target as HTMLElement).closest('[role="toolbar"]')) return
+              const slot = (event.target as HTMLElement).closest<HTMLElement>('[data-page-slot]')
+              setPinnedPage(slot ? Number(slot.dataset.pageNumber) : null)
+            }}
             onMouseUp={handlePagesMouseUp}
             onClick={handleCitationClick}
             onMouseOver={handleCitationMouseOver}
@@ -922,7 +940,7 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
                       baseHeight={size.height}
                       scale={scale}
                       renderScale={renderScale}
-                      active={(n >= renderWindow.first && n <= renderWindow.last) || n === pageNumber}
+                      active={(n >= renderWindow.first && n <= renderWindow.last) || n === pageNumber || n === pinnedPage}
                       highlightMode={Boolean(highlightTool?.active)}
                       referenceIndex={referenceIndex}
                       highlights={highlightsByPage.get(n) ?? NO_HIGHLIGHTS}

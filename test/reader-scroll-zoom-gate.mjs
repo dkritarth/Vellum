@@ -145,6 +145,7 @@ async function run() {
     s = await state(window)
     console.log(`2. scrolled to "${s.indicator}", max ${maxRendered} pages mounted at once`)
     assert.strictEqual(indicatorPage(s), numPages, 'indicator reaches last page')
+    assert(maxRendered <= 5, `windowing should keep at most 5 pages mounted, saw ${maxRendered}`)
     await shot('02-scrolled-to-end')
 
     // 3. Prev/next + outline jumps scroll to their page.
@@ -282,6 +283,38 @@ async function run() {
     await shot('08-search')
     await window.press('input[aria-label="Search in document"]', 'Escape')
     assert.strictEqual(await window.locator('[data-search-hit]').count(), 0, 'Escape clears hits')
+
+    // 9. Position + zoom survive switching to another paper's tab and back;
+    // tabs close.
+    await window.locator(VIEWPORT).focus()
+    await window.keyboard.press('Control+=')
+    await window.click('button[aria-label="Next page"]')
+    await window.waitForTimeout(400)
+    const saved = await state(window)
+    const other = await window.evaluate((p) => window.vellum.ingest(p), path.join(ROOT, 'core/ingest/fixtures/sample.pdf'))
+    await window.click('nav button:has-text("Library")')
+    // dispatchEvent: long path titles in the Library grid can overlap the
+    // neighbouring card's trash button (library layout, out of scope here).
+    await window.locator(`button:has-text(${JSON.stringify(other.title.slice(0, 30))})`).first().dispatchEvent('click')
+    await window.waitForSelector('[data-page-slot] canvas')
+    await window.waitForTimeout(800)
+    const tabs = window.locator('[role="tablist"][aria-label="Open papers"] [role="tab"]')
+    assert.strictEqual(await tabs.count(), 2, 'two paper tabs open')
+    await tabs.first().click()
+    await window.waitForSelector('[data-page-slot] canvas')
+    await window.waitForTimeout(1000)
+    const restored = await state(window)
+    console.log(`9. tab switch: ${saved.indicator} @ ${saved.zoom} (scrollTop ${saved.scrollTop}) -> ${restored.indicator} @ ${restored.zoom} (scrollTop ${restored.scrollTop})`)
+    assert.strictEqual(restored.zoom, saved.zoom, 'zoom restored after tab switch')
+    assert.strictEqual(restored.indicator, saved.indicator, 'page restored after tab switch')
+    assert(Math.abs(restored.scrollTop - saved.scrollTop) <= 2, 'scroll position restored after tab switch')
+    await window.click('[role="tablist"][aria-label="Open papers"] button[aria-label^="Close"]')
+    await window.waitForTimeout(400)
+    assert.strictEqual(await tabs.count(), 1, 'closing a tab removes it')
+    assert.strictEqual(await tabs.first().getAttribute('aria-selected'), 'true', 'remaining tab becomes active')
+    await window.click('[role="tablist"][aria-label="Open papers"] button[aria-label^="Close"]')
+    await window.getByText('No paper open').waitFor()
+    await shot('09-all-tabs-closed')
 
     assertNoConsoleErrors(consoleLines, [])
     passed = true

@@ -897,4 +897,42 @@ describe('Reader remembers zoom per paper (#202)', () => {
     await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2'))
     expect(screen.getByLabelText('Zoom')).toHaveTextContent('150%')
   })
+
+  it('opens a different paper at its own zoom, not the previous paper\'s', async () => {
+    const user = userEvent.setup()
+    const { rerender } = render(<Reader slug="paper-a" />)
+    await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2'))
+    await user.click(screen.getByRole('button', { name: 'Zoom in' }))
+    expect(screen.getByLabelText('Zoom')).toHaveTextContent('125%')
+
+    rerender(<Reader slug="paper-b" />)
+    await waitFor(() => expect(screen.getByLabelText('Zoom')).toHaveTextContent('100%'))
+    rerender(<Reader slug="paper-a" />)
+    await waitFor(() => expect(screen.getByLabelText('Zoom')).toHaveTextContent('125%'))
+  })
+})
+
+describe('Reader selection menu lifecycle', () => {
+  it('closes a stale menu when a new selection starts outside any text layer', async () => {
+    const { container } = render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(getTextLayer(container, 1)?.querySelector('span')).not.toBeNull())
+
+    selectText(getTextLayer(container, 1), 0, 12)
+    fireEvent.mouseUp(getTextLayer(container, 1))
+    expect(await screen.findByRole('button', { name: 'Explain' })).toBeInTheDocument()
+
+    // New selection anchored in the page column itself (e.g. a drag that
+    // began in the gap between pages).
+    const pages = container.querySelector('[data-page-slot]')!.parentElement!
+    const gap = document.createTextNode('gap text')
+    pages.appendChild(gap)
+    const range = document.createRange()
+    range.setStart(gap, 0)
+    range.setEnd(getTextLayer(container, 2).querySelector('span')!.firstChild!, 3)
+    window.getSelection()!.removeAllRanges()
+    window.getSelection()!.addRange(range)
+    fireEvent.mouseUp(pages)
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Explain' })).toBeNull())
+  })
 })

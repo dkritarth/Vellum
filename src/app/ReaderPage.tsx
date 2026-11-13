@@ -90,6 +90,21 @@ export function ReaderPage({
   const [textVersion, setTextVersion] = useState(0)
   const [overlays, setOverlays] = useState<OverlayBox[]>([])
 
+  // Release pdf.js's per-page operator list and decoded resources when the
+  // page leaves the render window, so scrolling a long paper doesn't keep
+  // every visited page in memory. Best effort: the release happens after the
+  // async getPage resolves, by which time the render/text cleanups below have
+  // cancelled their tasks; pdf.js skips cleanup if a render is still pending.
+  useEffect(() => {
+    if (!active) return
+    return () => {
+      void doc
+        .getPage(pageNumber)
+        .then((page) => page.cleanup())
+        .catch(() => undefined)
+    }
+  }, [doc, pageNumber, active])
+
   // Canvas: rasterise at `renderScale` x devicePixelRatio into a fresh
   // canvas, then swap it in, so the old raster stays visible (stretched)
   // until the new one is ready. Superseded renders are cancelled.
@@ -282,7 +297,7 @@ export function ReaderPage({
       data-page-slot=""
       data-page-number={pageNumber}
       aria-label={`Page ${pageNumber}`}
-      role="region"
+      role="group"
     >
       {active ? (
         <>

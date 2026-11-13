@@ -286,7 +286,15 @@ export class ChatManager {
           onEvent({ kind: 'error', message: errorMessageFromUpdate(update) })
           return
         } else if (update.kind === 'done') {
-          const doneData = update.data as { usage?: { inputTokens?: number; outputTokens?: number; thoughtTokens?: number; cachedReadTokens?: number; cachedWriteTokens?: number; totalTokens?: number } | null } | undefined
+          const doneData = update.data as { stopReason?: string; usage?: { inputTokens?: number; outputTokens?: number; thoughtTokens?: number; cachedReadTokens?: number; cachedWriteTokens?: number; totalTokens?: number } | null } | undefined
+          // Cancellation and limits leave incomplete agent context. Reuse the
+          // existing failure path: discard partial output and evict before retry.
+          if (doneData?.stopReason === 'cancelled') {
+            throw new Error('ACP turn cancelled (cancelled). Partial answer was not saved. You can retry.')
+          }
+          if (doneData?.stopReason === 'max_tokens' || doneData?.stopReason === 'max_turn_requests') {
+            throw new Error(`ACP turn reached its limit (${doneData.stopReason}). Partial answer was not saved. You can retry.`)
+          }
           if (doneData?.usage) {
             promptUsage = doneData.usage
           }

@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { AcpBackend, AcpClient, AcpPromptRequest, AcpSession, AcpUpdate } from '../acp/client.js'
 import { upsertPaper } from '../library/repo.js'
 import { openDb } from '../store/db.js'
-import { ChatManager } from './manager.js'
+import { ChatManager, type AskStreamEvent } from './manager.js'
 import { getChatMessages } from './repo.js'
 import { listUsageRecords, getUsageSummary } from '../usage/repo.js'
 
@@ -415,6 +415,48 @@ describe('ChatManager', () => {
     // The user's turn is still persisted even though the reply failed.
     expect(getChatMessages(db, session.id)).toHaveLength(1)
   })
+
+  it.each(['cancelled', 'max_tokens', 'max_turn_requests'])(
+    'rejects %s after partial streaming and allows explicit retry with fresh context',
+    async (stopReason) => {
+      const updates: AcpUpdate[] = [textUpdate('Completed answer'), doneUpdate]
+      const client = new FakeClient(updates)
+      const manager = new ChatManager(client)
+      const { session } = manager.openChat({ db, paperSlug: slug })
+      const params = { db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'Original question' }
+      await manager.runTurn(params, () => {})
+      updates.splice(0, updates.length, textUpdate('The evidence is'), {
+        kind: 'done', data: { stopReason, usage: { inputTokens: 10, outputTokens: 3 } },
+      })
+      const events: AskStreamEvent[] = []
+      await manager.runTurn({ ...params, text: 'Interrupted question' }, (event) => events.push(event))
+
+      expect(events.map((event) => event.kind)).toEqual(['text', 'error'])
+      expect(events.at(-1)).toMatchObject({ kind: 'error', message: expect.stringContaining(stopReason) })
+      expect(client.sessions[0].disposed).toBe(true)
+      expect(client.newSessionCalls).toBe(1) // No automatic retry.
+      expect(manager.openChat({ db, paperSlug: slug })).toMatchObject({ activeTurn: null })
+      expect(manager.openChat({ db, paperSlug: slug }).messages.map((m) => m.content)).toEqual([
+        'Original question', 'Completed answer', 'Interrupted question',
+      ])
+
+      updates.splice(0, updates.length, textUpdate('Retry answer'), {
+        kind: 'done', data: { stopReason: 'end_turn', usage: { inputTokens: 20, outputTokens: 5, totalTokens: 25 } },
+      })
+      const retryEvents: AskStreamEvent[] = []
+      await manager.runTurn({ ...params, text: 'Please retry' }, (event) => retryEvents.push(event))
+      expect(client.newSessionCalls).toBe(2)
+      const retry = client.sessions[1].requests[0].text
+      expect(retry).toContain('User: Original question')
+      expect(retry).toContain('Assistant: Completed answer')
+      expect(retry).toContain('User: Interrupted question')
+      expect(retry).not.toContain('The evidence is')
+      expect(retryEvents.at(-1)).toMatchObject({ kind: 'done', message: { content: 'Retry answer' } })
+      expect(listUsageRecords(db, { sessionId: session.id })).toHaveLength(2)
+      expect(listUsageRecords(db, { sessionId: session.id })[0]).toMatchObject({ inputTokens: 20, outputTokens: 5, totalTokens: 25 })
+      await manager.disposeAll()
+    },
+  )
 
   it('surfaces a mid-stream error update without persisting a partial assistant message', async () => {
     const client = new FakeClient([textUpdate('partial '), { kind: 'error', data: { message: 'turn timed out' } }])

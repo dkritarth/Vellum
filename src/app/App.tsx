@@ -50,6 +50,7 @@ export function App(): JSX.Element {
   const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null)
   const [selectedCollectionName, setSelectedCollectionName] = useState<string | null>(null)
   const [selectedChatSessionId, setSelectedChatSessionId] = useState<number | null>(null)
+  const [deletedSessionIds, setDeletedSessionIds] = useState<readonly number[]>([])
   const [chatBanner, setChatBanner] = useState<string | null>(null)
 
   async function handleSelectChatSession(session: ChatSessionSummary): Promise<void> {
@@ -137,6 +138,7 @@ export function App(): JSX.Element {
           onSelectCollection={handleSelectCollection}
           selectedSessionId={selectedChatSessionId}
           onSelectSession={handleSelectChatSession}
+          onSessionDeleted={(id) => setDeletedSessionIds((ids) => [...ids, id])}
           onSelectTrash={() => setView('trash')}
           onSelectUsage={() => setView('usage')}
         />
@@ -197,6 +199,7 @@ export function App(): JSX.Element {
           onJumpToHighlight={jumpToHighlight}
           injectedPrompt={injectedPrompt}
           targetSessionId={selectedChatSessionId}
+          deletedSessionIds={deletedSessionIds}
         />
       </div>
       <IngestModal

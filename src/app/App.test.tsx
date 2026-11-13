@@ -158,3 +158,62 @@ describe('App shell', () => {
     expect(screen.getByText('ACP Usage & Plan Telemetry')).toBeInTheDocument()
   })
 })
+
+// Exercise deletion through the real Sidebar/ChatsList/RightPanel/AskPanel seam.
+describe('displayed conversation deletion', () => {
+  const slug = 'arxiv-1706.03762'
+  async function setup(explicit = false) {
+    const user = userEvent.setup()
+    let deleted = false
+    const snapshot = (id: number) => ({
+      session: { id, paperSlug: slug, backend: 'codex', title: null, createdAt: 't' },
+      messages: [{ id: id * 10, sessionId: id, role: 'assistant', content: id === 1 ? 'Deleted history' : 'Remaining history', createdAt: 't' }],
+    })
+    Object.assign(window.vellum, {
+      collectionsList: vi.fn().mockResolvedValue([]),
+      questionsGet: vi.fn().mockResolvedValue([]),
+      getPaper: vi.fn().mockResolvedValue({ slug, title: 'Attention Is All You Need' }),
+      askOpen: vi.fn().mockImplementation(() => Promise.resolve(snapshot(deleted ? 2 : 1))),
+      askStart: vi.fn().mockResolvedValue({ requestId: 'next' }),
+      chatListSessions: vi.fn().mockImplementation(() => Promise.resolve((deleted ? [2] : [1, 2]).map((id) => ({
+        id, paperSlug: slug, paperTitle: 'Attention Is All You Need', title: `Conversation ${id}`, backend: 'codex', messageCount: 1, lastActiveAt: '2026-11-01',
+      })))),
+      chatDeleteSession: vi.fn().mockImplementation(async (id: number) => { if (id === 1) deleted = true }),
+    })
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'Library' }))
+    await user.click(await screen.findByText('Attention Is All You Need'))
+    await screen.findByText('Deleted history')
+    await user.click(screen.getByRole('tab', { name: 'Chats' }))
+    await screen.findByText('Conversation 1')
+    if (explicit) await user.click(screen.getByText('Conversation 1'))
+    return { user }
+  }
+
+  afterEach(() => vi.restoreAllMocks())
+
+  it.each([false, true])('reopens a valid session after deleting displayed chat (explicit=%s)', async (explicit) => {
+    const { user } = await setup(explicit)
+    await user.click(screen.getByRole('button', { name: 'Delete chat Conversation 1' }))
+    await screen.findByText('Remaining history')
+    expect(screen.queryByText('Deleted history')).not.toBeInTheDocument()
+    await user.type(screen.getByLabelText('Ask a question'), 'Next question')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    expect(window.vellum.askStart).toHaveBeenLastCalledWith({ chatSessionId: 2, slug, text: 'Next question' })
+  })
+
+  it.each(['unrelated', 'cancel', 'failure'])('preserves displayed history and draft on %s deletion', async (kind) => {
+    const { user } = await setup()
+    await user.type(screen.getByLabelText('Ask a question'), 'Keep draft')
+    if (kind === 'cancel') vi.mocked(window.confirm).mockReturnValue(false)
+    if (kind === 'failure') {
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      vi.mocked(window.vellum.chatDeleteSession).mockRejectedValue(new Error('delete failed'))
+    }
+    await user.click(screen.getByRole('button', { name: `Delete chat Conversation ${kind === 'unrelated' ? 2 : 1}` }))
+    expect(screen.getByText('Deleted history')).toBeInTheDocument()
+    expect(screen.getByLabelText('Ask a question')).toHaveValue('Keep draft')
+    expect(window.vellum.askOpen).toHaveBeenCalledTimes(1)
+  })
+})

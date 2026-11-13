@@ -17,6 +17,7 @@ import {
   clampScale,
   countOccurrences,
   expandCitationNumbers,
+  clearReaderViewState,
   injectCitationMarkers,
   rangeFromAnchor,
   Reader,
@@ -86,6 +87,7 @@ vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
 vi.mock('pdfjs-dist/legacy/build/pdf.worker.mjs?url', () => ({ default: 'worker-url' }))
 
 beforeEach(() => {
+  clearReaderViewState()
   // jsdom has no 2d canvas context and logs "Not implemented" for
   // getContext; return null quietly (ReaderPage skips the raster then).
   HTMLCanvasElement.prototype.getContext = (() => null) as typeof HTMLCanvasElement.prototype.getContext
@@ -878,5 +880,21 @@ describe('injectCitationMarkers idempotency', () => {
     expect(container.querySelectorAll('button')).toHaveLength(2)
     expect(container.querySelector('button button')).toBeNull()
     expect(container.textContent).toBe('see [1] and [2]')
+  })
+})
+
+describe('Reader remembers zoom per paper (#202)', () => {
+  it('restores a paper\'s zoom when it is reopened', async () => {
+    const user = userEvent.setup()
+    const first = render(<Reader slug="paper-a" />)
+    await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2'))
+    await user.click(screen.getByRole('button', { name: 'Zoom in' }))
+    await user.click(screen.getByRole('button', { name: 'Zoom in' }))
+    expect(screen.getByLabelText('Zoom')).toHaveTextContent('150%')
+    first.unmount()
+
+    render(<Reader slug="paper-a" />)
+    await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2'))
+    expect(screen.getByLabelText('Zoom')).toHaveTextContent('150%')
   })
 })

@@ -205,10 +205,35 @@ const FLASH_DURATION_MS = 1500
 /** Delay after the last zoom change before pages re-rasterise at the new
  * scale. Until then the previous canvases are stretched. */
 const RENDER_SCALE_DEBOUNCE_MS = 150
+/** Zoom events closer together than this (at the same cursor point) are one
+ * gesture and share a zoom anchor. */
+const GESTURE_IDLE_MS = 250
 /** Space left above a page when jumping to it. */
 const JUMP_TOP_MARGIN_PX = 8
 
 const NO_HIGHLIGHTS: HighlightRecord[] = []
+
+/** Where the reader was in a paper: zoom plus the page point at the top
+ * centre of the pane. Kept per slug for the session so switching tabs or
+ * visiting Library and coming back doesn't reset to page 1 / 100% (#202). */
+interface ReaderViewState {
+  scale: number
+  page: number
+  fx: number
+  fy: number
+}
+
+const viewStateBySlug = new Map<string, ReaderViewState>()
+
+/** Test hook: forget remembered positions/zoom. */
+export function clearReaderViewState(): void {
+  viewStateBySlug.clear()
+}
+
+function topAnchorPoint(viewport: HTMLElement): { x: number; y: number } {
+  const rect = viewport.getBoundingClientRect()
+  return { x: rect.left + viewport.clientWidth / 2, y: rect.top + 1 }
+}
 
 interface PageSize {
   width: number
@@ -265,6 +290,19 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
   // Cleared by any user scroll input.
   const pageLockRef = useRef<number | null>(null)
   const scrollFrameRef = useRef<number | null>(null)
+  const gestureAnchorRef = useRef<{ anchor: ZoomAnchor; time: number } | null>(null)
+  const slugRef = useRef(slug)
+  slugRef.current = slug
+
+  const saveViewState = useCallback((): void => {
+    const viewport = viewportRef.current
+    const current = slugRef.current
+    if (!viewport || !current) return
+    const { x, y } = topAnchorPoint(viewport)
+    const anchor = captureZoomAnchor(viewport, x, y)
+    if (!anchor) return
+    viewStateBySlug.set(current, { scale: scaleRef.current, page: anchor.page, fx: anchor.fx, fy: anchor.fy })
+  }, [])
 
   // Load the document whenever the open paper changes.
   useEffect(() => {
@@ -310,6 +348,12 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
           if (cancelled) return
           const viewport = page.getViewport({ scale: 1 })
           sizes.push({ width: viewport.width, height: viewport.height })
+        }
+        const saved = viewStateBySlug.get(slug)
+        if (saved) {
+          scaleRef.current = saved.scale
+          setScale(saved.scale)
+          setRenderScale(saved.scale)
         }
         setPageSizes(sizes)
         setDoc(pdf)
@@ -379,12 +423,19 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
     setPageNumber(pickCurrentPage(boxes, scrollTop, clientHeight))
   }, [])
 
-  // New document: start at the top-left and compute the first window.
+  // New document: return to the remembered position for this paper, or
+  // start at the top-left; then compute the first render window.
   useLayoutEffect(() => {
     const viewport = viewportRef.current
     if (!viewport || !doc) return
     viewport.scrollTop = 0
     viewport.scrollLeft = 0
+    const saved = slugRef.current ? viewStateBySlug.get(slugRef.current) : undefined
+    if (saved) {
+      const { x, y } = topAnchorPoint(viewport)
+      restoreZoomAnchor(viewport, { page: saved.page, fx: saved.fx, fy: saved.fy, clientX: x, clientY: y })
+      setPageNumber(saved.page)
+    }
     updateViewport(false)
   }, [doc, updateViewport])
 
@@ -409,6 +460,7 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
     scrollFrameRef.current = requestAnimationFrame(() => {
       scrollFrameRef.current = null
       updateViewport(true)
+      saveViewState()
     })
   }
 
@@ -430,11 +482,21 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
       let anchor: ZoomAnchor | null = null
       if (viewport) {
         const rect = viewport.getBoundingClientRect()
-        anchor = captureZoomAnchor(
-          viewport,
-          clientX ?? rect.left + viewport.clientWidth / 2,
-          clientY ?? rect.top + viewport.clientHeight / 2,
-        )
+        const x = clientX ?? rect.left + viewport.clientWidth / 2
+        const y = clientY ?? rect.top + viewport.clientHeight / 2
+        // A pinch is dozens of wheel events. Re-capturing the anchor after
+        // each one accumulates the integer rounding of scroll offsets, so
+        // reuse the gesture's first anchor while the cursor holds still.
+        const now = performance.now()
+        const previous = gestureAnchorRef.current
+        anchor =
+          previous &&
+          now - previous.time < GESTURE_IDLE_MS &&
+          Math.abs(previous.anchor.clientX - x) <= 2 &&
+          Math.abs(previous.anchor.clientY - y) <= 2
+            ? previous.anchor
+            : captureZoomAnchor(viewport, x, y)
+        gestureAnchorRef.current = anchor ? { anchor, time: now } : null
       }
       scaleRef.current = to
       // Commit the new layout synchronously so the anchor can be restored
@@ -446,8 +508,9 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
       })
       if (viewport && anchor) restoreZoomAnchor(viewport, anchor)
       updateViewport(false)
+      saveViewState()
     },
-    [updateViewport],
+    [updateViewport, saveViewState],
   )
 
   // Trackpad pinch (and Ctrl/Cmd + mouse wheel) arrives as a `wheel` event
@@ -462,6 +525,7 @@ export function Reader({ slug, highlightTool, jumpTarget, onAddToChat, onExplain
         return
       }
       pageLockRef.current = null
+      gestureAnchorRef.current = null
     }
     viewportEl.addEventListener('wheel', handleWheel, { passive: false })
     return () => viewportEl.removeEventListener('wheel', handleWheel)

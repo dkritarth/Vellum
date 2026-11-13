@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
@@ -216,4 +216,162 @@ describe('displayed conversation deletion', () => {
     expect(screen.getByLabelText('Ask a question')).toHaveValue('Keep draft')
     expect(window.vellum.askOpen).toHaveBeenCalledTimes(1)
   })
+})
+
+// Public App journey: actual Chats options, tabs, Library, and Ask bridge calls.
+describe('chat navigation ownership', () => {
+  type Paper = NonNullable<Awaited<ReturnType<typeof window.vellum.getPaper>>>
+  function deferred() {
+    let resolve!: (paper: Paper | null) => void
+    let reject!: (error: Error) => void
+    const promise = new Promise<Paper | null>((yes, no) => { resolve = yes; reject = no })
+    return { promise, resolve, reject }
+  }
+  const papers: Paper[] = ['A', 'B'].map((name) => ({
+    slug: `paper-${name.toLowerCase()}`, title: `Paper ${name}`, authors: [],
+    addedAt: '2026-01-01', pdfPath: 'paper.pdf', mdPath: 'paper.md',
+  }))
+  async function setup() {
+    const user = userEvent.setup()
+    const deleted = new Set<number>()
+    Object.assign(window.vellum, {
+      listPapers: vi.fn().mockResolvedValue(papers),
+      getPaper: vi.fn().mockImplementation(async (slug: string) => papers.find((paper) => paper.slug === slug) ?? null),
+      collectionsList: vi.fn().mockResolvedValue([]),
+      questionsGet: vi.fn().mockResolvedValue([]),
+      chatListSessions: vi.fn().mockResolvedValue(papers.map((paper, i) => ({
+        id: i + 1, paperSlug: paper.slug, paperTitle: paper.title, title: `Chat ${i + 1}`,
+        backend: 'codex', messageCount: 1, lastActiveAt: '2026-01-01',
+      }))),
+      askOpen: vi.fn().mockImplementation(async (target: string | { slug: string; sessionId?: number }) => {
+        const slug = typeof target === 'string' ? target : target.slug
+        const requestedId = typeof target === 'string' ? (slug === 'paper-a' ? 1 : 2) : target.sessionId
+        const id = requestedId !== undefined && deleted.has(requestedId) ? 3 : requestedId
+        return { session: { id, paperSlug: slug, backend: 'codex', title: null, createdAt: 't' }, messages: [] }
+      }),
+      askStart: vi.fn().mockResolvedValue({ requestId: 'next' }),
+      chatDeleteSession: vi.fn().mockImplementation(async (id: number) => { deleted.add(id) }),
+    })
+    render(<App />)
+    await user.click(screen.getByRole('tab', { name: 'Chats' }))
+    await screen.findByRole('option', { name: /Chat 1/ })
+    return { user, chat: (id: number) => screen.getByRole('option', { name: new RegExp(`Chat ${id}`) }) }
+  }
+
+  it('keeps latest chat and paper together when lookups finish in reverse order', async () => {
+    const { user, chat } = await setup()
+    const a = deferred(), b = deferred()
+    vi.mocked(window.vellum.getPaper).mockReturnValueOnce(a.promise).mockReturnValueOnce(b.promise)
+    await user.click(chat(1))
+    await user.click(chat(2))
+    await act(async () => b.resolve(papers[1]))
+    expect(screen.getByRole('tab', { name: 'Paper B' })).toHaveAttribute('aria-selected', 'true')
+    await act(async () => a.resolve(papers[0]))
+    expect(screen.getByRole('tab', { name: 'Paper B' })).toHaveAttribute('aria-selected', 'true')
+    expect(chat(2)).toHaveAttribute('aria-selected', 'true')
+    expect(window.vellum.askOpen).toHaveBeenCalledTimes(1)
+    expect(window.vellum.askOpen).toHaveBeenLastCalledWith({ slug: 'paper-b', sessionId: 2 })
+  })
+  it('keeps displayed chat and draft until associated paper resolves, then commits both', async () => {
+    const { user, chat } = await setup()
+    await user.click(chat(1))
+    await user.type(screen.getByLabelText('Ask a question'), 'Keep draft')
+    const pending = deferred()
+    vi.mocked(window.vellum.getPaper).mockReturnValueOnce(pending.promise)
+    await user.click(chat(2))
+    expect(chat(1)).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByLabelText('Ask a question')).toHaveValue('Keep draft')
+    expect(window.vellum.askOpen).toHaveBeenCalledTimes(1)
+    await act(async () => pending.resolve(papers[1]))
+    expect(screen.getByRole('tab', { name: 'Paper B' })).toHaveAttribute('aria-selected', 'true')
+    expect(chat(2)).toHaveAttribute('aria-selected', 'true')
+    await user.type(screen.getByLabelText('Ask a question'), 'Question for B')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    expect(window.vellum.askStart).toHaveBeenLastCalledWith({ slug: 'paper-b', chatSessionId: 2, text: 'Question for B' })
+    // Direct navigation to another paper must not carry B's durable chat ID.
+    await user.click(screen.getByRole('tab', { name: 'Paper A' }))
+    expect(window.vellum.askOpen).toHaveBeenLastCalledWith('paper-a')
+  })
+
+  for (const navigation of ['paper', 'tab', 'library', 'home', 'trash', 'usage'] as const) {
+    it.each(['success', 'missing', 'rejected'] as const)(
+      `ignores stale %s after direct ${navigation} navigation`, async (outcome) => {
+        const { user, chat } = await setup()
+        await user.click(chat(2))
+        await user.type(screen.getByLabelText('Ask a question'), 'Preserved draft')
+        if (navigation === 'paper') await user.click(screen.getByRole('button', { name: 'Library' }))
+        const pending = deferred()
+        vi.mocked(window.vellum.getPaper).mockReturnValueOnce(pending.promise)
+        await user.click(chat(1))
+        if (navigation === 'paper') {
+          await user.click(screen.getByText('Paper B', { selector: 'span' }))
+        } else if (navigation === 'tab') {
+          await user.click(screen.getByRole('tab', { name: 'Paper B' }))
+        } else {
+          await user.click(screen.getByRole('button', { name: navigation[0].toUpperCase() + navigation.slice(1) }))
+        }
+        await act(async () => {
+          if (outcome === 'rejected') pending.reject(new Error('lookup failed'))
+          else pending.resolve(outcome === 'missing' ? null : papers[0])
+        })
+        expect(screen.getByRole('tab', { name: 'Paper B' })).toHaveAttribute('aria-selected', 'true')
+        expect(screen.queryByRole('tab', { name: 'Paper A' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+        expect(screen.getByLabelText('Ask a question')).toHaveValue('Preserved draft')
+        expect(window.vellum.askOpen).toHaveBeenCalledTimes(1)
+        if (navigation === 'library') expect(screen.getByLabelText(/search papers by title/i)).toBeInTheDocument()
+        if (navigation === 'trash') expect(screen.getByRole('region', { name: 'Trash view' })).toBeInTheDocument()
+        if (navigation === 'usage') expect(screen.getByRole('region', { name: /usage and telemetry view/i })).toBeInTheDocument()
+      },
+    )
+  }
+
+  it.each(['missing', 'rejected'] as const)('preserves latest missing-paper banner after stale %s', async (outcome) => {
+    const { user, chat } = await setup()
+    const a = deferred(), b = deferred()
+    vi.mocked(window.vellum.getPaper).mockReturnValueOnce(a.promise).mockReturnValueOnce(b.promise)
+    await user.click(chat(1))
+    await user.click(chat(2))
+    await act(async () => b.resolve(null))
+    expect(screen.getByRole('alert')).toHaveTextContent('Chat "Chat 2" references paper "paper-b"')
+    await act(async () => outcome === 'missing' ? a.resolve(null) : a.reject(new Error('stale failure')))
+    expect(screen.getByRole('alert')).toHaveTextContent('Chat "Chat 2" references paper "paper-b"')
+    expect(window.vellum.askOpen).not.toHaveBeenCalled()
+  })
+
+  it.each(['missing', 'rejected'] as const)('shows current %s error without changing displayed chat; retry recovers', async (outcome) => {
+    const { user, chat } = await setup()
+    await user.click(chat(2))
+    await user.type(screen.getByLabelText('Ask a question'), 'Preserved draft')
+    const pending = deferred()
+    vi.mocked(window.vellum.getPaper).mockReturnValueOnce(pending.promise)
+    await user.click(chat(1))
+    await act(async () => outcome === 'missing' ? pending.resolve(null) : pending.reject(new Error('current failure')))
+    expect(screen.getByRole('alert')).toHaveTextContent(outcome === 'missing' ? 'was not found in your library' : 'Could not load paper for chat "Chat 1"')
+    expect(chat(2)).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByLabelText('Ask a question')).toHaveValue('Preserved draft')
+    await user.click(chat(1))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Paper A' })).toHaveAttribute('aria-selected', 'true')
+    expect(window.vellum.askOpen).toHaveBeenLastCalledWith({ slug: 'paper-a', sessionId: 1 })
+  })
+
+  it.each(['success', 'missing', 'rejected'] as const)('does not resurrect deleted pending target on %s', async (outcome) => {
+    const { user, chat } = await setup()
+    await user.click(chat(2))
+    await user.type(screen.getByLabelText('Ask a question'), 'Preserved draft')
+    const pending = deferred()
+    vi.mocked(window.vellum.getPaper).mockReturnValueOnce(pending.promise)
+    await user.click(chat(1))
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    vi.mocked(window.vellum.chatListSessions).mockResolvedValue([])
+    await user.click(screen.getByRole('button', { name: 'Delete chat Chat 1' }))
+    await act(async () => outcome === 'rejected' ? pending.reject(new Error('deleted lookup')) : pending.resolve(outcome === 'missing' ? null : papers[0]))
+    expect(screen.getByRole('tab', { name: 'Paper B' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByRole('tab', { name: 'Paper A' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Ask a question')).toHaveValue('Preserved draft')
+    expect(window.vellum.askOpen).toHaveBeenCalledTimes(1)
+  })
+
 })

@@ -254,8 +254,11 @@
   display: contents;
 }
 
+/* Explicit color: Electron 32 (Chromium 128) does not support the
+   AccentColor system color, and an invalid background inside any ::selection
+   rule leaves the selection fully transparent while dragging. */
 .textLayer ::selection {
-  background: color-mix(in srgb, AccentColor, transparent 50%);
+  background: rgba(64, 128, 255, 0.38);
   color: transparent;
 }
 

@@ -602,13 +602,6 @@ export function Reader({
   }, [doc, updateViewport])
 
 
-  useEffect(() => {
-    if (!viewportEl || typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(() => updateViewport(false))
-    observer.observe(viewportEl)
-    return () => observer.disconnect()
-  }, [viewportEl, updateViewport])
-
   useEffect(
     () => () => {
       if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current)

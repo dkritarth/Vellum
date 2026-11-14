@@ -1,0 +1,34 @@
+.handle {
+  position: relative;
+  flex: 0 0 5px;
+  margin: 0 -2px;
+  z-index: 5;
+  cursor: col-resize;
+  touch-action: none;
+  background: transparent;
+  transition: background 120ms ease;
+}
+
+.handle::after {
+  content: '';
+  position: absolute;
+  inset: 0 2px;
+  background: transparent;
+  transition: background 120ms ease;
+}
+
+.handle:hover::after,
+.handle:focus-visible::after,
+:global(body[data-resizing='true']) .handle::after {
+  background: var(--vellum-accent, #6d8cff);
+}
+
+.handle:focus-visible {
+  outline: none;
+}
+
+/* While dragging, keep the cursor and stop text selection everywhere. */
+:global(body[data-resizing='true']) {
+  cursor: col-resize;
+  user-select: none;
+}

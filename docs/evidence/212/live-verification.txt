@@ -1,0 +1,6 @@
+• 23:45:06 ingested /tmp/vellum-pdfs/attn.pdf
+• 23:45:12 right pane 360 -> 503
+• 23:45:15 fitted zoom: 67%
+• 23:45:21 {"selection":true,"dragResize":true,"leftHidden":true,"rightHiddenByShortcut":true,"interruptedDrag":true,"widthClamped":true,"readerFits":true,"noHorizontalClipping":true,"doubleClickReset":true,"persistLeftHidden":true,"persistWidth":true}
+• 23:45:21 console errors (session 2): 0
+LIVE2: PASS

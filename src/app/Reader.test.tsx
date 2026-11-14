@@ -1055,3 +1055,35 @@ describe('Reader document ownership and search errors (ported stack)', () => {
     expect(screen.queryByLabelText('Search matches')).toBeNull()
   })
 })
+
+describe('Reader follows available panel width', () => {
+  it('fits the paper after a panel resize, while preserving a manually chosen zoom', async () => {
+    let resize: (() => void) | undefined
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { resize = callback }
+      observe() {}
+      disconnect() {}
+    })
+    try {
+      const { container } = render(<Reader slug="my-paper" />)
+      await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2'))
+      const viewport = container.querySelector('[data-reader-viewport]') as HTMLElement
+      Object.defineProperty(viewport, 'clientWidth', { configurable: true, value: 132 })
+      act(() => resize?.())
+      expect(screen.getByLabelText('Zoom')).toHaveTextContent('100%')
+      Object.defineProperty(viewport, 'clientWidth', { configurable: true, value: 82 })
+      act(() => resize?.())
+      expect(screen.getByLabelText('Zoom')).toHaveTextContent('50%')
+      Object.defineProperty(viewport, 'clientWidth', { configurable: true, value: 132 })
+      act(() => resize?.())
+      expect(screen.getByLabelText('Zoom')).toHaveTextContent('100%')
+      fireEvent.wheel(viewport, { deltaY: -10, ctrlKey: true })
+      expect(screen.getByLabelText('Zoom')).toHaveTextContent('111%')
+      Object.defineProperty(viewport, 'clientWidth', { configurable: true, value: 82 })
+      act(() => resize?.())
+      expect(screen.getByLabelText('Zoom')).toHaveTextContent('111%')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})

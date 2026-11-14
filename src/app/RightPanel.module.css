@@ -1,8 +1,8 @@
 .rightPanel {
   display: flex;
   flex-direction: column;
-  width: 320px;
-  flex-shrink: 0;
+  width: 100%;
+  min-width: 0;
   border-left: 1px solid var(--vellum-border, #2a2a2a);
   background: var(--vellum-surface, #1a1a1a);
   overflow: hidden;

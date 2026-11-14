@@ -1,8 +1,8 @@
 .sidebar {
   display: flex;
   flex-direction: column;
-  width: 220px;
-  flex-shrink: 0;
+  width: 100%;
+  min-width: 0;
   border-right: 1px solid var(--vellum-border, #2a2a2a);
   background: var(--vellum-surface, #1a1a1a);
   padding: 12px 8px;

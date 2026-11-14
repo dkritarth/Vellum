@@ -14,6 +14,8 @@ import type { PaperTab } from './TabStrip'
 import { RightPanel, type RightPanelTab } from './RightPanel'
 import type { InjectedPrompt } from './AskPanel'
 import type { HighlightRecord } from '../../core/highlights/repo'
+import { ResizeHandle } from './ResizeHandle'
+import { usePanelLayout, type PanelSide } from './panelLayout'
 import styles from './App.module.css'
 
 // Vellum shell — [P1-07] anara-style frame, [P1-08] wires in real data:
@@ -61,6 +63,19 @@ export function App(): JSX.Element {
   // Bumped when a paper is dropped on a sidebar collection so the Library
   // re-reads tags and the filtered list.
   const [libraryRefreshNonce, setLibraryRefreshNonce] = useState(0)
+  const panels = usePanelLayout()
+  const { toggle: togglePanel, setCollapsed: setPanelCollapsed } = panels
+
+  // Mod+B toggles the sidebar, Mod+Alt+B the paper panel (as in VS Code).
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.code !== 'KeyB') return
+      event.preventDefault()
+      togglePanel(event.altKey ? 'right' : 'left')
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [togglePanel])
 
   const activeNavItem: NavItem | null =
     view === 'reader' ? 'Home' : view === 'library' ? (libraryViaSearch ? 'Search' : 'Library') : null
@@ -108,6 +123,7 @@ export function App(): JSX.Element {
   }
 
   function handleAddToChat(quote: string, page: number): void {
+    setPanelCollapsed('right', false)
     setRightPanelTab('Ask')
     setInjectedPrompt({
       text: `> "${quote}" (p. ${page})
@@ -120,6 +136,7 @@ export function App(): JSX.Element {
   }
 
   function handleExplain(quote: string, page: number): void {
+    setPanelCollapsed('right', false)
     setRightPanelTab('Ask')
     setInjectedPrompt({
       text: `Explain this passage from page ${page}:
@@ -211,6 +228,12 @@ export function App(): JSX.Element {
         onNewTab={showLibrary}
       />
       <div className={styles.body}>
+        <div
+          className={styles.sidePane}
+          style={{ width: panels.layout.leftWidth }}
+          hidden={panels.layout.leftCollapsed}
+          data-testid="left-pane"
+        >
         <Sidebar
           onNavChange={handleNavChange}
           selectedCollectionId={selectedCollectionId}
@@ -225,6 +248,16 @@ export function App(): JSX.Element {
           onPaperAssigned={() => setLibraryRefreshNonce((n) => n + 1)}
           onCollectionsChanged={() => setLibraryRefreshNonce((n) => n + 1)}
         />
+        </div>
+        {panels.layout.leftCollapsed ? null : (
+          <ResizeHandle
+            side="left"
+            width={panels.layout.leftWidth}
+            onResize={(width) => panels.setWidth('left', width)}
+            onReset={() => panels.resetWidth('left')}
+            onCollapse={() => panels.setCollapsed('left', true)}
+          />
+        )}
         <main className={styles.centerPane} aria-label="Paper view">
           {chatBanner && (
             <div role="alert" className={styles.chatBanner}>
@@ -282,6 +315,23 @@ export function App(): JSX.Element {
             )}
           </div>
         </main>
+        {panels.layout.rightCollapsed ? null : (
+          <ResizeHandle
+            side="right"
+            width={panels.layout.rightWidth}
+            onResize={(width) => panels.setWidth('right', width)}
+            onReset={() => panels.resetWidth('right')}
+            onCollapse={() => panels.setCollapsed('right', true)}
+          />
+        )}
+        {/* Collapsed panels stay mounted (hidden) so streaming answers and
+            unsent drafts survive a collapse. */}
+        <div
+          className={styles.sidePane}
+          style={{ width: panels.layout.rightWidth }}
+          hidden={panels.layout.rightCollapsed}
+          data-testid="right-pane"
+        >
         <RightPanel
           slug={activeTabId ?? undefined}
           activeTab={rightPanelTab}
@@ -294,6 +344,7 @@ export function App(): JSX.Element {
           targetSessionId={selectedChatSessionId}
           deletedSessionIds={deletedSessionIds}
         />
+        </div>
       </div>
       <IngestModal
         isOpen={isIngestOpen}
@@ -304,10 +355,34 @@ export function App(): JSX.Element {
         }}
       />
       <footer className={styles.statusBar}>
+        <PanelToggle side="left" collapsed={panels.layout.leftCollapsed} onToggle={togglePanel} />
         <span>Vellum</span>
         <span className={styles.statusBarSpacer} />
         <span>bridge: {pong}</span>
+        <PanelToggle side="right" collapsed={panels.layout.rightCollapsed} onToggle={togglePanel} />
       </footer>
     </div>
+  )
+}
+
+const IS_MAC = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform)
+
+function PanelToggle({ side, collapsed, onToggle }: { side: PanelSide; collapsed: boolean; onToggle: (side: PanelSide) => void }) {
+  const name = side === 'left' ? 'sidebar' : 'paper panel'
+  const shortcut = `${IS_MAC ? '⌘' : 'Ctrl+'}${side === 'right' ? (IS_MAC ? '⌥' : 'Alt+') : ''}B`
+  return (
+    <button
+      type="button"
+      className={styles.panelToggle}
+      aria-pressed={!collapsed}
+      aria-label={`${collapsed ? 'Show' : 'Hide'} ${name}`}
+      title={`${collapsed ? 'Show' : 'Hide'} ${name} (${shortcut})`}
+      onClick={() => onToggle(side)}
+    >
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+        <rect x="1.5" y="2.5" width="13" height="11" rx="2" fill="none" stroke="currentColor" />
+        <rect x={side === 'left' ? 2 : 10} y="3" width="4" height="10" rx="1" fill="currentColor" opacity={collapsed ? 0.25 : 0.9} />
+      </svg>
+    </button>
   )
 }

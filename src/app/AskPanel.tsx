@@ -19,6 +19,7 @@ import type { AskUpdatePayload } from '../../electron/preload'
 import { ModelSelector, isChatBackend } from './ModelSelector'
 import type { ChatBackend } from './ModelSelector'
 import { QuickActions } from './QuickActions'
+import { MarkdownText } from './MarkdownText'
 import styles from './AskPanel.module.css'
 
 type Role = 'user' | 'assistant'
@@ -316,7 +317,7 @@ export function AskPanel({
               key={message.id}
               className={message.role === 'user' ? styles.userMessage : styles.assistantMessage}
             >
-              {message.content}
+              {message.role === 'assistant' ? <MarkdownText text={message.content} /> : message.content}
             </div>
           ))
         )}

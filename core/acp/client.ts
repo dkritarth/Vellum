@@ -46,6 +46,8 @@ export interface AcpPromptRequest {
 export interface AcpUpdate {
   kind: 'text' | 'tool_call' | 'tool_result' | 'usage_update' | 'done' | 'error'
   data: unknown
+  /** For 'text': the agent message this chunk belongs to, when the agent reports one. */
+  messageId?: string
 }
 
 export interface AcpSession {

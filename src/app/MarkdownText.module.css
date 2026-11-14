@@ -1,0 +1,78 @@
+.markdown {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown p,
+.markdown ul,
+.markdown ol,
+.markdown pre {
+  margin: 0 0 8px;
+}
+
+.markdown ul,
+.markdown ol {
+  padding-left: 20px;
+}
+
+.markdown li + li {
+  margin-top: 3px;
+}
+
+.markdown strong {
+  font-weight: 650;
+  color: var(--vellum-text, #f2f2f2);
+}
+
+.markdown hr {
+  border: 0;
+  border-top: 1px solid var(--vellum-border, #333333);
+  margin: 10px 0;
+}
+
+.heading {
+  font-weight: 650;
+  margin-top: 12px;
+}
+
+.code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.math {
+  font-family: 'Cambria Math', 'STIX Two Math', 'Latin Modern Math', Georgia, serif;
+  font-style: italic;
+}
+
+.mathBlock {
+  font-family: 'Cambria Math', 'STIX Two Math', 'Latin Modern Math', Georgia, serif;
+  font-style: italic;
+  text-align: center;
+  overflow-x: auto;
+}
+
+.link {
+  text-decoration: underline dotted;
+}

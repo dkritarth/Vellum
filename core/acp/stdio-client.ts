@@ -260,7 +260,9 @@ async function terminateAdapter(child: AdapterChildProcess): Promise<void> {
 export function mapSessionUpdate(update: SessionUpdate): AcpUpdate {
   switch (update.sessionUpdate) {
     case 'agent_message_chunk':
-      return { kind: 'text', data: update.content }
+      return typeof update.messageId === 'string'
+        ? { kind: 'text', data: update.content, messageId: update.messageId }
+        : { kind: 'text', data: update.content }
     // Only the agent's answer is 'text'. Some agents (agy) echo the user's
     // prompt back as user_message_chunk and stream reasoning as
     // agent_thought_chunk; treating those as text pasted the prompt and the

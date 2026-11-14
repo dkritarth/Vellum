@@ -161,6 +161,32 @@ describe('ChatManager', () => {
     expect(messages[1]).toMatchObject({ role: 'assistant', content: 'The core contribution is the Transformer.' })
   })
 
+  it('separates agent messages with a blank line instead of running them together', async () => {
+    const msg = (text: string, messageId: string): AcpUpdate => ({ ...textUpdate(text), messageId })
+    const toolCall: AcpUpdate = { kind: 'tool_call', data: { toolCallId: 't1' } }
+    const client = new FakeClient([
+      textUpdate('I will read the paper.'),
+      toolCall,
+      textUpdate('The paper reports '),
+      textUpdate('28.4 BLEU.'),
+      msg('Preamble.', 'm1'),
+      msg('Answer ', 'm2'),
+      msg('text.', 'm2'),
+      doneUpdate,
+    ])
+    const manager = new ChatManager(client)
+    const { session } = manager.openChat({ db, paperSlug: slug })
+    const streamed: string[] = []
+    await manager.runTurn(
+      { db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'q' },
+      (event) => { if (event.kind === 'text') streamed.push(event.text) },
+    )
+
+    const expected = 'I will read the paper.\n\nThe paper reports 28.4 BLEU.Preamble.\n\nAnswer text.'
+    expect(getChatMessages(db, session.id)[1].content).toBe(expected)
+    expect(streamed.join('')).toBe(expected)
+  })
+
   it('passes the paper markdown path as a context file (grounding)', async () => {
     const client = new FakeClient([doneUpdate])
     const manager = new ChatManager(client)

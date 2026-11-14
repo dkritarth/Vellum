@@ -54,6 +54,11 @@ function textFromUpdate(update: AcpUpdate): string {
   return ''
 }
 
+function paragraphSeparator(text: string): string {
+  if (text.endsWith('\n\n')) return ''
+  return text.endsWith('\n') ? '\n' : '\n\n'
+}
+
 function errorMessageFromUpdate(update: AcpUpdate): string {
   const data = update.data
   if (typeof data === 'object' && data !== null) {
@@ -251,6 +256,11 @@ export class ChatManager {
     const promptText = buildPromptText(params.mdPath, params.text, freshlySpawned ? priorMessages : [])
 
     let accumulated = ''
+    // Agents such as Codex send a short preamble message, run tools, then
+    // send the answer as a new message. Join separate messages with a blank
+    // line so the preamble does not run into the answer's first sentence.
+    let lastMessageId: string | undefined
+    let messageBreak = false
     let latestUsageUpdate: { used?: number; size?: number; costAmount?: number; costCurrency?: string } | undefined
     let promptUsage: {
       inputTokens?: number | null
@@ -264,12 +274,17 @@ export class ChatManager {
     try {
       for await (const update of acpSession.prompt({ text: promptText, contextFiles: [params.mdPath] })) {
         if (update.kind === 'text') {
-          const chunk = textFromUpdate(update)
+          let chunk = textFromUpdate(update)
+          if (update.messageId && lastMessageId && update.messageId !== lastMessageId) messageBreak = true
+          if (update.messageId) lastMessageId = update.messageId
           if (chunk) {
+            if (messageBreak && accumulated.trim() !== '') chunk = paragraphSeparator(accumulated) + chunk
+            messageBreak = false
             accumulated += chunk
             onEvent({ kind: 'text', text: chunk })
           }
         } else if (update.kind === 'tool_call' || update.kind === 'tool_result') {
+          if (update.kind === 'tool_call') messageBreak = true
           onEvent({ kind: 'tool_activity' })
         } else if (update.kind === 'usage_update') {
           const u = update.data as { used?: number; size?: number; cost?: { amount?: number; currency?: string } } | undefined

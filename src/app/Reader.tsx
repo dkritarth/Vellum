@@ -601,8 +601,7 @@ export function Reader({
     updateViewport(false)
   }, [doc, updateViewport])
 
-  // Pane resizes (window resize, TOC/right panel toggles) change how many
-  // pages fit.
+
   useEffect(() => {
     if (!viewportEl || typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(() => updateViewport(false))
@@ -674,6 +673,25 @@ export function Reader({
     },
     [updateViewport, saveViewState],
   )
+
+  // Follow available width at the default zoom. Once the user explicitly
+  // zooms, retain that scale and let the viewport scroll horizontally.
+  useEffect(() => {
+    if (!viewportEl || !pageSizes.length || typeof ResizeObserver === 'undefined') return
+    const widestPage = Math.max(...pageSizes.map((size) => size.width))
+    let previousFit = DEFAULT_SCALE
+    const observer = new ResizeObserver(() => {
+      const available = viewportEl.clientWidth - 32 // .pages has 16px padding per side.
+      if (available > 0 && widestPage > 0) {
+        const nextFit = clampScale(Math.round(Math.min(DEFAULT_SCALE, available / widestPage) * 1000) / 1000)
+        if (Math.abs(scaleRef.current - previousFit) < 0.001) applyZoom(nextFit)
+        previousFit = nextFit
+      }
+      updateViewport(false)
+    })
+    observer.observe(viewportEl)
+    return () => observer.disconnect()
+  }, [viewportEl, pageSizes, applyZoom, updateViewport])
 
   // Trackpad pinch (and Ctrl/Cmd + mouse wheel) arrives as a `wheel` event
   // with ctrlKey set. React's onWheel is passive, so preventDefault — which

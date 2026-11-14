@@ -46,7 +46,11 @@ type AdapterChildProcess = ChildProcessByStdio<Writable, Readable, null>
 /** First-party adapter subprocess per backend. Do not add others here without
  * a card — this is the whole point of the "no OAuth bridge" guardrail. */
 const ADAPTERS: Record<AcpBackend, { command: string }> = {
-  claude: { command: 'claude-code-acp' },
+  // `claude-agent-acp` is the current name of the first-party Claude adapter
+  // (@agentclientprotocol/claude-agent-acp). The old `claude-code-acp` package
+  // is deprecated and too old for current Claude models, but still works as a
+  // fallback when it is the only one installed.
+  claude: { command: 'claude-agent-acp' },
   codex: { command: 'codex-acp' },
   // Google's own Antigravity CLI, run as an ACP server. It owns Google sign-in
   // and token storage (macOS keychain); Vellum never touches its credentials.
@@ -63,14 +67,21 @@ export function resolveAdapterCommand(
   fileExists: (path: string) => boolean = existsSync,
 ): string {
   const { command } = ADAPTERS[backend]
+  if (backend === 'claude') {
+    return onPath(command, sourceEnv, fileExists) ? command : LEGACY_CLAUDE_COMMAND
+  }
   if (backend !== 'antigravity') return command
   const override = sourceEnv.VELLUM_AGY_PATH?.trim()
   if (override) return override
-  for (const dir of (sourceEnv.PATH ?? '').split(delimiter)) {
-    if (dir && fileExists(join(dir, command))) return command
-  }
+  if (onPath(command, sourceEnv, fileExists)) return command
   const userLocal = join(sourceEnv.HOME ?? homedir(), '.local', 'bin', command)
   return fileExists(userLocal) ? userLocal : command
+}
+
+const LEGACY_CLAUDE_COMMAND = 'claude-code-acp'
+
+function onPath(command: string, sourceEnv: NodeJS.ProcessEnv, fileExists: (path: string) => boolean): boolean {
+  return (sourceEnv.PATH ?? '').split(delimiter).some((dir) => dir !== '' && fileExists(join(dir, command)))
 }
 
 /** Legacy adapter compatibility. Current codex-acp reads CODEX_CONFIG instead;
@@ -106,7 +117,8 @@ export type SpawnAdapter = (backend: AcpBackend) => AdapterChildProcess
  * the normal (non-nested) case. Everything else the adapter needs for auth
  * (PATH, HOME, the CLI's own creds/config env) passes through. For Codex only,
  * a nonblank VELLUM_CODEX_MODEL replaces CODEX_CONFIG.model in the copied env.
- * Antigravity drops raw Google API-key/cloud credential env vars.
+ * Every backend drops raw Anthropic/OpenAI API-key env vars; Antigravity also
+ * drops raw Google API-key/cloud credential env vars.
  * Exported standalone for tests at the child-environment boundary. */
 export function buildAdapterEnv(
   sourceEnv: NodeJS.ProcessEnv = process.env,
@@ -129,6 +141,9 @@ export function buildAdapterEnv(
     }
     rest.CODEX_CONFIG = JSON.stringify({ ...config, model })
   }
+  // No raw API-key path for any backend: a key left in the user's shell must
+  // never take precedence over the signed-in subscription CLI.
+  for (const key of RAW_API_KEY_ENV) delete rest[key]
   if (backend === 'antigravity') {
     // Same rule as the other backends: auth comes from the signed-in CLI,
     // never from a raw API key or cloud credential sitting in the env.
@@ -136,6 +151,8 @@ export function buildAdapterEnv(
   }
   return rest
 }
+
+const RAW_API_KEY_ENV = ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'OPENAI_API_KEY', 'CODEX_API_KEY']
 
 const ANTIGRAVITY_SCRUBBED_ENV = [
   'GEMINI_API_KEY',

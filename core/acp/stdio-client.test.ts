@@ -497,6 +497,18 @@ describe('antigravity backend', () => {
     expect(env).toEqual({ PATH: '/usr/bin' })
   })
 
+  it('strips raw Anthropic and OpenAI API keys for every backend', () => {
+    const keys = { ANTHROPIC_API_KEY: 'a', ANTHROPIC_AUTH_TOKEN: 't', OPENAI_API_KEY: 'o', CODEX_API_KEY: 'c' }
+    for (const backend of ['claude', 'codex', 'antigravity'] as const) {
+      expect(buildAdapterEnv({ PATH: '/usr/bin', ...keys }, backend)).toEqual({ PATH: '/usr/bin' })
+    }
+  })
+
+  it('prefers claude-agent-acp on PATH and falls back to legacy claude-code-acp', () => {
+    expect(resolveAdapterCommand('claude', { PATH: '/a:/b' }, (f) => f === '/b/claude-agent-acp')).toBe('claude-agent-acp')
+    expect(resolveAdapterCommand('claude', { PATH: '/a:/b' }, () => false)).toBe('claude-code-acp')
+  })
+
   it('leaves Google env alone for other backends', () => {
     expect(buildAdapterEnv({ GEMINI_API_KEY: 'k' }, 'codex')).toEqual({ GEMINI_API_KEY: 'k' })
   })

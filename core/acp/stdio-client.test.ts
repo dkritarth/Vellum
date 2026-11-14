@@ -172,6 +172,15 @@ describe('mapSessionUpdate', () => {
     expect(result).toEqual({ kind: 'text', data: { type: 'text', text: 'hi' } })
   })
 
+  it('carries the agent message id so separate messages can be split', () => {
+    const result = mapSessionUpdate({
+      sessionUpdate: 'agent_message_chunk',
+      content: { type: 'text', text: 'hi' },
+      messageId: 'm2',
+    } as never)
+    expect(result).toEqual({ kind: 'text', data: { type: 'text', text: 'hi' }, messageId: 'm2' })
+  })
+
   it('keeps echoed user prompts and agent reasoning out of answer text', () => {
     for (const sessionUpdate of ['user_message_chunk', 'agent_thought_chunk']) {
       const raw = { sessionUpdate, content: { type: 'text', text: 'not the answer' } }

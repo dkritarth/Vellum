@@ -13,7 +13,7 @@
 // third-party harness.
 
 import { spawn, type ChildProcessByStdio } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import { Readable, Writable } from 'node:stream'
@@ -283,10 +283,41 @@ export function mapSessionUpdate(update: SessionUpdate): AcpUpdate {
   }
 }
 
-function toPromptBlocks(req: AcpPromptRequest): ContentBlock[] {
+/** Largest context file embedded into a prompt as text. Bigger files are
+ * sent as a link only, and the agent reads them with its own file tools. */
+export const MAX_EMBEDDED_CONTEXT_BYTES = 512 * 1024
+
+/** Reads a context file for embedding, or null when it is missing, not a
+ * regular file, or too large. */
+export function readEmbeddableContext(path: string): string | null {
+  try {
+    const stat = statSync(path)
+    if (!stat.isFile() || stat.size > MAX_EMBEDDED_CONTEXT_BYTES) return null
+    return readFileSync(path, 'utf8')
+  } catch {
+    return null
+  }
+}
+
+/** Builds the ACP prompt. Each context file is always linked. When the agent
+ * accepts embedded context, a file's text is also embedded the first time
+ * this session sees it, so grounding does not depend on the agent's own file
+ * tools (Codex's Linux sandbox cannot start on hosts that restrict user
+ * namespaces, #101). Later turns only link it: the text is already in the
+ * agent's conversation history. */
+export function toPromptBlocks(
+  req: AcpPromptRequest,
+  embed: (path: string) => string | null = () => null,
+): ContentBlock[] {
   const blocks: ContentBlock[] = [{ type: 'text', text: req.text }]
   for (const path of req.contextFiles ?? []) {
-    blocks.push({ type: 'resource_link', uri: pathToFileURL(path).toString(), name: path })
+    const uri = pathToFileURL(path).toString()
+    const text = embed(path)
+    if (text === null) {
+      blocks.push({ type: 'resource_link', uri, name: path })
+    } else {
+      blocks.push({ type: 'resource', resource: { uri, mimeType: 'text/markdown', text } })
+    }
   }
   return blocks
 }
@@ -429,7 +460,19 @@ class StdioAcpSession implements AcpSession {
     private readonly child: AdapterChildProcess,
     private readonly turnMs: number,
     private readonly childFailureMessage: () => string | undefined,
+    private readonly embeddedContext = false,
+    private readonly readContext: (path: string) => string | null = readEmbeddableContext,
   ) {}
+
+  // Context files whose text this agent conversation already holds.
+  private readonly embeddedPaths = new Set<string>()
+
+  private embedOnce(path: string): string | null {
+    if (!this.embeddedContext || this.embeddedPaths.has(path)) return null
+    const text = this.readContext(path)
+    if (text !== null) this.embeddedPaths.add(path)
+    return text
+  }
 
   /** Error text for a rejected `session/prompt`. A JSON-RPC error from a
    * live adapter is reported as-is. When the transport closed because the
@@ -489,8 +532,16 @@ class StdioAcpSession implements AcpSession {
     const timeout = timeoutAfter(this.turnMs, `ACP turn timed out after ${this.turnMs}ms`)
     this.turnTimeout = timeout
 
+    // A rejected turn may never have reached the agent's history, so its
+    // embedded files are embedded again on the next turn.
+    const embeddedThisTurn: string[] = []
+    const embed = (path: string): string | null => {
+      const text = this.embedOnce(path)
+      if (text !== null) embeddedThisTurn.push(path)
+      return text
+    }
     this.connection
-      .prompt({ sessionId: this.sessionId, prompt: toPromptBlocks(req) })
+      .prompt({ sessionId: this.sessionId, prompt: toPromptBlocks(req, embed) })
       .then((res) => {
         if (settled) return
         settled = true
@@ -503,6 +554,7 @@ class StdioAcpSession implements AcpSession {
         if (settled) return
         settled = true
         timeout.cancel()
+        for (const path of embeddedThisTurn) this.embeddedPaths.delete(path)
         const message = await this.promptFailureMessage(err)
         queue.push({ kind: 'error', data: { message } })
         queue.close()
@@ -596,7 +648,7 @@ export class StdioAcpClient implements AcpClient {
     // against `connection.initialize()`/`newSession()` is a timing accident,
     // so prefer `failure`'s reason whenever the child has in fact exited.
     try {
-      await Promise.race([
+      const initialized = await Promise.race([
         connection.initialize({
           protocolVersion: PROTOCOL_VERSION,
           clientInfo: { name: 'vellum', version: '0.1.0' },
@@ -625,7 +677,15 @@ export class StdioAcpClient implements AcpClient {
       }
       handshake.cancel()
       const turnMs = this.timeouts.turnMs ?? DEFAULT_TURN_TIMEOUT_MS
-      session = new StdioAcpSession(connection, newSessionResult.sessionId, child, turnMs, tracker.message)
+      const embeddedContext = initialized.agentCapabilities?.promptCapabilities?.embeddedContext === true
+      session = new StdioAcpSession(
+        connection,
+        newSessionResult.sessionId,
+        child,
+        turnMs,
+        tracker.message,
+        embeddedContext,
+      )
       return session
     } catch (err) {
       handshake.cancel()

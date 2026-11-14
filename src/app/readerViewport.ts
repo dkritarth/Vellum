@@ -73,7 +73,7 @@ export function pagesInWindow(
 const LINE_HEIGHT_PX = 16
 /** Largest per-event delta honoured, so one notch of a mouse wheel with
  * Ctrl held zooms by a step rather than jumping straight to a bound. */
-const MAX_ZOOM_DELTA_PX = 25
+const MAX_ZOOM_DELTA_PX = 12
 /** Exponential zoom rate: scale *= exp(-delta * rate). A trackpad pinch
  * produces many small deltas, giving a smooth, symmetric zoom. */
 const ZOOM_RATE = 0.01

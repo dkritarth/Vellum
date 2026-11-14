@@ -160,10 +160,12 @@ export function CollectionsTree({
     if (!paperSlug) return
     try {
       await window.vellum.collectionsAssign({ paperSlug, collectionId })
+      setActionError(null)
       await refreshTree()
       onPaperAssigned?.(collectionId)
     } catch (err) {
       console.error('Failed to add paper to collection', err)
+      setActionError(`Could not add paper to collection: ${errorMessage(err)}`)
     }
   }
 

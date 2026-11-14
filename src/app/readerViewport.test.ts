@@ -75,8 +75,9 @@ describe('wheelZoomFactor', () => {
 
   it('caps one mouse-wheel notch to a modest step', () => {
     const notch = wheelZoomFactor(-100, 0)
+    // About 13% per notch: five notches take 100% to ~180%, not to the cap.
     expect(notch).toBeGreaterThan(1.1)
-    expect(notch).toBeLessThan(1.35)
+    expect(notch).toBeLessThan(1.15)
     expect(wheelZoomFactor(-3, 1)).toBe(wheelZoomFactor(-48, 0))
   })
 })

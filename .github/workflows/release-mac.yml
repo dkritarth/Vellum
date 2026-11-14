@@ -10,6 +10,7 @@ on:
     branches: [master]
     paths:
       - electron-builder.yml
+      - scripts/after-pack-adhoc-sign.cjs
       - package.json
       - package-lock.json
       - resources/**
@@ -44,7 +45,7 @@ jobs:
       - run: npm ci
       - name: Build and package
         env:
-          # No Developer ID certificate: let electron-builder ad-hoc sign.
+          # No Developer ID certificate; afterPack ad-hoc signs instead.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npm run dist:mac -- --${{ matrix.arch }}
       - name: Check packaged SQLite binding architecture
@@ -52,7 +53,7 @@ jobs:
           app=$(find release -maxdepth 2 -name Vellum.app | head -1)
           file "$app/Contents/Resources/native/better_sqlite3.node"
           file "$app/Contents/Resources/native/better_sqlite3.node" | grep -q "${{ matrix.arch == 'x64' && 'x86_64' || 'arm64' }}"
-          codesign --verify --deep --verbose=2 "$app" || true
+          codesign --verify --deep --strict --verbose=2 "$app"
       - uses: actions/upload-artifact@v4
         with:
           name: Vellum-mac-${{ matrix.arch }}

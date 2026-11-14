@@ -1,6 +1,7 @@
 appId: dev.vellum.app
 productName: Vellum
 icon: resources/icons/icon.png
+afterPack: scripts/after-pack-adhoc-sign.cjs
 directories:
   output: release
 files:
@@ -19,8 +20,9 @@ linux:
   category: Education
 mac:
   # Built on a macOS runner per architecture so the SQLite binding matches.
-  # No Developer ID is configured: electron-builder ad-hoc signs, so the first
-  # launch needs right-click > Open (or `xattr -cr /Applications/Vellum.app`).
+  # No Developer ID is configured: scripts/after-pack-adhoc-sign.cjs ad-hoc
+  # signs the bundle, so the first launch needs right-click > Open (or
+  # `xattr -cr /Applications/Vellum.app`).
   category: public.app-category.education
   target:
     - dmg

@@ -44,6 +44,7 @@ import { createHighlight, deleteHighlight, listHighlights } from '../core/highli
 import type { HighlightRecord } from '../core/highlights/repo.js'
 import { openDb } from '../core/store/db.js'
 import { resolveRuntimePaths } from './paths.js'
+import { mergeLoginShellPath } from './shell-path.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -482,6 +483,12 @@ ipcMain.handle('vellum:ask-start', (event: IpcMainInvokeEvent, params: unknown):
 
   return { requestId }
 })
+
+// Finder/launcher starts get a minimal PATH; recover the login shell's so
+// npm/Homebrew-installed ACP adapters (and node) are found.
+if (app.isPackaged && process.platform !== 'win32') {
+  process.env.PATH = mergeLoginShellPath(process.env.PATH, process.env)
+}
 
 app.whenReady().then(() => {
   createWindow()

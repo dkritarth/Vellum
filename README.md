@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/vellum-icon.png" alt="Vellum icon" width="128" height="128"></p>
+
 # Vellum
 
 Local-first AI paper workspace for reviewing, understanding, annotating, and
@@ -38,6 +40,18 @@ the deprecated `claude-code-acp` is a fallback) / `codex-acp` on PATH and their
 CLIs signed in
 (see the wiki's ACP-Integration page). For Gemini, install Google's Antigravity
 CLI (`agy`) and sign in once with `agy acp --login` (see `core/acp/README.md`).
+
+## macOS app
+
+The **macOS build** workflow (`.github/workflows/release-mac.yml`) packages
+`Vellum-<version>-arm64.dmg` (Apple Silicon) and `-x64.dmg` (Intel) on macOS
+runners. Run it from the Actions tab, or push a `v*` tag to attach the DMGs to a
+GitHub release. On a Mac you can also run `npm ci && npm run dist:mac`.
+
+The build is ad-hoc signed, not notarized. On first launch, right-click
+`Vellum.app` and choose **Open**, or run `xattr -cr /Applications/Vellum.app`.
+Install and sign in to at least one ACP adapter first; the app picks up your
+login shell's `PATH` to find it.
 
 ## Verify
 

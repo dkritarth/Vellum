@@ -1,12 +1,13 @@
 appId: dev.vellum.app
 productName: Vellum
+icon: resources/icons/icon.png
 directories:
   output: release
 files:
   - out/**/*
   - package.json
 extraResources:
-  # npm run dist forces an Electron rebuild before this resource is copied.
+  # npm run dist / dist:mac force an Electron rebuild before this resource is copied.
   - from: node_modules/better-sqlite3/build/Release/better_sqlite3.node
     to: native/better_sqlite3.node
 linux:
@@ -16,3 +17,13 @@ linux:
     - tar.gz
   maintainer: Kritarth Dandapat <dkritarth@gmail.com>
   category: Education
+mac:
+  # Built on a macOS runner per architecture so the SQLite binding matches.
+  # No Developer ID is configured: electron-builder ad-hoc signs, so the first
+  # launch needs right-click > Open (or `xattr -cr /Applications/Vellum.app`).
+  category: public.app-category.education
+  target:
+    - dmg
+    - zip
+dmg:
+  artifactName: ${productName}-${version}-${arch}.${ext}

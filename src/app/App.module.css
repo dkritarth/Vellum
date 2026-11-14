@@ -93,3 +93,44 @@
 .statusBarSpacer {
   flex: 1;
 }
+
+/* [#212] Side panes: width comes from the persisted layout. */
+.sidePane {
+  display: flex;
+  flex-shrink: 0;
+  min-height: 0;
+}
+
+.sidePane[hidden] {
+  display: none;
+}
+
+.sidePane > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.panelToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  padding: 0 6px;
+  margin: 0 4px 0 -4px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--vellum-text-dim, #8a8a8a);
+  cursor: pointer;
+}
+
+.panelToggle:last-child {
+  margin: 0 -4px 0 4px;
+}
+
+.panelToggle:hover,
+.panelToggle:focus-visible {
+  color: var(--vellum-text, #eaeaea);
+  background: var(--vellum-surface-hover, #262626);
+  outline: none;
+}

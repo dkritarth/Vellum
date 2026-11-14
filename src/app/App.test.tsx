@@ -68,6 +68,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  window.localStorage.clear()
 })
 
 describe('App shell', () => {
@@ -519,4 +520,37 @@ describe('chat navigation ownership', () => {
     expect(window.vellum.askOpen).toHaveBeenCalledTimes(1)
   })
 
+
+  it('collapses, restores and resizes the side panels, and remembers the layout', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<App />)
+    const left = screen.getByTestId('left-pane')
+    const right = screen.getByTestId('right-pane')
+    expect(left).toBeVisible()
+    expect(right).toBeVisible()
+
+    await user.click(screen.getByRole('button', { name: 'Hide sidebar' }))
+    expect(left).not.toBeVisible()
+    expect(screen.queryByRole('separator', { name: 'Resize sidebar' })).toBeNull()
+    await user.keyboard('{Control>}b{/Control}')
+    expect(left).toBeVisible()
+
+    await user.keyboard('{Control>}{Alt>}b{/Alt}{/Control}')
+    expect(right).not.toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Show paper panel' }))
+    expect(right).toBeVisible()
+
+    const handle = screen.getByRole('separator', { name: 'Resize paper panel' })
+    const before = Number(handle.getAttribute('aria-valuenow'))
+    handle.focus()
+    await user.keyboard('{ArrowLeft}{ArrowLeft}')
+    expect(Number(handle.getAttribute('aria-valuenow'))).toBe(before + 32)
+    expect(right.style.width).toBe(`${before + 32}px`)
+
+    await user.click(screen.getByRole('button', { name: 'Hide sidebar' }))
+    unmount()
+    render(<App />)
+    expect(screen.getByTestId('left-pane')).not.toBeVisible()
+    expect(screen.getByTestId('right-pane').style.width).toBe(`${before + 32}px`)
+  })
 })

@@ -47,6 +47,8 @@ interface SidebarProps {
   activeFooterItem?: FooterItem | null
   /** A Library card was dropped onto a collection. */
   onPaperAssigned?: (collectionId: number) => void
+  /** A sidebar collection was created, renamed or deleted. */
+  onCollectionsChanged?: () => void
 }
 
 export function Sidebar({
@@ -61,6 +63,7 @@ export function Sidebar({
   activeNavItem,
   activeFooterItem,
   onPaperAssigned,
+  onCollectionsChanged,
 }: SidebarProps = {}): JSX.Element {
   const [localActive, setLocalActive] = useState<NavItem>('Home')
   const [libraryView, setLibraryView] = useState<LibraryView>('Files')
@@ -122,6 +125,7 @@ export function Sidebar({
               onSelectCollection?.(id, name)
             }}
             onPaperAssigned={onPaperAssigned}
+            onCollectionsChanged={onCollectionsChanged}
           />
         ) : (
           <ChatsList

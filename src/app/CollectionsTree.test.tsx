@@ -201,6 +201,34 @@ describe('CollectionsTree [L2-01]', () => {
     })
   })
 
+  it('reports collection changes so the Library can offer new collections on cards', async () => {
+    const onCollectionsChanged = vi.fn()
+    window.vellum = {
+      ...window.vellum,
+      collectionsRename: vi.fn().mockResolvedValue(undefined),
+      collectionsDelete: vi.fn().mockResolvedValue(undefined),
+    } as any
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    render(
+      <CollectionsTree selectedCollectionId={null} onSelectCollection={vi.fn()} onCollectionsChanged={onCollectionsChanged} />,
+    )
+    await screen.findByText('Computer Science')
+
+    fireEvent.click(screen.getByRole('button', { name: 'New Collection' }))
+    fireEvent.change(screen.getByPlaceholderText('Collection name...'), { target: { value: 'Databases' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await waitFor(() => expect(onCollectionsChanged).toHaveBeenCalledTimes(1))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rename AI' }))
+    const rename = screen.getByDisplayValue('AI')
+    fireEvent.change(rename, { target: { value: 'ML' } })
+    fireEvent.keyDown(rename, { key: 'Enter' })
+    await waitFor(() => expect(onCollectionsChanged).toHaveBeenCalledTimes(2))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Computer Science' }))
+    await waitFor(() => expect(onCollectionsChanged).toHaveBeenCalledTimes(3))
+  })
+
   it('assigns a paper dropped on a collection and reports it', async () => {
     const collectionsAssign = vi.fn().mockResolvedValue(undefined)
     window.vellum = { ...window.vellum, collectionsAssign } as any

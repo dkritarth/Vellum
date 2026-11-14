@@ -217,6 +217,7 @@ export function App(): JSX.Element {
           activeNavItem={activeNavItem}
           activeFooterItem={activeFooterItem}
           onPaperAssigned={() => setLibraryRefreshNonce((n) => n + 1)}
+          onCollectionsChanged={() => setLibraryRefreshNonce((n) => n + 1)}
         />
         <main className={styles.centerPane} aria-label="Paper view">
           {chatBanner && (

@@ -8,6 +8,8 @@ export interface CollectionsTreeProps {
   onSelectCollection: (id: number | null, name: string | null) => void
   /** A Library card was dropped on a collection and assigned to it. */
   onPaperAssigned?: (collectionId: number) => void
+  /** A collection was created, renamed or deleted. */
+  onCollectionsChanged?: () => void
 }
 
 /** Enter/Space on the row itself (not a nested button or input) selects it. */
@@ -27,6 +29,7 @@ export function CollectionsTree({
   selectedCollectionId,
   onSelectCollection,
   onPaperAssigned,
+  onCollectionsChanged,
 }: CollectionsTreeProps): JSX.Element {
   const [dropTargetId, setDropTargetId] = useState<number | null>(null)
   const [tree, setTree] = useState<CollectionTreeItem[]>([])
@@ -90,6 +93,7 @@ export function CollectionsTree({
       setNewCollectionName('')
       setCreatingParentId(null)
       await refreshTree()
+      onCollectionsChanged?.()
       onSelectCollection(created.id, created.name)
     } catch (err) {
       console.error('Failed to create collection', err)
@@ -107,6 +111,7 @@ export function CollectionsTree({
       setEditingId(null)
       setEditingName('')
       await refreshTree()
+      onCollectionsChanged?.()
       if (selectedCollectionId === id) {
         onSelectCollection(id, name)
       }
@@ -140,6 +145,7 @@ export function CollectionsTree({
         selection.onSelectCollection(null, null)
       }
       await refreshTree()
+      onCollectionsChanged?.()
     } catch (err) {
       console.error('Failed to delete collection', err)
       setActionError(`Could not delete collection "${name}": ${errorMessage(err)}`)

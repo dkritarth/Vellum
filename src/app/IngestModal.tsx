@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import { friendlyIpcError } from './ipcError'
 import styles from './IngestModal.module.css'
 
 export interface IngestModalProps {
@@ -13,6 +14,28 @@ export function IngestModal({ isOpen, onClose, onSuccess }: IngestModalProps): J
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Escape dismisses the dialog, matching the Close/Cancel buttons — which are
+  // disabled mid-ingest, so Escape is ignored then too.
+  useEffect(() => {
+    if (!isOpen || loading) return
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [isOpen, loading, onClose])
+
+  // Each opening starts clean: the modal stays mounted while closed, so
+  // without this a failed attempt's input and error reappear next time.
+  useEffect(() => {
+    if (isOpen) {
+      setInput('')
+      setError(null)
+      // Also forget the native picker's file so re-picking it fires `change`.
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }, [isOpen])
 
   if (!isOpen) return null
 
@@ -37,18 +60,24 @@ export function IngestModal({ isOpen, onClose, onSuccess }: IngestModalProps): J
       onSuccess({ slug: result.slug, title: result.title })
     } catch (err: unknown) {
       setLoading(false)
-      const msg = err instanceof Error ? err.message : String(err)
-      setError(msg)
+      setError(friendlyIpcError(err, 'Could not add this paper.'))
     }
   }
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>): void {
     const file = event.target.files?.[0]
-    if (file) {
-      // In Electron renderer, File objects have a `path` property
-      const path = (file as unknown as { path?: string }).path || file.name
+    if (!file) return
+
+    // Clear the picker so choosing the same file again can retry after a failure.
+    event.target.value = ''
+    try {
+      const path = window.vellum?.getPathForFile?.(file)
+      if (!path) throw new Error('Selected file has no disk path.')
       setInput(path)
       setError(null)
+    } catch {
+      setInput('')
+      setError('Could not access this PDF. Choose the file again or enter its full path manually.')
     }
   }
 

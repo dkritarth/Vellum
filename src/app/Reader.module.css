@@ -26,6 +26,7 @@
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
@@ -36,7 +37,8 @@
   color: var(--vellum-text-dim, #8a8a8a);
 }
 
-.toolbar button {
+.toolbar button,
+.highlightSave button {
   border: 1px solid var(--vellum-border, #2a2a2a);
   border-radius: 6px;
   background: transparent;
@@ -45,12 +47,14 @@
   padding: 4px 8px;
 }
 
-.toolbar button:hover:not(:disabled) {
+.toolbar button:hover:not(:disabled),
+.highlightSave button:hover:not(:disabled) {
   color: var(--vellum-text, #eaeaea);
   background: var(--vellum-surface-hover, #222222);
 }
 
-.toolbar button:disabled {
+.toolbar button:disabled,
+.highlightSave button:disabled {
   opacity: 0.4;
   cursor: default;
 }
@@ -58,18 +62,24 @@
 .pageNav,
 .zoom {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
 }
 
 .search {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   margin-left: auto;
+  max-width: 100%;
 }
 
 .search input {
+  flex: 1 1 auto;
+  min-width: 8rem;
   background: var(--vellum-bg, #101010);
   border: 1px solid var(--vellum-border, #2a2a2a);
   border-radius: 6px;
@@ -130,38 +140,136 @@
   cursor: default;
 }
 
+/* #198: one vertical scroll column holding every page. `.pages` is at
+   least as wide as the pane (pages centred) and grows to the widest page
+   when zoomed in, so horizontal scroll reaches both edges — the old
+   `justify-content: center` on the scroll container clipped the left side. */
 .pageViewport {
   flex: 1;
+  min-width: 0;
   overflow: auto;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 16px;
+  position: relative;
+  outline: none;
+  overscroll-behavior: contain;
+}
+
+.pageViewport:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--vellum-accent, #4f8cff);
 }
 
 .loading {
   color: var(--vellum-text-dim, #8a8a8a);
   font-size: 13px;
+  text-align: center;
+  margin: 16px;
 }
 
-.pageLayer {
+.pages {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  width: max-content;
+  min-width: 100%;
+  box-sizing: border-box;
+}
+
+/* One page. Sized inline (ReaderPage) from --total-scale-factor so canvas,
+   text layer and overlays share one box at every zoom. White so pages that
+   haven't rendered yet still read as paper. */
+.pageSlot {
+  position: relative;
+  flex-shrink: 0;
+  background: #ffffff;
+  box-shadow: 0 0 0 1px var(--vellum-border, #2a2a2a), 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.canvasHost {
+  position: absolute;
+  inset: 0;
 }
 
 .canvas {
   display: block;
-  box-shadow: 0 0 0 1px var(--vellum-border, #2a2a2a);
+  width: 100%;
+  height: 100%;
 }
 
 /* pdf.js text layer — positioned to exactly overlay the canvas glyph-for-glyph
    so selection matches what's visually rendered. Text is transparent; only
-   the user's selection highlight is visible (pdf.js applies this via its own
-   inline styles/CSS custom properties on rendered spans). */
+   the user's selection highlight is visible.
+
+   pdf.js's TextLayer only sets per-span custom properties (left/top as %,
+   --font-height, --scale-x, --rotate) and relies on the stylesheet below to
+   turn them into geometry. These rules are ported from
+   pdfjs-dist/web/pdf_viewer.css (.textLayer). Without them, spans flow as
+   visible plain text over the canvas. --total-scale-factor is inherited
+   from the page slot (ReaderPage), so zoom rescales the layer without a
+   re-render. */
 .textLayer {
   position: absolute;
   inset: 0;
-  overflow: hidden;
+  overflow: clip;
+  text-align: initial;
+  opacity: 1;
   line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 0;
+  /* setLayerDimensions() sizes this div with round(down, …, var(--scale-round-*)). */
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+.textLayer :global(span),
+.textLayer :global(br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  user-select: text;
+}
+
+.textLayer > :global(:not(.markedContent)),
+.textLayer :global(.markedContent span:not(.markedContent)) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.textLayer :global(.markedContent) {
+  display: contents;
+}
+
+.textLayer ::selection {
+  background: color-mix(in srgb, AccentColor, transparent 50%);
+  color: transparent;
+}
+
+.textLayer :global(br)::selection {
+  background: transparent;
+}
+
+.textLayer :global(.endOfContent) {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  user-select: none;
 }
 
 .textLayer[data-highlight-mode='active'] {
@@ -182,6 +290,14 @@
   position: absolute;
   opacity: 0.35;
   mix-blend-mode: multiply;
+}
+
+/* Search hits for the submitted query, on every rendered page. */
+.searchHit {
+  position: absolute;
+  background: rgba(255, 196, 0, 0.4);
+  mix-blend-mode: multiply;
+  border-radius: 2px;
 }
 
 .highlightRectFlash {
@@ -214,4 +330,27 @@
 .citationMarkerFlash {
   outline: 2px solid var(--vellum-text, #eaeaea);
   outline-offset: 1px;
+}
+
+.highlightSave {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vellum-border, #2a2a2a);
+  background: var(--vellum-surface, #1a1a1a);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.highlightSave p {
+  margin: 0;
+}
+
+.searchError {
+  margin: 0;
+  padding: 8px 12px;
+  color: var(--vellum-text, #eaeaea);
+  border-bottom: 1px solid var(--vellum-border, #2a2a2a);
+  flex-shrink: 0;
 }

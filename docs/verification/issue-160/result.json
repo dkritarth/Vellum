@@ -1,0 +1,25 @@
+{
+  "cases": [
+    {
+      "reason": "cancelled",
+      "chatId": 4,
+      "failedSession": 3,
+      "retrySession": 4
+    },
+    {
+      "reason": "max_tokens",
+      "chatId": 5,
+      "failedSession": 5,
+      "retrySession": 6
+    },
+    {
+      "reason": "max_turn_requests",
+      "chatId": 6,
+      "failedSession": 7,
+      "retrySession": 8
+    }
+  ],
+  "pdfBytes": 2215244,
+  "markdownCharacters": 39605,
+  "consoleLines": []
+}

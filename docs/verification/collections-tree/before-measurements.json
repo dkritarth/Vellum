@@ -1,0 +1,51 @@
+{
+  "sidebar": {
+    "tag": "NAV",
+    "cls": "_sidebar_19icm_1",
+    "scrollWidth": 246,
+    "clientWidth": 236,
+    "left": 0,
+    "right": 237,
+    "width": 237
+  },
+  "panel": {
+    "tag": "DIV",
+    "cls": "_viewPanel_19icm_71",
+    "scrollWidth": 238,
+    "clientWidth": 220,
+    "left": 8,
+    "right": 228,
+    "width": 220
+  },
+  "tree": {
+    "tag": "DIV",
+    "cls": "_container_d48bu_1",
+    "scrollWidth": 238,
+    "clientWidth": 220,
+    "left": 8,
+    "right": 228,
+    "width": 220
+  },
+  "row": {
+    "tag": "DIV",
+    "cls": "_inputRow_d48bu_145",
+    "scrollWidth": 238,
+    "clientWidth": 220,
+    "left": 8,
+    "right": 228,
+    "width": 220
+  },
+  "input": {
+    "left": 14,
+    "right": 183,
+    "width": 169
+  },
+  "cancel": {
+    "left": 222.578125,
+    "right": 245.796875,
+    "width": 23.21875
+  },
+  "sidebarVisibleRight": 236,
+  "cancelClipped": true,
+  "sidebarOverflowX": true
+}

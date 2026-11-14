@@ -12,7 +12,7 @@ import {
   removePaperFromCollection,
   renameCollection,
 } from './repo.js'
-import { upsertPaper } from '../library/repo.js'
+import { listPapers, restorePaper, trashPaper, upsertPaper } from '../library/repo.js'
 
 describe('collections repo [L2-01]', () => {
   let db: Database
@@ -98,6 +98,62 @@ describe('collections repo [L2-01]', () => {
 
     const nlpNode = tree[0].children.find((c) => c.name === 'NLP')!
     expect(nlpNode.paperCount).toBe(2)
+  })
+
+  it('counts only active papers and retains membership through trash and restore', () => {
+    const collection = createCollection(db, { name: 'Transformers' })
+    assignPaperToCollection(db, { paperSlug: 'paper-1', collectionId: collection.id })
+    assignPaperToCollection(db, { paperSlug: 'paper-2', collectionId: collection.id })
+    expect(getCollectionsTree(db)[0].paperCount).toBe(2)
+
+    trashPaper(db, 'paper-1')
+    expect(listPapers(db, { collectionId: collection.id }).map((p) => p.slug)).toEqual(['paper-2'])
+    expect(getCollectionsTree(db)[0].paperCount).toBe(1)
+    expect(listPaperCollections(db, 'paper-1')).toEqual([collection])
+
+    trashPaper(db, 'paper-2')
+    expect(listPapers(db, { collectionId: collection.id })).toEqual([])
+    expect(getCollectionsTree(db)[0].paperCount).toBe(0)
+
+    restorePaper(db, 'paper-1')
+    expect(listPapers(db, { collectionId: collection.id }).map((p) => p.slug)).toEqual(['paper-1'])
+    expect(getCollectionsTree(db)[0].paperCount).toBe(1)
+    expect(listPaperCollections(db, 'paper-1')).toEqual([collection])
+
+    restorePaper(db, 'paper-2')
+    expect(getCollectionsTree(db)[0].paperCount).toBe(2)
+  })
+
+  it('keeps direct counts independent across nested and shared collections', () => {
+    const parent = createCollection(db, { name: 'AI' })
+    const child = createCollection(db, { name: 'NLP', parentId: parent.id })
+    const independent = createCollection(db, { name: 'Reading' })
+    const empty = createCollection(db, { name: 'Empty' })
+    assignPaperToCollection(db, { paperSlug: 'paper-1', collectionId: parent.id })
+    assignPaperToCollection(db, { paperSlug: 'paper-2', collectionId: child.id })
+    assignPaperToCollection(db, { paperSlug: 'paper-2', collectionId: independent.id })
+
+    trashPaper(db, 'paper-2')
+    const tree = getCollectionsTree(db)
+    expect(tree.find((c) => c.id === parent.id)).toMatchObject({
+      paperCount: 1,
+      children: [{ id: child.id, paperCount: 0 }],
+    })
+    expect(tree.find((c) => c.id === independent.id)?.paperCount).toBe(0)
+    expect(tree.find((c) => c.id === empty.id)?.paperCount).toBe(0)
+    expect(listPaperCollections(db, 'paper-2')).toEqual([child, independent])
+
+    restorePaper(db, 'paper-2')
+    const restored = getCollectionsTree(db)
+    expect(restored.find((c) => c.id === parent.id)).toMatchObject({
+      paperCount: 1,
+      children: [{ id: child.id, paperCount: 1 }],
+    })
+    expect(restored.find((c) => c.id === independent.id)?.paperCount).toBe(1)
+    expect(restored.find((c) => c.id === empty.id)?.paperCount).toBe(0)
+    expect(listPapers(db, { collectionId: parent.id }).map((p) => p.slug)).toEqual(['paper-1'])
+    expect(listPapers(db, { collectionId: child.id }).map((p) => p.slug)).toEqual(['paper-2'])
+    expect(listPapers(db, { collectionId: independent.id }).map((p) => p.slug)).toEqual(['paper-2'])
   })
 
   it('deletes collection recursively without deleting actual papers', () => {

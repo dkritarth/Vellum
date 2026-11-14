@@ -33,8 +33,14 @@ interface RightPanelProps {
   /** [P2-02] Drives the Reader to a clicked annotation's page. Undefined =
    * jump seam not wired (e.g. tests rendering RightPanel standalone). */
   onJumpToHighlight?: (highlight: HighlightRecord) => void
+  onHighlightDeleted?: (paperSlug: string) => void
+  /** Changes after a persisted highlight change for `slug`; refreshes an open list. */
+  highlightsRevision?: number
   /** [R1-05] Injected prompt from PDF text selection actions */
   injectedPrompt?: InjectedPrompt | null
+  onInjectedPromptHandled?: (nonce: number) => void
+  /** Successful deletions retained by App across Ask tab remounts. */
+  deletedSessionIds?: readonly number[]
   /** [L2-02] Target chat session to open in AskPanel */
   targetSessionId?: number | null
 }
@@ -45,8 +51,12 @@ export function RightPanel({
   onTabChange,
   slug,
   onJumpToHighlight,
+  highlightsRevision,
+  onHighlightDeleted,
   injectedPrompt,
+  onInjectedPromptHandled,
   targetSessionId,
+  deletedSessionIds,
 }: RightPanelProps): JSX.Element {
   const [internalTab, setInternalTab] = useState<RightPanelTab>(defaultTab)
   const activeTab = controlledActiveTab ?? internalTab
@@ -77,7 +87,7 @@ export function RightPanel({
       </div>
 
       <div className={styles.tabPanel} role="tabpanel">
-        {renderTabContent(activeTab, slug, onJumpToHighlight, injectedPrompt, targetSessionId)}
+        {renderTabContent(activeTab, slug, onJumpToHighlight, injectedPrompt, targetSessionId, deletedSessionIds, highlightsRevision, onHighlightDeleted, onInjectedPromptHandled)}
       </div>
     </aside>
   )
@@ -89,10 +99,14 @@ function renderTabContent(
   onJumpToHighlight: ((highlight: HighlightRecord) => void) | undefined,
   injectedPrompt: InjectedPrompt | null | undefined,
   targetSessionId?: number | null,
+  deletedSessionIds?: readonly number[],
+  highlightsRevision?: number,
+  onHighlightDeleted?: (paperSlug: string) => void,
+  onInjectedPromptHandled?: (nonce: number) => void,
 ): JSX.Element {
   switch (tab) {
     case 'Ask':
-      if (slug) return <AskPanel slug={slug} injectedPrompt={injectedPrompt} targetSessionId={targetSessionId} />
+      if (slug) return <AskPanel slug={slug} injectedPrompt={injectedPrompt} onInjectedPromptHandled={onInjectedPromptHandled} targetSessionId={targetSessionId} deletedSessionIds={deletedSessionIds} />
       return (
         <div className={styles.askTab}>
           <p className={styles.placeholder}>Open a paper to start asking questions.</p>
@@ -104,6 +118,6 @@ function renderTabContent(
     case 'Details':
       return <DetailsPanel slug={slug} />
     case 'Annotations':
-      return <AnnotationsPanel slug={slug} onJump={onJumpToHighlight} />
+      return <AnnotationsPanel onHighlightDeleted={onHighlightDeleted} slug={slug} onJump={onJumpToHighlight} highlightsRevision={highlightsRevision} />
   }
 }

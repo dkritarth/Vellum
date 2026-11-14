@@ -1,0 +1,91 @@
+{
+  "root": "/data/dandapat/.tmp/vellum179-i4BVHM",
+  "results": [
+    "Native real-paper selection and visible yellow action refresh open list with one correct quote/page/color row",
+    "Visible annotation jump keeps row focus and Reader page 1",
+    "Creation while Annotations closed loads on reopen; both saved rows remain",
+    "Initial delayed read error distinct from loading/empty; repeated error and keyboard retry recover exact saved rows",
+    "Injected panel refresh failure retains known rows and Reader overlays; explicit retry adds persisted new highlight",
+    "Repeated failed delete retains exact storage/list/overlays; Tab and Enter retry same ID then only target disappears",
+    "Delayed outgoing delete error does not contaminate B or revisited A",
+    "Process restart retains A/B highlights, both notes and original PDF bytes"
+  ],
+  "papers": [
+    {
+      "slug": "local-vellum-125-real-paper",
+      "title": "/tmp/vellum-125-real-paper.pdf",
+      "authors": [],
+      "mdPath": "/data/dandapat/.tmp/vellum179-i4BVHM/data/papers/local-vellum-125-real-paper/paper.md",
+      "pdfPath": "/data/dandapat/.tmp/vellum179-i4BVHM/data/papers/local-vellum-125-real-paper/paper.pdf",
+      "sections": [],
+      "addedAt": "2026-11-06T20:13:56.669Z"
+    },
+    {
+      "slug": "local-vellum-121-attention",
+      "title": "/tmp/vellum-121-attention.pdf",
+      "authors": [],
+      "mdPath": "/data/dandapat/.tmp/vellum179-i4BVHM/data/papers/local-vellum-121-attention/paper.md",
+      "pdfPath": "/data/dandapat/.tmp/vellum179-i4BVHM/data/papers/local-vellum-121-attention/paper.pdf",
+      "sections": [],
+      "addedAt": "2026-11-06T20:13:55.867Z"
+    }
+  ],
+  "paperHashes": [
+    "bdfaa68d8984f0dc02beaca527b76f207d99b666d31d1da728ee0728182df697",
+    "c5df7480729819ce5911dc8f4e357f056a8ceb592581164ea7f382fd5b48bcf8"
+  ],
+  "contentHashes": [
+    {
+      "slug": "local-vellum-125-real-paper",
+      "pdf": "c5df7480729819ce5911dc8f4e357f056a8ceb592581164ea7f382fd5b48bcf8",
+      "markdown": "0f38b95e2420eaeb43814014fa298e51f4106eb668c15e0d3ca6a93457bf170c"
+    },
+    {
+      "slug": "local-vellum-121-attention",
+      "pdf": "bdfaa68d8984f0dc02beaca527b76f207d99b666d31d1da728ee0728182df697",
+      "markdown": "22c55d6e2dfe98465efb7017ec1d8bfe6e9d3f9644c9e743da79bea9fb2e3d3e"
+    }
+  ],
+  "overlayGeometry": [
+    {
+      "css": "left: 144.141px; top: 303px; width: 0px; height: 17px; background: pink;",
+      "rect": {
+        "x": 508.640625,
+        "y": 438,
+        "width": 0,
+        "height": 17,
+        "top": 438,
+        "right": 508.640625,
+        "bottom": 455,
+        "left": 508.640625
+      }
+    },
+    {
+      "css": "left: 144.141px; top: 302px; width: 0px; height: 19px; background: pink;",
+      "rect": {
+        "x": 508.640625,
+        "y": 437,
+        "width": 0,
+        "height": 19,
+        "top": 437,
+        "right": 508.640625,
+        "bottom": 456,
+        "left": 508.640625
+      }
+    },
+    {
+      "css": "left: 0px; top: 319px; width: 145.547px; height: 17px; background: pink;",
+      "rect": {
+        "x": 364.5,
+        "y": 454,
+        "width": 145.546875,
+        "height": 17,
+        "top": 454,
+        "right": 510.046875,
+        "bottom": 471,
+        "left": 364.5
+      }
+    }
+  ],
+  "errors": []
+}

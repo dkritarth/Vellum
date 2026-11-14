@@ -1,0 +1,216 @@
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /tmp/vellum-annotation-errors-repro
+
+stdout | repro.test.tsx > distinguishes failed initial read from genuinely empty highlights and offers retry
+load failure UI No highlights yet — turn on Highlight mode and select text to add one.
+
+stdout | repro.test.tsx > explains current delete failure while preserving saved row and offers retry
+delete failure UI Saved evidencePage 1×
+
+ ❯ repro.test.tsx (2 tests | 2 failed) 134ms
+   × distinguishes failed initial read from genuinely empty highlights and offers retry 39ms
+     → expect(element).not.toBeInTheDocument()
+
+expected document not to contain element, found <p
+  class="_placeholder_014637"
+>
+  No highlights yet — turn on Highlight mode and select text to add one.
+</p> instead
+   × explains current delete failure while preserving saved row and offers retry 94ms
+     → Unable to find an accessible element with the role "alert"
+
+Here are the accessible roles:
+
+  list:
+
+  Name "":
+  [36m<ul[39m
+    [33mclass[39m=[32m"_annotationsPanel_014637"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  listitem:
+
+  Name "":
+  [36m<li[39m
+    [33mclass[39m=[32m"_row_014637"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  button:
+
+  Name "Saved evidence Page 1":
+  [36m<button[39m
+    [33mclass[39m=[32m"_rowMain_014637"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  Name "Delete highlight: Saved evidence":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Delete highlight: Saved evidence"[39m
+    [33mclass[39m=[32m"_deleteButton_014637"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<ul[39m
+      [33mclass[39m=[32m"_annotationsPanel_014637"[39m
+    [36m>[39m
+      [36m<li[39m
+        [33mclass[39m=[32m"_row_014637"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"_rowMain_014637"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"_swatch_014637"[39m
+            [33mstyle[39m=[32m"background: yellow;"[39m
+          [36m/>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"_quote_014637"[39m
+          [36m>[39m
+            [0mSaved evidence[0m
+          [36m</span>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"_page_014637"[39m
+          [36m>[39m
+            [0mPage [0m
+            [0m1[0m
+          [36m</span>[39m
+        [36m</button>[39m
+        [36m<button[39m
+          [33maria-label[39m=[32m"Delete highlight: Saved evidence"[39m
+          [33mclass[39m=[32m"_deleteButton_014637"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0m×[0m
+        [36m</button>[39m
+      [36m</li>[39m
+    [36m</ul>[39m
+  [36m</div>[39m
+[36m</body>[39m
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  repro.test.tsx > distinguishes failed initial read from genuinely empty highlights and offers retry
+Error: expect(element).not.toBeInTheDocument()
+
+expected document not to contain element, found <p
+  class="_placeholder_014637"
+>
+  No highlights yet — turn on Highlight mode and select text to add one.
+</p> instead
+ ❯ repro.test.tsx:11:54
+      9|  render(<AnnotationsPanel slug="paper"/>);await act(async()=>{})
+     10|  console.log('load failure UI',document.body.textContent)
+     11|  expect(screen.queryByText(/No highlights yet/)).not.toBeInTheDocument…
+       |                                                      ^
+     12|  expect(screen.getByRole('alert')).toHaveTextContent(/load|read/i)
+     13|  expect(screen.getByRole('button',{name:/retry/i})).toBeEnabled()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  repro.test.tsx > explains current delete failure while preserving saved row and offers retry
+TestingLibraryElementError: Unable to find an accessible element with the role "alert"
+
+Here are the accessible roles:
+
+  list:
+
+  Name "":
+  [36m<ul[39m
+    [33mclass[39m=[32m"_annotationsPanel_014637"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  listitem:
+
+  Name "":
+  [36m<li[39m
+    [33mclass[39m=[32m"_row_014637"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  button:
+
+  Name "Saved evidence Page 1":
+  [36m<button[39m
+    [33mclass[39m=[32m"_rowMain_014637"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  Name "Delete highlight: Saved evidence":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Delete highlight: Saved evidence"[39m
+    [33mclass[39m=[32m"_deleteButton_014637"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<ul[39m
+      [33mclass[39m=[32m"_annotationsPanel_014637"[39m
+    [36m>[39m
+      [36m<li[39m
+        [33mclass[39m=[32m"_row_014637"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"_rowMain_014637"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"_swatch_014637"[39m
+            [33mstyle[39m=[32m"background: yellow;"[39m
+          [36m/>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"_quote_014637"[39m
+          [36m>[39m
+            [0mSaved evidence[0m
+          [36m</span>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"_page_014637"[39m
+          [36m>[39m
+            [0mPage [0m
+            [0m1[0m
+          [36m</span>[39m
+        [36m</button>[39m
+        [36m<button[39m
+          [33maria-label[39m=[32m"Delete highlight: Saved evidence"[39m
+          [33mclass[39m=[32m"_deleteButton_014637"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0m×[0m
+        [36m</button>[39m
+      [36m</li>[39m
+    [36m</ul>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ Object.getElementError ../../home/dandapat/code/Vellum/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ ../../home/dandapat/code/Vellum/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ ../../home/dandapat/code/Vellum/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ ../../home/dandapat/code/Vellum/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ repro.test.tsx:21:16
+     19|  expect(screen.getByText(row.quote)).toBeVisible();expect(notification…
+     20|  console.log('delete failure UI',document.body.textContent)
+     21|  expect(screen.getByRole('alert')).toHaveTextContent(/delete|remove/i)
+       |                ^
+     22|  expect(screen.getByRole('button',{name:/retry/i})).toBeEnabled()
+     23| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  15:07:30
+   Duration  1.03s (transform 86ms, setup 0ms, collect 188ms, tests 134ms, environment 390ms, prepare 90ms)

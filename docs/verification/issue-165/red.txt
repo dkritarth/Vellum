@@ -1,0 +1,297 @@
+
+> vellum@0.1.0 test
+> vitest run src/app/NotesPanel.test.tsx
+
+
+ RUN  v2.1.9 /home/dandapat/.t3/worktrees/Vellum/t3-9347abbf
+
+stdout | src/app/NotesPanel.test.tsx > reports failed autosave and offers retry while preserving unsaved draft
+failed autosave visible UI Clear noteNew unsaved evidence
+
+stdout | src/app/NotesPanel.test.tsx > reports failed clear after restoring the note
+failed clear visible UI Clear noteSaved research evidence
+
+ ❯ src/app/NotesPanel.test.tsx (30 tests | 2 failed) 386ms
+   × reports failed autosave and offers retry while preserving unsaved draft 21ms
+     → Unable to find an accessible element with the role "alert"
+
+Here are the accessible roles:
+
+  button:
+
+  Name "Clear note":
+  <button
+    class="_clearButton_0b1aef"
+    type="button"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="_status_0b1aef"
+  />
+
+  --------------------------------------------------
+  textbox:
+
+  Name "Note":
+  <textarea
+    aria-label="Note"
+    class="_editor_0b1aef"
+    placeholder="Write notes about this paper…"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <div
+      class="_notesPanel_0b1aef"
+    >
+      <div
+        class="_header_0b1aef"
+      >
+        <button
+          class="_clearButton_0b1aef"
+          type="button"
+        >
+          Clear note
+        </button>
+        <p
+          class="_status_0b1aef"
+        />
+      </div>
+      <textarea
+        aria-label="Note"
+        class="_editor_0b1aef"
+        placeholder="Write notes about this paper…"
+      >
+        New unsaved evidence
+      </textarea>
+    </div>
+  </div>
+</body>
+   × reports failed clear after restoring the note 15ms
+     → Unable to find an accessible element with the role "alert"
+
+Here are the accessible roles:
+
+  button:
+
+  Name "Clear note":
+  <button
+    class="_clearButton_0b1aef"
+    type="button"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="_status_0b1aef"
+  />
+
+  --------------------------------------------------
+  textbox:
+
+  Name "Note":
+  <textarea
+    aria-label="Note"
+    class="_editor_0b1aef"
+    placeholder="Write notes about this paper…"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <div
+      class="_notesPanel_0b1aef"
+    >
+      <div
+        class="_header_0b1aef"
+      >
+        <button
+          class="_clearButton_0b1aef"
+          type="button"
+        >
+          Clear note
+        </button>
+        <p
+          class="_status_0b1aef"
+        />
+      </div>
+      <textarea
+        aria-label="Note"
+        class="_editor_0b1aef"
+        placeholder="Write notes about this paper…"
+      >
+        Saved research evidence
+      </textarea>
+    </div>
+  </div>
+</body>
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/app/NotesPanel.test.tsx > reports failed autosave and offers retry while preserving unsaved draft
+TestingLibraryElementError: Unable to find an accessible element with the role "alert"
+
+Here are the accessible roles:
+
+  button:
+
+  Name "Clear note":
+  <button
+    class="_clearButton_0b1aef"
+    type="button"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="_status_0b1aef"
+  />
+
+  --------------------------------------------------
+  textbox:
+
+  Name "Note":
+  <textarea
+    aria-label="Note"
+    class="_editor_0b1aef"
+    placeholder="Write notes about this paper…"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <div
+      class="_notesPanel_0b1aef"
+    >
+      <div
+        class="_header_0b1aef"
+      >
+        <button
+          class="_clearButton_0b1aef"
+          type="button"
+        >
+          Clear note
+        </button>
+        <p
+          class="_status_0b1aef"
+        />
+      </div>
+      <textarea
+        aria-label="Note"
+        class="_editor_0b1aef"
+        placeholder="Write notes about this paper…"
+      >
+        New unsaved evidence
+      </textarea>
+    </div>
+  </div>
+</body>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/app/NotesPanel.test.tsx:478:16
+    476|  expect(screen.getByRole('textbox',{name:'Note'})).toHaveValue('New un…
+    477|  console.log('failed autosave visible UI',document.body.textContent)
+    478|  expect(screen.getByRole('alert')).toHaveTextContent(/save/i)
+       |                ^
+    479|  expect(screen.getByRole('button',{name:/retry/i})).toBeVisible()
+    480| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/app/NotesPanel.test.tsx > reports failed clear after restoring the note
+TestingLibraryElementError: Unable to find an accessible element with the role "alert"
+
+Here are the accessible roles:
+
+  button:
+
+  Name "Clear note":
+  <button
+    class="_clearButton_0b1aef"
+    type="button"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="_status_0b1aef"
+  />
+
+  --------------------------------------------------
+  textbox:
+
+  Name "Note":
+  <textarea
+    aria-label="Note"
+    class="_editor_0b1aef"
+    placeholder="Write notes about this paper…"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <div
+      class="_notesPanel_0b1aef"
+    >
+      <div
+        class="_header_0b1aef"
+      >
+        <button
+          class="_clearButton_0b1aef"
+          type="button"
+        >
+          Clear note
+        </button>
+        <p
+          class="_status_0b1aef"
+        />
+      </div>
+      <textarea
+        aria-label="Note"
+        class="_editor_0b1aef"
+        placeholder="Write notes about this paper…"
+      >
+        Saved research evidence
+      </textarea>
+    </div>
+  </div>
+</body>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/app/NotesPanel.test.tsx:487:16
+    485|  expect(screen.getByRole('textbox',{name:'Note'})).toHaveValue('Saved …
+    486|  console.log('failed clear visible UI',document.body.textContent)
+    487|  expect(screen.getByRole('alert')).toHaveTextContent(/clear|delete/i)
+       |                ^
+    488| })
+    489|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 28 passed (30)
+   Start at  10:02:08
+   Duration  1.27s (transform 111ms, setup 0ms, collect 213ms, tests 386ms, environment 359ms, prepare 80ms)

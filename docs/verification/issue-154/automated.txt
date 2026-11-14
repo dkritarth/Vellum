@@ -1,0 +1,103 @@
+    at HTMLCanvasElement.getContext (file:///home/dandapat/.t3/worktrees/Vellum/t3-7a41c9b3/node_modules/tinyspy/dist/index.js:45:80)
+    at HTMLCanvasElement.mockCall (file:///home/dandapat/.t3/worktrees/Vellum/t3-7a41c9b3/node_modules/@vitest/spy/dist/index.js:61:17) undefined
+
+ ❯ src/app/Reader.test.tsx (53 tests | 1 failed) 1416ms
+   × Reader document disposal > releases each ready document owner once on replacement and unmount 15ms
+     → expected "spy" to be called once, but got 0 times
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/app/Reader.test.tsx > Reader document disposal > releases each ready document owner once on replacement and unmount
+AssertionError: expected "spy" to be called once, but got 0 times
+ ❯ src/app/Reader.test.tsx:1022:22
+    1020|     rerender(<Reader slug="b" />)
+    1021|     await waitFor(() => expect(getTextLayer(container)).toHaveTextCont…
+    1022|     expect(destroyA).toHaveBeenCalledOnce()
+       |                      ^
+    1023|     expect(destroyB).not.toHaveBeenCalled()
+    1024|     unmount()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 52 passed (53)
+   Start at  09:17:23
+   Duration  4.42s (transform 376ms, setup 0ms, collect 551ms, tests 1.42s, environment 464ms, prepare 94ms)
+
+Error: Search transport destroyed
+ ❯ Object.<anonymous> src/app/Reader.test.tsx:1065:56
+    1063|       } }),
+    1064|     }
+    1065|     const destroy = vi.fn(async () => { pending.reject(new Error('Sear…
+       |                                                        ^
+    1066|     getDocumentMock.mockReturnValueOnce({ promise: Promise.resolve(pdf…
+    1067|     const { container, rerender, unmount } = render(<Reader slug="a" /…
+ ❯ Object.mockCall node_modules/@vitest/spy/dist/index.js:61:17
+ ❯ Object.spy [as destroy] node_modules/tinyspy/dist/index.js:45:80
+ ❯ src/app/Reader.tsx:560:25
+ ❯ safelyCallDestroy node_modules/react-dom/cjs/react-dom.development.js:22971:5
+ ❯ commitHookEffectListUnmount node_modules/react-dom/cjs/react-dom.development.js:23139:11
+ ❯ commitPassiveUnmountInsideDeletedTreeOnFiber node_modules/react-dom/cjs/react-dom.development.js:25140:11
+ ❯ commitPassiveUnmountEffectsInsideOfDeletedTree_begin node_modules/react-dom/cjs/react-dom.development.js:25087:5
+ ❯ commitPassiveUnmountEffects_begin node_modules/react-dom/cjs/react-dom.development.js:24995:11
+ ❯ commitPassiveUnmountEffects node_modules/react-dom/cjs/react-dom.development.js:24980:3
+
+This error originated in "src/app/Reader.test.tsx" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "consumes document teardown rejection during an active search". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 60 skipped (61)
+     Errors  1 error
+   Start at  09:23:20
+   Duration  1.29s (transform 233ms, setup 0ms, collect 401ms, tests 210ms, environment 347ms, prepare 91ms)
+
+    at HTMLCanvasElement.mockCall (file:///home/dandapat/.t3/worktrees/Vellum/t3-7a41c9b3/node_modules/@vitest/spy/dist/index.js:61:17) undefined
+
+ ✓ src/app/Reader.test.tsx (61 tests) 1839ms
+
+ Test Files  1 passed (1)
+      Tests  61 passed (61)
+   Start at  09:26:21
+   Duration  2.92s (transform 226ms, setup 0ms, collect 383ms, tests 1.84s, environment 356ms, prepare 79ms)
+
+ ✓ core/store/db.test.ts (3 tests) 848ms
+   ✓ openDb > creates the containing directory if missing, at a temp path 559ms
+
+ Test Files  41 passed (41)
+      Tests  402 passed (402)
+   Start at  09:25:28
+   Duration  6.44s (transform 2.96s, setup 0ms, collect 12.97s, tests 18.35s, environment 16.39s, prepare 4.40s)
+
+
+> vellum@0.1.0 typecheck
+> tsc --noEmit -p tsconfig.json
+
+rendering chunks...
+out/preload/preload.mjs  5.08 kB
+✓ built in 18ms
+vite v5.4.21 building for production...
+transforming...
+✓ 80 modules transformed.
+rendering chunks...
+../out/renderer/index.html                          0.54 kB
+../out/renderer/assets/pdf.worker-BASQQs-o.mjs  2,366.08 kB
+../out/renderer/assets/index-Bt3UL1Kw.css          48.37 kB
+../out/renderer/assets/index-DFiSol5H.js        1,357.07 kB
+✓ built in 2.08s
+after pending worker switch {"tasks":6,"destroyed":5,"workers":6,"terminated":5}
+after pending search switch {"tasks":8,"destroyed":7,"workers":8,"terminated":7}
+before final unmount {"tasks":17,"destroyed":16,"workers":17,"terminated":16}
+after final unmount {"tasks":17,"destroyed":17,"workers":17,"terminated":17}
+restart current B {"tasks":1,"destroyed":0,"workers":1,"terminated":0}
+PASS: delayed reads, selection context/focus, rapid switches, stale completion, zoom/page, highlights, missing PDF, restart /tmp/vellum154-live-r4pFB4
+Expected upstream termination warnings: 4
+after pending worker switch {"tasks":6,"destroyed":5,"workers":6,"terminated":5}
+after pending search switch {"tasks":8,"destroyed":7,"workers":8,"terminated":7}
+before final unmount {"tasks":17,"destroyed":16,"workers":17,"terminated":16}
+after final unmount {"tasks":17,"destroyed":17,"workers":17,"terminated":17}
+restart current B {"tasks":1,"destroyed":0,"workers":1,"terminated":0}
+PASS: delayed reads, selection context/focus, rapid switches, stale completion, zoom/page, highlights, missing PDF, restart /tmp/vellum154-live-LmibS0
+Expected upstream termination warnings: 4

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SuggestedQuestions } from './SuggestedQuestions'
 import type { SuggestedQuestionRecord } from '../../core/questions/repo'
@@ -118,5 +118,46 @@ describe('SuggestedQuestions [L2-03]', () => {
     await waitFor(() => {
       expect(window.vellum.questionsGet).toHaveBeenCalledTimes(2)
     })
+  })
+
+  it('ignores a slow response for the previous paper after the slug changes', async () => {
+    let resolveA: (rows: SuggestedQuestionRecord[]) => void = () => undefined
+    const questionsGet = vi.fn((slug: string) =>
+      slug === 'paper-a'
+        ? new Promise<SuggestedQuestionRecord[]>((resolve) => {
+            resolveA = resolve
+          })
+        : Promise.resolve([{ ...mockQuestions[0], id: 20, paperSlug: 'paper-b', question: 'Question about B?' }]),
+    )
+    window.vellum = { ...window.vellum, questionsGet } as any
+    const onSelect = vi.fn()
+    const { rerender } = render(
+      <SuggestedQuestions slug="paper-a" backend="claude" disabled={false} onSelectQuestion={onSelect} />,
+    )
+    rerender(<SuggestedQuestions slug="paper-b" backend="claude" disabled={false} onSelectQuestion={onSelect} />)
+    expect(await screen.findByText('Question about B?')).toBeInTheDocument()
+
+    await act(async () => {
+      resolveA([{ ...mockQuestions[0], id: 10, paperSlug: 'paper-a', question: 'Question about A?' }])
+    })
+
+    expect(screen.queryByText('Question about A?')).not.toBeInTheDocument()
+    expect(screen.getByText('Question about B?')).toBeInTheDocument()
+  })
+
+  it('does not show the previous paper questions while the next paper loads', async () => {
+    const questionsGet = vi.fn((slug: string) =>
+      slug === 'paper-a' ? Promise.resolve(mockQuestions) : new Promise<SuggestedQuestionRecord[]>(() => undefined),
+    )
+    window.vellum = { ...window.vellum, questionsGet } as any
+    const { rerender } = render(
+      <SuggestedQuestions slug="paper-a" backend="claude" disabled={false} onSelectQuestion={vi.fn()} />,
+    )
+    expect(await screen.findByText(mockQuestions[0].question)).toBeInTheDocument()
+
+    rerender(<SuggestedQuestions slug="paper-b" backend="claude" disabled={false} onSelectQuestion={vi.fn()} />)
+
+    expect(screen.queryByText(mockQuestions[0].question)).not.toBeInTheDocument()
+    expect(screen.getByText('Generating paper questions…')).toBeInTheDocument()
   })
 })

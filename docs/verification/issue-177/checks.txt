@@ -1,0 +1,65 @@
+Base: 42b0d14ba2252c7096c41545fbcfcaf754f8ff14 (#176 above #106)
+Base red: npx vitest run src/app/App.annotation-delete.test.tsx
+1 failed (successful delete leaves overlay), 1 passed (failed-delete control).
+Full base output: red.txt. Guard negative control: guard-negative.txt.
+
+Final focused:
+npx vitest run src/app/App.annotation-delete.test.tsx src/app/App.annotations.test.tsx src/app/Reader.test.tsx src/app/AnnotationsPanel.test.tsx src/app/RightPanel.test.tsx
+ ✓ src/app/App.annotation-delete.test.tsx (10 tests) 1561ms
+   ✓ removes the rendered Reader overlay when its annotation is deleted 304ms
+
+ Test Files  5 passed (5)
+      Tests  76 passed (76)
+   Start at  15:02:38
+   Duration  2.81s (transform 751ms, setup 0ms, collect 2.18s, tests 3.87s, environment 2.08s, prepare 469ms)
+
+
+Full: npm test
+ ✓ src/app/ModelSelector.test.tsx (1 test) 123ms
+ ✓ src/app/OrcidBadge.test.tsx (1 test) 67ms
+
+ Test Files  43 passed (43)
+      Tests  407 passed (407)
+   Start at  15:04:29
+   Duration  5.85s (transform 2.04s, setup 0ms, collect 10.42s, tests 21.50s, environment 14.24s, prepare 4.23s)
+
+
+Typecheck: npm run typecheck (exit 0)
+
+> vellum@0.1.0 typecheck
+> tsc --noEmit -p tsconfig.json
+
+
+Build: npm run build (exit 0)
+../out/renderer/index.html                          0.54 kB
+../out/renderer/assets/pdf.worker-BASQQs-o.mjs  2,366.08 kB
+../out/renderer/assets/index-CwMB36rj.css          46.73 kB
+../out/renderer/assets/index-Cg5O5aDm.js        1,357.69 kB
+✓ built in 2.07s
+
+git diff --check: exit 0
+Existing Reader unit tests emit jsdom missing canvas-context diagnostics; tests pass.
+
+Built actual Electron, final distinct-passage run:
+PASS Native real-paper selection and visible yellow action refresh open list with one correct quote/page/color row
+PASS Visible annotation jump keeps row focus and Reader page 1
+PASS Creation while Annotations closed loads on reopen; both saved rows remain
+PASS Visible Delete removes yellow overlay without navigation; green overlay and row remain
+PASS Controlled failed delete retains exact saved record, row and green overlay
+PASS Delayed outgoing A deletion preserves B overlay/list; return to A shows empty storage/list/overlay
+PASS Subsequent native creation refreshes open list and Reader after multiple deletions
+PASS Process restart retains A/B highlights, both notes and original PDF bytes
+Evidence: /tmp/vellum177-live-distinct; isolated data: /data/dandapat/.tmp/vellum177-hYLv7X/data
+
+Development actual Electron:
+PASS npm run dev actual Electron native selection creates immediate row and Delete removes overlay/list/storage without navigation. Isolated root /tmp/vellum177-dev-xUcucY
+
+Renderer warnings/errors/page errors: none captured in built/restart/dev.
+Main diagnostics: D-Bus, deliberate injected delete rejection, debugger shutdown, dev GPU initialization error. See committed logs.
+
+Node native SQLite binary restored exactly; sha256sum -c: OK.
+Independent Node in-memory SELECT 1 returned { restored: 1 }.
+No Node SQLite checks overlapped Electron rebuild or live app.
+Full local logs: /tmp/vellum177-tests.log, /tmp/vellum177-focused.log,
+/tmp/vellum177-typecheck.log, /tmp/vellum177-build.log.
+Self-review Standards: no remaining findings. Spec: locally verified; independent review pending.

@@ -1,0 +1,6 @@
+PASS Visible pink menu action: delayed/repeated rejection, disabled pending retry, Enter retry saves exact captured values once; no false rows/overlays
+PASS Highlight mode: delayed/repeated failure, keyboard retry without reselection preserves original blue despite current green; exactly one additional row
+PASS New native selection and page navigation retire obsolete retry; delayed page failure stays retired; same-page annotation jump clears error and retains focus
+PASS Outgoing delayed failure after paper switch and revisit cannot contaminate current paper; exact stored records unchanged
+PASS Successful deletion still removes only target; full process restart retains both papers highlights/notes and exact source/ingested PDF/Markdown hashes
+Evidence: /tmp/vellum181-live-keyboard; isolated data: /data/dandapat/.tmp/vellum181-1ni4xb/data

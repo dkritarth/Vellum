@@ -1,0 +1,226 @@
+
+> vellum@0.1.0 test
+> vitest run src/app/Reader.test.tsx -t annotation selection retirement
+
+
+ RUN  v2.1.9 /home/dandapat/.t3/worktrees/Vellum/t3-02618ba2
+
+stderr | src/app/Reader.test.tsx > Reader annotation selection retirement [#173] > retires selection on annotation jump to page 1 and keeps flash and fresh context
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/.t3/worktrees/Vellum/t3-02618ba2/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/.t3/worktrees/Vellum/t3-02618ba2/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/.t3/worktrees/Vellum/t3-02618ba2/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-02618ba2/src/app/Reader.tsx:605:28 undefined
+
+stderr | src/app/Reader.test.tsx > Reader annotation selection retirement [#173] > retires selection on annotation jump to page 2 and keeps flash and fresh context
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/.t3/worktrees/Vellum/t3-02618ba2/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/.t3/worktrees/Vellum/t3-02618ba2/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/.t3/worktrees/Vellum/t3-02618ba2/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-02618ba2/src/app/Reader.tsx:605:28 undefined
+
+stderr | src/app/Reader.test.tsx > Reader annotation selection retirement [#173] > retires selection on annotation jump to page 2 and keeps flash and fresh context
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/home/dandapat/.t3/worktrees/Vellum/t3-02618ba2/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/home/dandapat/.t3/worktrees/Vellum/t3-02618ba2/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/home/dandapat/.t3/worktrees/Vellum/t3-02618ba2/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /home/dandapat/.t3/worktrees/Vellum/t3-02618ba2/src/app/Reader.tsx:605:28
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at processTimers (node:internal/timers:568:9) undefined
+
+ ❯ src/app/Reader.test.tsx (67 tests | 2 failed | 65 skipped) 177ms
+   × Reader annotation selection retirement [#173] > retires selection on annotation jump to page 1 and keeps flash and fresh context 134ms
+     → expect(element).not.toBeInTheDocument()
+
+expected document not to contain element, found <div
+  aria-label="Selection actions"
+  class="_menu_a67332"
+  role="toolbar"
+  style="left: 0px; top: 0px;"
+>
+  <button
+    class="_actionButton_a67332"
+    title="Insert quoted selection into Ask composer"
+    type="button"
+  >
+    Add to chat
+  </button>
+  <button
+    class="_actionButton_a67332"
+    title="Ask agent to explain this passage"
+    type="button"
+  >
+    Explain
+  </button>
+  <div
+    class="_divider_a67332"
+  />
+  <div
+    class="_swatches_a67332"
+  >
+    <button
+      aria-label="Highlight yellow"
+      class="_swatchButton_a67332"
+      style="background-color: rgb(250, 204, 21);"
+      title="Highlight yellow"
+      type="button"
+    />
+    <button
+      aria-label="Highlight green"
+      class="_swatchButton_a67332"
+      style="background-color: rgb(74, 222, 128);"
+      title="Highlight green"
+      type="button"
+    />
+    <button
+      aria-label="Highlight blue"
+      class="_swatchButton_a67332"
+      style="background-color: rgb(96, 165, 250);"
+      title="Highlight blue"
+      type="button"
+    />
+    <button
+      aria-label="Highlight pink"
+      class="_swatchButton_a67332"
+      style="background-color: rgb(244, 114, 182);"
+      title="Highlight pink"
+      type="button"
+    />
+  </div>
+</div> instead
+   × Reader annotation selection retirement [#173] > retires selection on annotation jump to page 2 and keeps flash and fresh context 41ms
+     → expect(element).not.toBeInTheDocument()
+
+expected document not to contain element, found <div
+  aria-label="Selection actions"
+  class="_menu_a67332"
+  role="toolbar"
+  style="left: 0px; top: 0px;"
+>
+  <button
+    class="_actionButton_a67332"
+    title="Insert quoted selection into Ask composer"
+    type="button"
+  >
+    Add to chat
+  </button>
+  <button
+    class="_actionButton_a67332"
+    title="Ask agent to explain this passage"
+    type="button"
+  >
+    Explain
+  </button>
+  <div
+    class="_divider_a67332"
+  />
+  <div
+    class="_swatches_a67332"
+  >
+    <button
+      aria-label="Highlight yellow"
+      class="_swatchButton_a67332"
+      style="background-color: rgb(250, 204, 21);"
+      title="Highlight yellow"
+      type="button"
+    />
+    <button
+      aria-label="Highlight green"
+      class="_swatchButton_a67332"
+      style="background-color: rgb(74, 222, 128);"
+      title="Highlight green"
+      type="button"
+    />
+    <button
+      aria-label="Highlight blue"
+      class="_swatchButton_a67332"
+      style="background-color: rgb(96, 165, 250);"
+      title="Highlight blue"
+      type="button"
+    />
+    <button
+      aria-label="Highlight pink"
+      class="_swatchButton_a67332"
+      style="background-color: rgb(244, 114, 182);"
+      title="Highlight pink"
+      type="button"
+    />
+  </div>
+</div> instead
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/app/Reader.test.tsx > Reader annotation selection retirement [#173] > retires selection on annotation jump to page 1 and keeps flash and fresh context
+ FAIL  src/app/Reader.test.tsx > Reader annotation selection retirement [#173] > retires selection on annotation jump to page 2 and keeps flash and fresh context
+Error: expect(element).not.toBeInTheDocument()
+
+expected document not to contain element, found <div
+  aria-label="Selection actions"
+  class="_menu_a67332"
+  role="toolbar"
+  style="left: 0px; top: 0px;"
+>
+  <button
+    class="_actionButton_a67332"
+    title="Insert quoted selection into Ask composer"
+    type="button"
+  >
+    Add to chat
+  </button>
+  <button
+    class="_actionButton_a67332"
+    title="Ask agent to explain this passage"
+    type="button"
+  >
+    Explain
+  </button>
+  <div
+    class="_divider_a67332"
+  />
+  <div
+    class="_swatches_a67332"
+  >
+    <button
+      aria-label="Highlight yellow"
+      class="_swatchButton_a67332"
+      style="background-color: rgb(250, 204, 21);"
+      title="Highlight yellow"
+      type="button"
+    />
+    <button
+      aria-label="Highlight green"
+      class="_swatchButton_a67332"
+      style="background-color: rgb(74, 222, 128);"
+      title="Highlight green"
+      type="button"
+    />
+    <button
+      aria-label="Highlight blue"
+      class="_swatchButton_a67332"
+      style="background-color: rgb(96, 165, 250);"
+      title="Highlight blue"
+      type="button"
+    />
+    <button
+      aria-label="Highlight pink"
+      class="_swatchButton_a67332"
+      style="background-color: rgb(244, 114, 182);"
+      title="Highlight pink"
+      type="button"
+    />
+  </div>
+</div> instead
+ ❯ src/app/Reader.test.tsx:778:78
+    776|     await waitFor(() => expect(getTextLayer(container)).toHaveTextCont…
+    777|     expect(screen.getByLabelText('Page')).toHaveTextContent(page + ' o…
+    778|     expect(screen.queryByRole('toolbar', { name: 'Selection actions' }…
+       |                                                                              ^
+    779|     await waitFor(() => expect(getOverlayContainer(container).firstEle…
+    780|     expect(onAddToChat).not.toHaveBeenCalled()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 65 skipped (67)
+   Start at  10:49:46
+   Duration  1.27s (transform 233ms, setup 0ms, collect 403ms, tests 177ms, environment 370ms, prepare 95ms)

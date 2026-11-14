@@ -9,13 +9,13 @@ executable backlog; PLAN and wiki do not authorize work.
 - Fourteen Phase-1 cards are merged. Treat them as implemented baseline, not proof
   of reliable product behavior.
 - Claude ACP has live on-plan smoke evidence.
-- Codex ACP is unverified and is current priority because Kritarth currently uses a
-  Codex subscription. Verify with current signed-in CLI and adapter; never infer
-  success from mocks or model-selector UI.
-- Issue #25 is first ready task. All later issues remain blocked behind explicit
-  dependency and milestone gates.
-- Open PRs #21–#24 map to issues #29–#32 and must not merge out of order or before
-  Phase-0 gate #28 closes.
+- Codex ACP is current priority because Kritarth currently uses a Codex
+  subscription. A signed-in smoke run passed under issue #25 (closed); evidence is
+  in `docs/verification/codex-acp-2026-08-12.md`. Re-verify with current signed-in
+  CLI and adapter; never infer success from mocks or model-selector UI.
+- Phase-0 gate #28 is still open. Find the current ready task with
+  `gh issue list --label status:ready`; all other issues stay blocked behind
+  explicit dependency and milestone gates.
 
 ## Next objective
 

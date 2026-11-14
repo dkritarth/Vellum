@@ -114,6 +114,27 @@ describe('chat repo', () => {
     expect(noMatches).toHaveLength(0)
   })
 
+  it('matches LIKE metacharacters in chat search literally', () => {
+    const percent = createChatSession(db, { paperSlug: 'attention-is-all-you-need', backend: 'claude' })
+    addChatMessage(db, { sessionId: percent.id, role: 'user', content: 'Why does dropout use 10% here?' })
+
+    const underscore = createChatSession(db, { paperSlug: 'attention-is-all-you-need', backend: 'codex' })
+    addChatMessage(db, { sessionId: underscore.id, role: 'user', content: 'What is d_model?' })
+
+    const plain = createChatSession(db, { paperSlug: 'attention-is-all-you-need', backend: 'claude', title: 'Plain chat' })
+    addChatMessage(db, { sessionId: plain.id, role: 'user', content: 'Explain multi-head attention' })
+
+    const backslash = createChatSession(db, { paperSlug: 'attention-is-all-you-need', backend: 'codex' })
+    addChatMessage(db, { sessionId: backslash.id, role: 'user', content: 'Render \\sqrt{d_k} please' })
+
+    expect(listChatSessions(db, { search: '%' }).map((s) => s.id)).toEqual([percent.id])
+    expect(listChatSessions(db, { search: '_' }).map((s) => s.id).sort()).toEqual(
+      [underscore.id, backslash.id].sort(),
+    )
+    expect(listChatSessions(db, { search: 'd_model' }).map((s) => s.id)).toEqual([underscore.id])
+    expect(listChatSessions(db, { search: '\\sqrt' }).map((s) => s.id)).toEqual([backslash.id])
+  })
+
   it('gracefully handles orphaned sessions when paper record is missing [L2-02]', () => {
     // Disable FK temporarily to simulate missing paper
     db.pragma('foreign_keys = OFF')

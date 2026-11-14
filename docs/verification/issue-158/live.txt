@@ -1,0 +1,9 @@
+PASS real search, next match, keyboard submit and focus
+PASS unsubmitted input distinct from completed no matches
+PASS pending clear invalidates late success and page jump
+PASS pending edit, newer pending, stale success preserves loading and page
+PASS pending edit, newer pending, stale failure preserves loading and page
+PASS accessible recoverable current error, keyboard retry
+PASS paper switch ignores held search failure and resets search
+PASS paper switches and process restart preserve saved note/highlight
+PASS zero unexpected warnings/errors/pageerrors; expected upstream termination warnings 1 isolated state /tmp/vellum158-live-uuN3U4

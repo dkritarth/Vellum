@@ -4,6 +4,7 @@
   "description": "Vellum — local-first AI paper workspace that runs on your own Claude/Codex plan via ACP. No extra API key.",
   "author": "Kritarth Dandapat",
   "license": "MIT",
+  "homepage": "https://github.com/dkritarth/Vellum",
   "main": "out/main/index.cjs",
   "type": "module",
   "scripts": {
@@ -20,8 +21,10 @@
     "test:gate:questions": "node test/questions-live.mjs",
     "test:gate:trash": "node test/trash-live.mjs",
     "test:gate:usage": "node test/usage-live.mjs",
-    "dist": "electron-vite build && electron-builder",
-    "test:gate:reader": "node test/reader-gate.mjs"
+    "dist": "electron-vite build && electron-rebuild --force --only better-sqlite3 && electron-builder --linux --publish never",
+    "test:gate:reader": "node test/reader-gate.mjs",
+    "test:gate:reader-scroll-zoom": "node test/reader-scroll-zoom-gate.mjs",
+    "test:gate:app-ux": "node test/app-ux-live.mjs"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.2.1",
@@ -50,7 +53,7 @@
     "vite": "^5.4.0",
     "vitest": "^2.1.0"
   },
-  "//": "@agentclientprotocol/sdk is the current canonical ACP TS lib (verified on npm 2026-07-21). @zed-industries/agent-client-protocol is deprecated and renamed to this package. better-sqlite3 bumped 11->13: v11's prebuilt/native build doesn't compile against newer V8 (Node 26) — v13 fixes the V8 API compat, no behavior change for our usage.",
+  "//": "@agentclientprotocol/sdk is the current canonical ACP TS lib (verified on npm 2026-07-21). @zed-industries/agent-client-protocol is deprecated and renamed to this package. better-sqlite3 is pinned to exactly 12.11.1 (moved from ^13.0.1 in #55); under Electron, core/store/db.ts loads the bundled resources/native/better_sqlite3.electron.node binding instead of the Node build.",
   "allowScripts": {
     "better-sqlite3@12.11.1": true,
     "better-sqlite3@13.0.1": true,

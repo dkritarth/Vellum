@@ -1,0 +1,102 @@
+[
+  {
+    "name": "page1-100",
+    "scale": 1,
+    "position": "absolute",
+    "color": "rgba(0, 0, 0, 0)",
+    "font": 17.22,
+    "layer": {
+      "x": 0,
+      "y": 0,
+      "width": 612,
+      "height": 792
+    },
+    "range": {
+      "x": 211.5,
+      "y": 145.9375,
+      "width": 187.15655517578125,
+      "height": 20
+    },
+    "ink": {
+      "minX": 212,
+      "maxX": 398,
+      "minY": 150,
+      "maxY": 161
+    }
+  },
+  {
+    "name": "page1-125",
+    "scale": 1.25,
+    "position": "absolute",
+    "color": "rgba(0, 0, 0, 0)",
+    "font": 21.525,
+    "layer": {
+      "x": 0,
+      "y": 0,
+      "width": 765,
+      "height": 990
+    },
+    "range": {
+      "x": 264.375,
+      "y": 182.921875,
+      "width": 234.1165771484375,
+      "height": 24
+    },
+    "ink": {
+      "minX": 265,
+      "maxX": 498,
+      "minY": 188,
+      "maxY": 202
+    }
+  },
+  {
+    "name": "page2-125",
+    "scale": 1.25,
+    "position": "absolute",
+    "color": "rgba(0, 0, 0, 0)",
+    "font": 14.95,
+    "layer": {
+      "x": 0,
+      "y": 0,
+      "width": 765,
+      "height": 990
+    },
+    "range": {
+      "x": 157.421875,
+      "y": 88.1875,
+      "width": 81.1065673828125,
+      "height": 17
+    },
+    "ink": {
+      "minX": 158,
+      "maxX": 237,
+      "minY": 92,
+      "maxY": 101
+    }
+  },
+  {
+    "name": "restart-page1-100",
+    "scale": 1,
+    "position": "absolute",
+    "color": "rgba(0, 0, 0, 0)",
+    "font": 17.22,
+    "layer": {
+      "x": 0,
+      "y": 0,
+      "width": 612,
+      "height": 792
+    },
+    "range": {
+      "x": 211.5,
+      "y": 145.9375,
+      "width": 187.15655517578125,
+      "height": 20
+    },
+    "ink": {
+      "minX": 212,
+      "maxX": 398,
+      "minY": 150,
+      "maxY": 161
+    }
+  }
+]

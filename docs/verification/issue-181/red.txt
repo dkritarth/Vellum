@@ -1,0 +1,29 @@
+
+> vellum@0.1.0 test
+> vitest run src/app/App.highlight-retry.test.tsx
+
+
+ RUN  v2.1.9 /home/dandapat/.t3/worktrees/Vellum/t3-e16be2c4
+
+stdout | src/app/App.highlight-retry.test.tsx > shows recoverable creation failure through menu
+failure mode menu visible alerts 0 selection actions 1 selected text Research evidence
+
+stdout | src/app/App.highlight-retry.test.tsx > shows recoverable creation failure through highlight mode
+failure mode highlight mode visible alerts 0 selection actions 0 selected text Research evidence
+
+ ❯ src/app/App.highlight-retry.test.tsx (2 tests | 2 failed) 527ms
+   × shows recoverable creation failure through menu 351ms
+     → Unable to find an accessible element with the role "alert"
+
+[Accessible-role trees omitted. Full original log: /tmp/vellum181-red.log]
+
+ FAIL  src/app/App.highlight-retry.test.tsx > shows recoverable creation failure through menu
+TestingLibraryElementError: Unable to find an accessible element with the role "alert"
+ ❯ src/app/App.highlight-retry.test.tsx:116:17
+ FAIL  src/app/App.highlight-retry.test.tsx > shows recoverable creation failure through highlight mode
+TestingLibraryElementError: Unable to find an accessible element with the role "alert"
+ ❯ src/app/App.highlight-retry.test.tsx:116:17
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  15:20:52
+   Duration  1.77s (transform 365ms, setup 0ms, collect 551ms, tests 527ms, environment 357ms, prepare 93ms)

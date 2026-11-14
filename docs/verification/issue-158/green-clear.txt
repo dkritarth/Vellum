@@ -1,0 +1,13 @@
+
+> vellum@0.1.0 test
+> vitest run src/app/Reader.test.tsx -t invalidates a pending search
+
+
+ RUN  v2.1.9 /home/dandapat/.t3/worktrees/Vellum/t3-2897987b
+
+ ✓ src/app/Reader.test.tsx (62 tests | 61 skipped) 150ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 61 skipped (62)
+   Start at  09:34:41
+   Duration  1.31s (transform 257ms, setup 0ms, collect 435ms, tests 150ms, environment 391ms, prepare 77ms)

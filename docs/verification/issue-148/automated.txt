@@ -1,0 +1,35 @@
+/tmp/vellum148-red.log
+AssertionError: expected { outgoing: true, …(2) } to deeply equal { outgoing: false, text: '', …(1) }
+-   "actions": 0,
+-   "outgoing": false,
+-   "text": "",
++   "actions": 1,
++   "outgoing": true,
++   "text": "Introduction to Vellum",
+ Test Files  1 failed (1)
+      Tests  1 failed | 46 skipped (47)
+   Duration  1.25s (transform 205ms, setup 0ms, collect 372ms, tests 157ms, environment 381ms, prepare 78ms)
+
+/tmp/vellum148-focused.log
+ Test Files  1 passed (1)
+      Tests  52 passed (52)
+   Duration  2.41s (transform 221ms, setup 0ms, collect 381ms, tests 1.33s, environment 373ms, prepare 80ms)
+
+/tmp/vellum148-tests.log
+ Test Files  41 passed (41)
+      Tests  393 passed (393)
+   Duration  6.08s (transform 2.30s, setup 0ms, collect 10.56s, tests 17.77s, environment 15.26s, prepare 4.31s)
+
+/tmp/vellum148-typecheck.log
+> tsc --noEmit -p tsconfig.json
+
+/tmp/vellum148-build.log
+✓ built in 4.60s
+✓ built in 16ms
+✓ built in 2.10s
+
+/tmp/vellum148-live.log
+PASS: delayed reads, selection context/focus, rapid switches, stale completion, zoom/page, highlights, missing PDF, restart /tmp/vellum148-live-vJPeKB
+
+/tmp/vellum148-live-built.log
+PASS: delayed reads, selection context/focus, rapid switches, stale completion, zoom/page, highlights, missing PDF, restart /tmp/vellum148-live-qTLNxR

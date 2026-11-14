@@ -1,0 +1,9 @@
+PASS Native real-paper selection and visible yellow action refresh open list with one correct quote/page/color row
+PASS Visible annotation jump keeps row focus and Reader page 1
+PASS Creation while Annotations closed loads on reopen; both saved rows remain
+PASS Initial delayed read error distinct from loading/empty; repeated error and keyboard retry recover exact saved rows
+PASS Injected panel refresh failure retains known rows and Reader overlays; explicit retry adds persisted new highlight
+PASS Repeated failed delete retains exact storage/list/overlays; Tab and Enter retry same ID then only target disappears
+PASS Delayed outgoing delete error does not contaminate B or revisited A
+PASS Process restart retains A/B highlights, both notes and original PDF bytes
+Evidence: /tmp/vellum179-live-final; isolated data: /data/dandapat/.tmp/vellum179-i4BVHM/data

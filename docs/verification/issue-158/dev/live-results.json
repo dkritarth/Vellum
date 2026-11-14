@@ -1,0 +1,25 @@
+{
+  "dir": "/tmp/vellum158-live-7nbgGU",
+  "checks": [
+    "real search, next match, keyboard submit and focus",
+    "unsubmitted input distinct from completed no matches",
+    "pending clear invalidates late success and page jump",
+    "pending edit, newer pending, stale success preserves loading and page",
+    "pending edit, newer pending, stale failure preserves loading and page",
+    "accessible recoverable current error, keyboard retry",
+    "paper switch ignores held search failure and resets search",
+    "paper switches and process restart preserve saved note/highlight"
+  ],
+  "errors": [],
+  "terminationWarnings": [],
+  "papers": [
+    {
+      "file": "/tmp/vellum-121-attention.pdf",
+      "title": "Attention Is All You Need"
+    },
+    {
+      "file": "/tmp/vellum-125-real-paper.pdf",
+      "title": "Less Than One-Shot Learning"
+    }
+  ]
+}

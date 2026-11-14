@@ -1,0 +1,56 @@
+
+ RUN  v2.1.9 /home/dandapat/.t3/worktrees/Vellum/t3-2fbce516
+
+ ❯ src/app/App.annotation-delete.test.tsx (9 tests | 3 failed) 1185ms
+   × ignores obsolete Reader success after a newer creation 79ms
+     → expected  to have a length of 1 but got +0
+   × ignores obsolete Reader failure after a newer creation 78ms
+     → expected  to have a length of 1 but got +0
+   × ignores obsolete refresh success after subsequent deletion 112ms
+     → expected <div …(2)></div> to have a length of +0 but got 1
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/app/App.annotation-delete.test.tsx > ignores obsolete Reader success after a newer creation
+ FAIL  src/app/App.annotation-delete.test.tsx > ignores obsolete Reader failure after a newer creation
+AssertionError: expected  to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/app/App.annotation-delete.test.tsx:188:65
+    186|   await waitFor(() => expect(document.querySelectorAll('[class*="highl…
+    187|   await act(async () => { if (completion === 'success') resolve([]); e…
+    188|   expect(document.querySelectorAll('[class*="highlightRect"]')).toHave…
+       |                                                                 ^
+    189| })
+    190|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/app/App.annotation-delete.test.tsx > ignores obsolete refresh success after subsequent deletion
+AssertionError: expected <div …(2)></div> to have a length of +0 but got 1
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ src/app/App.annotation-delete.test.tsx:213:65
+    211|     else request.reject(new Error('obsolete refresh failed'))
+    212|   } })
+    213|   expect(document.querySelectorAll('[class*="highlightRect"]')).toHave…
+       |                                                                 ^
+    214|   expect(within(annotations()).getByText(/No highlights yet/)).toBeVis…
+    215| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 6 passed (9)
+   Start at  14:59:30
+   Duration  2.44s (transform 366ms, setup 0ms, collect 568ms, tests 1.18s, environment 357ms, prepare 68ms)

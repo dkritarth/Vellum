@@ -1,0 +1,8 @@
+[790972:1106/144724.704421:ERROR:object_proxy.cc(576)] Failed to call method: org.freedesktop.DBus.StartServiceByName: object_path= /org/freedesktop/DBus: org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the network connection was broken.
+Error occurred in handler for 'vellum:highlights-create': Error: issue-175 controlled create failure
+    at state.release (eval at evaluate (:311:30), <anonymous>:14:44)
+    at eval (eval at evaluate (:311:30), <anonymous>:1:37)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+Debugger ending on ws://127.0.0.1:40781/b2d380f0-f41e-4d38-827e-55a2e3f703d7
+For help, see: https://nodejs.org/en/docs/inspector

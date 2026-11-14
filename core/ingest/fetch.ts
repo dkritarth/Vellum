@@ -2,7 +2,7 @@
 //
 // Network boundary:
 //   - arXiv: metadata from the Atom API, PDF bytes from export.arxiv.org/pdf.
-//   - DOI: metadata from api.crossref.org/works, PDF bytes from doi.org.
+//   - DOI: metadata from api.crossref.org/works, candidate PDF response from doi.org.
 //   - pdf_url: PDF bytes straight from the URL, metadata empty.
 //   - local_pdf: PDF bytes straight off disk, metadata empty.
 //
@@ -12,11 +12,9 @@
 //      guess the title, author list, or year — we have the publisher record.
 //   2. An agent run (extract.ts) costs latency and tokens; fetch.ts is cheap
 //      HTTP GETs.
-//   3. For DOIs whose publisher PDF is open-access, fetching straight from
-//      doi.org gets the real paper. For closed DOIs, the publisher redirects
-//      behind auth, so fetchSource() for a DOI may throw — caller decides how
-//      to degrade (e.g. prompt the user for a local PDF or drop to metadata-
-//      only).
+//   3. DOI resolution may return a publisher landing page even for open-access
+//      papers. Reject explicit HTML before conversion and ask for a direct PDF
+//      URL or local file; DOI resolution does not promise PDF bytes.
 //
 // How to test manually without launching the UI:
 //   node -e "
@@ -32,7 +30,8 @@
 // (The DOI above is open-access and has rich, multi-author, multi-affiliation
 // metadata (AlphaFold, Nature, 2021, 34 authors). Both kinds fetched clean.
 
-import { readFile } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { open } from 'node:fs/promises'
 import type { ClassifiedInput } from './classify'
 import { assertSafeUrl, type DnsLookupFn } from './ssrf'
 
@@ -54,7 +53,8 @@ export interface FetchedSource {
 }
 
 export interface FetchPdfOptions {
-  /** Maximum time in milliseconds before aborting the request. Defaults to 30,000ms. */
+  /** Maximum time in milliseconds before aborting the request. Defaults to
+   * 30,000ms. Each arXiv/Crossref metadata request gets the same budget. */
   timeoutMs?: number
   /** Maximum bytes allowed for the PDF. Defaults to 52,428,800 (50 MB). */
   maxBytes?: number
@@ -74,14 +74,35 @@ const ARXIV_API = 'https://export.arxiv.org/api/query'
 const ARXIV_PDF_BASE = 'https://export.arxiv.org/pdf'
 const CROSSREF_API = 'https://api.crossref.org/works'
 
-async function fetchArxivMetadata(arxivId: string): Promise<RawMetadata> {
+// Metadata hosts are fixed (arXiv, Crossref), so they skip the SSRF check, but
+// a server that accepts the connection and never answers would otherwise hang
+// ingest indefinitely. The signal covers both headers and body.
+async function withTimeout<T>(
+  label: string,
+  timeoutMs: number,
+  run: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const signal = AbortSignal.timeout(timeoutMs)
+  try {
+    return await run(signal)
+  } catch (err: unknown) {
+    if (signal.aborted) {
+      throw new Error(`${label} request timed out after ${timeoutMs}ms`)
+    }
+    throw err
+  }
+}
+
+async function fetchArxivMetadata(arxivId: string, timeoutMs: number): Promise<RawMetadata> {
   const idNoVersion = arxivId.replace(/v\d+$/, '')
   const url = `${ARXIV_API}?id_list=${encodeURIComponent(idNoVersion)}`
-  const res = await fetch(url)
-  if (!res.ok) {
-    throw new Error(`arXiv API request failed: ${res.status} ${res.statusText}`)
-  }
-  const xml = await res.text()
+  const xml = await withTimeout('arXiv API', timeoutMs, async (signal) => {
+    const res = await fetch(url, { signal })
+    if (!res.ok) {
+      throw new Error(`arXiv API request failed: ${res.status} ${res.statusText}`)
+    }
+    return res.text()
+  })
   return parseArxivAtom(xml, arxivId)
 }
 
@@ -100,23 +121,23 @@ function parseArxivAtom(xml: string, arxivId: string): RawMetadata {
   }
 
   const authors = [...entry.matchAll(/<author>\s*<name>([\s\S]*?)<\/name>/g)].map((m) =>
-    normalizeWhitespace(m[1]),
+    decodeXmlText(m[1]),
   )
 
   const published = extractTag(entry, 'published')
   const year = published ? Number.parseInt(published.slice(0, 4), 10) : undefined
 
   const venueMatch = entry.match(/<arxiv:journal_ref>([\s\S]*?)<\/arxiv:journal_ref>/)
-  const venue = venueMatch ? normalizeWhitespace(venueMatch[1]) : undefined
+  const venue = venueMatch ? decodeXmlText(venueMatch[1]) : undefined
 
   const abstract = extractTag(entry, 'summary')
 
   return {
-    title: normalizeWhitespace(title),
+    title: decodeXmlText(title),
     authors,
     year: year !== undefined && Number.isFinite(year) ? year : undefined,
     venue,
-    abstract: abstract ? normalizeWhitespace(abstract) : undefined,
+    abstract: abstract ? decodeXmlText(abstract) : undefined,
   }
 }
 
@@ -127,6 +148,31 @@ function extractTag(xml: string, tag: string): string | undefined {
 
 function normalizeWhitespace(s: string): string {
   return s.replace(/\s+/g, ' ').trim()
+}
+
+// Decode extracted field text in one pass so escaped markup stays text and
+// replacement ampersands cannot trigger a second round of entity expansion.
+function decodeXmlText(s: string): string {
+  const decoded = s.replace(/&(amp|lt|gt|apos|quot|#\d+|#x[\da-fA-F]+);/g, (reference, entity: string) => {
+    switch (entity) {
+      case 'amp': return '&'
+      case 'lt': return '<'
+      case 'gt': return '>'
+      case 'apos': return "'"
+      case 'quot': return '"'
+    }
+    const codePoint = entity.startsWith('#x')
+      ? Number.parseInt(entity.slice(2), 16)
+      : Number.parseInt(entity.slice(1), 10)
+    // XML 1.0 Char production, including legal but discouraged characters:
+    // https://www.w3.org/TR/REC-xml/#NT-Char (CharRef: #NT-CharRef).
+    const valid = codePoint === 0x9 || codePoint === 0xA || codePoint === 0xD ||
+      (codePoint >= 0x20 && codePoint <= 0xD7FF) ||
+      (codePoint >= 0xE000 && codePoint <= 0xFFFD) ||
+      (codePoint >= 0x10000 && codePoint <= 0x10FFFF)
+    return valid ? String.fromCodePoint(codePoint) : reference
+  })
+  return normalizeWhitespace(decoded)
 }
 
 async function fetchArxivPdf(arxivId: string, options?: FetchPdfOptions): Promise<Uint8Array> {
@@ -156,12 +202,14 @@ function normalizeOrcid(value: unknown): string | null {
   return /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/.test(stripped) ? stripped : null
 }
 
-async function fetchCrossrefMetadata(doi: string): Promise<RawMetadata> {
-  const res = await fetch(`${CROSSREF_API}/${encodeURIComponent(doi)}`)
-  if (!res.ok) {
-    throw new Error(`Crossref API request failed: ${res.status} ${res.statusText}`)
-  }
-  const body = (await res.json()) as CrossrefWork
+async function fetchCrossrefMetadata(doi: string, timeoutMs: number): Promise<RawMetadata> {
+  const body = await withTimeout('Crossref API', timeoutMs, async (signal) => {
+    const res = await fetch(`${CROSSREF_API}/${encodeURIComponent(doi)}`, { signal })
+    if (!res.ok) {
+      throw new Error(`Crossref API request failed: ${res.status} ${res.statusText}`)
+    }
+    return (await res.json()) as CrossrefWork
+  })
   const work = body.message
 
   const title = work.title?.[0]
@@ -251,6 +299,14 @@ export async function fetchPdfFromUrl(
       throw new Error(`${label} request failed: ${res.status} ${res.statusText}`)
     }
 
+    const mediaType = res.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase()
+    if (mediaType === 'text/html' || mediaType === 'application/xhtml+xml') {
+      await res.body?.cancel().catch(() => {})
+      throw new Error(
+        `${label} resolved to a web page, not a PDF. Supply a direct PDF URL or download the PDF and import the local file.`,
+      )
+    }
+
     // Check Content-Length header early if available
     const contentLengthHeader = res.headers.get('content-length')
     if (contentLengthHeader) {
@@ -315,16 +371,17 @@ export async function fetchSource(
   input: ClassifiedInput,
   options?: FetchPdfOptions,
 ): Promise<FetchedSource> {
+  const metadataTimeoutMs = options?.timeoutMs ?? DEFAULT_PDF_TIMEOUT_MS
   switch (input.kind) {
     case 'arxiv': {
       const [pdfBytes, metadata] = await Promise.all([
         fetchArxivPdf(input.value, options),
-        fetchArxivMetadata(input.value),
+        fetchArxivMetadata(input.value, metadataTimeoutMs),
       ])
       return { pdfBytes, metadata }
     }
     case 'doi': {
-      const metadata = await fetchCrossrefMetadata(input.value)
+      const metadata = await fetchCrossrefMetadata(input.value, metadataTimeoutMs)
       const pdfBytes = await fetchPdfFromUrl(`https://doi.org/${input.value}`, 'DOI PDF', options)
       return { pdfBytes, metadata }
     }
@@ -333,8 +390,38 @@ export async function fetchSource(
       return { pdfBytes, metadata: undefined }
     }
     case 'local_pdf': {
-      const pdfBytes = new Uint8Array(await readFile(input.value))
-      return { pdfBytes, metadata: undefined }
+      const maxBytes = options?.maxBytes ?? DEFAULT_MAX_PDF_BYTES
+      // Nonblocking open lets us reject FIFOs without waiting for a writer.
+      const handle = await open(input.value, constants.O_RDONLY | constants.O_NONBLOCK)
+      try {
+        const stat = await handle.stat()
+        if (!stat.isFile()) throw new Error('Local PDF must be a regular file')
+        if (stat.size > maxBytes) {
+          throw new Error(`Local PDF exceeds maximum allowed size of ${maxBytes} bytes`)
+        }
+        const chunks: Uint8Array[] = []
+        let totalBytes = 0
+        while (true) {
+          // Read at most one byte past the cap, even if the file grows after stat.
+          const chunk = new Uint8Array(Math.min(64 * 1024, maxBytes - totalBytes + 1))
+          const { bytesRead } = await handle.read(chunk, 0, chunk.byteLength, null)
+          if (bytesRead === 0) break
+          totalBytes += bytesRead
+          if (totalBytes > maxBytes) {
+            throw new Error(`Local PDF exceeds maximum allowed size of ${maxBytes} bytes`)
+          }
+          chunks.push(bytesRead === chunk.byteLength ? chunk : chunk.slice(0, bytesRead))
+        }
+        const pdfBytes = new Uint8Array(totalBytes)
+        let offset = 0
+        for (const chunk of chunks) {
+          pdfBytes.set(chunk, offset)
+          offset += chunk.byteLength
+        }
+        return { pdfBytes, metadata: undefined }
+      } finally {
+        await handle.close()
+      }
     }
   }
 }

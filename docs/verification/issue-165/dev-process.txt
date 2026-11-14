@@ -1,0 +1,38 @@
+
+> vellum@0.1.0 dev
+> electron-vite dev --noSandbox --remoteDebuggingPort 19365
+
+vite v5.4.21 building SSR bundle for development...
+transforming...
+✓ 111 modules transformed.
+rendering chunks...
+out/main/index.cjs                    365.10 kB
+out/main/chunks/pdfjs-B9lhfSZS.cjs  2,098.84 kB
+✓ built in 4.27s
+
+build the electron main process successfully
+
+-----
+
+vite v5.4.21 building SSR bundle for development...
+transforming...
+✓ 1 modules transformed.
+rendering chunks...
+out/preload/preload.mjs  5.08 kB
+✓ built in 15ms
+
+build the electron preload files successfully
+
+-----
+
+dev server running for the electron renderer process at:
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+
+start electron app...
+
+
+DevTools listening on ws://127.0.0.1:19365/devtools/browser/6f5d46d8-53d9-4dcc-9472-e27a54262093
+[630632:1106/100634.702283:ERROR:viz_main_impl.cc(166)] Exiting GPU process due to errors during initialization
+[630601:1106/100635.487667:ERROR:object_proxy.cc(576)] Failed to call method: org.freedesktop.DBus.StartServiceByName: object_path= /org/freedesktop/DBus: org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the network connection was broken.

@@ -11,6 +11,7 @@
 // migration's SQL in place — append a new one.
 
 import type { Database } from 'better-sqlite3'
+import { SOURCE_IDENTITY_SQL } from './migrations/009-paper-sources.js'
 
 import { SCHEMA_V1, SCHEMA_V3_NOTES, SCHEMA_V4_HIGHLIGHTS, SCHEMA_V5_AUTHOR_ORCIDS, SCHEMA_V6_SUGGESTED_QUESTIONS, SCHEMA_V7_TRASH, SCHEMA_V8_USAGE } from './schema.js'
 
@@ -29,6 +30,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 6, sql: SCHEMA_V6_SUGGESTED_QUESTIONS }, // [L2-03] suggested_questions table
   { version: 7, sql: SCHEMA_V7_TRASH }, // [L2-04] trashed_at column
   { version: 8, sql: SCHEMA_V8_USAGE }, // [L2-05] usage_records table
+  { version: 9, sql: SOURCE_IDENTITY_SQL }, // #78 source location ownership
 ]
 
 /**

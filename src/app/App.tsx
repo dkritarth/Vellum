@@ -1,14 +1,14 @@
 import { TrashView } from './TrashView.js'
 import { UsageView } from './UsageView.js'
 import type { ChatSessionSummary } from '../../core/chat/repo'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { IngestModal } from './IngestModal'
 import { Library } from './Library'
 import { Reader } from './Reader'
 import { ReaderToolbar } from './ReaderToolbar'
 import type { HighlightColor } from './ReaderToolbar'
 import { Sidebar } from './Sidebar'
-import type { NavItem } from './Sidebar'
+import type { FooterItem, NavItem } from './Sidebar'
 import { TabStrip } from './TabStrip'
 import type { PaperTab } from './TabStrip'
 import { RightPanel, type RightPanelTab } from './RightPanel'
@@ -45,33 +45,66 @@ export function App(): JSX.Element {
   const [highlightActive, setHighlightActive] = useState(false)
   const [highlightColor, setHighlightColor] = useState<HighlightColor>('yellow')
   const [jumpTarget, setJumpTarget] = useState<{ page: number; highlightId: string; nonce: number } | null>(null)
+  // Invalidation counts only; durable highlight records remain in storage.
+  const [highlightRevisions, setHighlightRevisions] = useState<Record<string, number>>({})
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('Ask')
   const [injectedPrompt, setInjectedPrompt] = useState<InjectedPrompt | null>(null)
   const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null)
   const [selectedCollectionName, setSelectedCollectionName] = useState<string | null>(null)
   const [selectedChatSessionId, setSelectedChatSessionId] = useState<number | null>(null)
+  const [deletedSessionIds, setDeletedSessionIds] = useState<readonly number[]>([])
   const [chatBanner, setChatBanner] = useState<string | null>(null)
+  // Library reached via the Search nav item: highlight Search and focus the
+  // title search box. The nonce re-focuses it on repeat clicks.
+  const [libraryViaSearch, setLibraryViaSearch] = useState(false)
+  const [searchFocusNonce, setSearchFocusNonce] = useState(0)
+  // Bumped when a paper is dropped on a sidebar collection so the Library
+  // re-reads tags and the filtered list.
+  const [libraryRefreshNonce, setLibraryRefreshNonce] = useState(0)
+
+  const activeNavItem: NavItem | null =
+    view === 'reader' ? 'Home' : view === 'library' ? (libraryViaSearch ? 'Search' : 'Library') : null
+  const activeFooterItem: FooterItem | null = view === 'trash' ? 'Trash' : view === 'usage' ? 'Usage' : null
+
+  // App owns navigation. A lookup may commit only while its request is current.
+  const chatNavigation = useRef<{ sessionId: number } | null>(null)
 
   async function handleSelectChatSession(session: ChatSessionSummary): Promise<void> {
-    setSelectedChatSessionId(session.id)
+    if (deletedSessionIds.includes(session.id)) return
+    const request = { sessionId: session.id }
+    chatNavigation.current = request
     try {
       const paper = await window.vellum.getPaper(session.paperSlug)
+      if (chatNavigation.current !== request) return
       if (paper) {
         setChatBanner(null)
         openPaper({ slug: paper.slug, title: paper.title })
+        setSelectedChatSessionId(session.id)
         setRightPanelTab('Ask')
       } else {
         setChatBanner(`Chat "${session.title}" references paper "${session.paperSlug}" which was not found in your library.`)
       }
     } catch {
+      if (chatNavigation.current !== request) return
       setChatBanner(`Could not load paper for chat "${session.title}".`)
     }
+  }
+
+  function navigateView(next: typeof view): void {
+    chatNavigation.current = null
+    setView(next)
+  }
+
+  function handleSessionDeleted(id: number): void {
+    if (chatNavigation.current?.sessionId === id) chatNavigation.current = null
+    setDeletedSessionIds((ids) => [...ids, id])
   }
 
   function handleSelectCollection(id: number | null, name: string | null): void {
     setSelectedCollectionId(id)
     setSelectedCollectionName(name)
-    setView('library')
+    setLibraryViaSearch(false)
+    navigateView('library')
   }
 
   function handleAddToChat(quote: string, page: number): void {
@@ -82,6 +115,7 @@ export function App(): JSX.Element {
 `,
       autoSend: false,
       nonce: Date.now(),
+      slug: activeTabId ?? undefined,
     })
   }
 
@@ -93,8 +127,13 @@ export function App(): JSX.Element {
 > "${quote}"`,
       autoSend: true,
       nonce: Date.now(),
+      slug: activeTabId ?? undefined,
     })
   }
+
+  const handleInjectedPromptHandled = useCallback((nonce: number): void => {
+    setInjectedPrompt((current) => (current?.nonce === nonce ? null : current))
+  }, [])
 
   useEffect(() => {
     window.vellum?.ping().then(setPong).catch(() => setPong('no-bridge'))
@@ -102,20 +141,51 @@ export function App(): JSX.Element {
 
   function openPaper(paper: { slug: string; title: string }): void {
     setTabs((current) => (current.some((tab) => tab.id === paper.slug) ? current : [...current, { id: paper.slug, title: paper.title }]))
+    if (paper.slug !== activeTabId) setSelectedChatSessionId(null)
     setActiveTabId(paper.slug)
-    setView('reader')
+    navigateView('reader')
   }
 
   function selectTab(id: string): void {
+    if (id !== activeTabId) setSelectedChatSessionId(null)
     setActiveTabId(id)
-    setView('reader')
+    navigateView('reader')
+  }
+
+  // Plain Library (not reached via Search): no Search highlight or focus.
+  function showLibrary(): void {
+    setLibraryViaSearch(false)
+    navigateView('library')
+  }
+
+  // Close a tab. Closing the active one activates its right neighbour, else
+  // its left one, else nothing (the Reader's empty state).
+  function closeTab(id: string): void {
+    const index = tabs.findIndex((tab) => tab.id === id)
+    if (index === -1) return
+    const remaining = tabs.filter((tab) => tab.id !== id)
+    setTabs(remaining)
+    if (activeTabId === id) {
+      const next = remaining[index] ?? remaining[index - 1] ?? null
+      setActiveTabId(next ? next.id : null)
+    }
   }
 
   function handleNavChange(item: NavItem): void {
     if (item === 'Create') {
       setIsIngestOpen(true)
+    } else if (item === 'Search') {
+      setLibraryViaSearch(true)
+      setSearchFocusNonce((n) => n + 1)
+      navigateView('library')
     } else {
-      setView(item === 'Library' ? 'library' : 'reader')
+      setLibraryViaSearch(false)
+      if (item === 'Library') {
+        // The Library item means "all papers"; collection rows filter.
+        setSelectedCollectionId(null)
+        setSelectedCollectionName(null)
+      }
+      navigateView(item === 'Library' ? 'library' : 'reader')
     }
   }
 
@@ -127,9 +197,19 @@ export function App(): JSX.Element {
     setJumpTarget({ page: highlight.page, highlightId: highlight.id, nonce: Date.now() })
   }
 
+  function handleHighlightsChanged(paperSlug: string): void {
+    setHighlightRevisions((current) => ({ ...current, [paperSlug]: (current[paperSlug] ?? 0) + 1 }))
+  }
+
   return (
     <div className={styles.shell}>
-      <TabStrip tabs={tabs} activeTabId={activeTabId} onSelectTab={selectTab} />
+      <TabStrip
+        tabs={tabs}
+        activeTabId={activeTabId}
+        onSelectTab={selectTab}
+        onCloseTab={closeTab}
+        onNewTab={showLibrary}
+      />
       <div className={styles.body}>
         <Sidebar
           onNavChange={handleNavChange}
@@ -137,66 +217,82 @@ export function App(): JSX.Element {
           onSelectCollection={handleSelectCollection}
           selectedSessionId={selectedChatSessionId}
           onSelectSession={handleSelectChatSession}
-          onSelectTrash={() => setView('trash')}
-          onSelectUsage={() => setView('usage')}
+          onSessionDeleted={handleSessionDeleted}
+          onSelectTrash={() => navigateView('trash')}
+          onSelectUsage={() => navigateView('usage')}
+          activeNavItem={activeNavItem}
+          activeFooterItem={activeFooterItem}
+          onPaperAssigned={() => setLibraryRefreshNonce((n) => n + 1)}
+          onCollectionsChanged={() => setLibraryRefreshNonce((n) => n + 1)}
         />
         <main className={styles.centerPane} aria-label="Paper view">
           {chatBanner && (
-            <div role="alert" style={{ background: '#742a2a', color: '#fff', padding: '6px 12px', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div role="alert" className={styles.chatBanner}>
               <span>{chatBanner}</span>
-              <button type="button" onClick={() => setChatBanner(null)} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}>✕</button>
+              <button type="button" aria-label="Dismiss chat navigation error" onClick={() => setChatBanner(null)} className={styles.dismissBanner}>✕</button>
             </div>
           )}
-          {view === 'trash' ? (
-            <TrashView
-              onBackToLibrary={() => setView('library')}
-            />
-          ) : view === 'usage' ? (
-            <UsageView
-              onBackToLibrary={() => setView('library')}
-            />
-          ) : view === 'library' ? (
-            <Library
-              onOpenPaper={openPaper}
-              selectedCollectionId={selectedCollectionId}
-              selectedCollectionName={selectedCollectionName}
-              onClearCollectionFilter={() => {
-                setSelectedCollectionId(null)
-                setSelectedCollectionName(null)
-              }}
-              onTrashPaper={(slug) => {
-                setTabs((current) => current.filter((tab) => tab.id !== slug))
-                if (activeTabId === slug) {
-                  const remaining = tabs.filter((tab) => tab.id !== slug)
-                  setActiveTabId(remaining.length > 0 ? remaining[remaining.length - 1].id : null)
-                }
-              }}
-            />
-          ) : (
-            <>
-              <ReaderToolbar
-                active={highlightActive}
-                color={highlightColor}
-                onToggle={() => setHighlightActive((current) => !current)}
-                onColorChange={setHighlightColor}
+          <div className={styles.centerContent}>
+            {view === 'trash' ? (
+              <TrashView
+                onBackToLibrary={showLibrary}
               />
-              <Reader
-                slug={activeTabId ?? undefined}
-                highlightTool={{ active: highlightActive, color: highlightColor }}
-                jumpTarget={jumpTarget}
-                onAddToChat={handleAddToChat}
-                onExplain={handleExplain}
+            ) : view === 'usage' ? (
+              <UsageView
+                onBackToLibrary={showLibrary}
               />
-            </>
-          )}
+            ) : view === 'library' ? (
+              <Library
+                onOpenPaper={openPaper}
+                focusSearchNonce={libraryViaSearch ? searchFocusNonce : 0}
+                refreshNonce={libraryRefreshNonce}
+                selectedCollectionId={selectedCollectionId}
+                selectedCollectionName={selectedCollectionName}
+                onClearCollectionFilter={() => {
+                  setSelectedCollectionId(null)
+                  setSelectedCollectionName(null)
+                  navigateView('library')
+                }}
+                onTrashPaper={(slug) => {
+                  setTabs((current) => current.filter((tab) => tab.id !== slug))
+                  if (activeTabId === slug) {
+                    const remaining = tabs.filter((tab) => tab.id !== slug)
+                    setActiveTabId(remaining.length > 0 ? remaining[remaining.length - 1].id : null)
+                  }
+                }}
+              />
+            ) : (
+              <>
+                <ReaderToolbar
+                  active={highlightActive}
+                  color={highlightColor}
+                  onToggle={() => setHighlightActive((current) => !current)}
+                  onColorChange={setHighlightColor}
+                />
+                <Reader
+                  slug={activeTabId ?? undefined}
+                  highlightTool={{ active: highlightActive, color: highlightColor }}
+                  jumpTarget={jumpTarget}
+                  onHighlightCreated={handleHighlightsChanged}
+                  highlightsRevision={activeTabId ? highlightRevisions[activeTabId] ?? 0 : 0}
+                  onAddToChat={handleAddToChat}
+                  onExplain={handleExplain}
+                />
+              </>
+            )}
+          </div>
         </main>
         <RightPanel
           slug={activeTabId ?? undefined}
           activeTab={rightPanelTab}
           onTabChange={setRightPanelTab}
           onJumpToHighlight={jumpToHighlight}
+          onHighlightDeleted={handleHighlightsChanged}
+          highlightsRevision={activeTabId ? highlightRevisions[activeTabId] ?? 0 : 0}
           injectedPrompt={injectedPrompt}
+          onInjectedPromptHandled={handleInjectedPromptHandled}
           targetSessionId={selectedChatSessionId}
+          deletedSessionIds={deletedSessionIds}
         />
       </div>
       <IngestModal

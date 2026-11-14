@@ -68,3 +68,18 @@
   color: var(--vellum-text-dim, #8a8a8a);
   text-align: center;
 }
+
+.loadMessage {
+  padding: 8px 16px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--vellum-text-dim, #8a8a8a);
+}
+
+.loadMessage p {
+  margin: 0 0 8px;
+}
+
+.editor:disabled {
+  cursor: not-allowed;
+}

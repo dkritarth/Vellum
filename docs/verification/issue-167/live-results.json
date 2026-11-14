@@ -1,0 +1,23 @@
+{
+  "results": [
+    "Empty state, create autofocus and Escape cancel",
+    "Obsolete initial success leaves newer pending poll loading; latest failure displays and next poll recovers",
+    "old-initial-success preserves visible created selection",
+    "old-initial-error preserves visible created selection",
+    "Rename through focused input and Enter survives obsolete successful poll",
+    "Newer poll supersedes held mutation-refresh rejection",
+    "Current failure persists through stale success; successful poll recovers",
+    "Unmounted poll rejection cannot publish into remounted tree",
+    "Real-paper membership filters library and existing direct count becomes 1; note/history/file hashes preserved",
+    "Restart preserves collection, membership, real paper, note, history, exact file hashes",
+    "Delete confirmation removes collection despite obsolete poll; paper/note/history/files survive"
+  ],
+  "pdfBytes": 2215244,
+  "markdownCharacters": 39605,
+  "hashes": [
+    "bdfaa68d8984f0dc02beaca527b76f207d99b666d31d1da728ee0728182df697",
+    "54c5d19767eab70f0de281b7bba5f9e3317b47c4ec6c829aae3e77609d8ac6a2"
+  ],
+  "isolatedData": "/data/dandapat/.tmp/vellum167-OABUfx",
+  "consoleErrors": []
+}

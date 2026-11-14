@@ -1,0 +1,8 @@
+[575055:1106/093847.162792:ERROR:viz_main_impl.cc(166)] Exiting GPU process due to errors during initialization
+[575022:1106/093847.978693:ERROR:object_proxy.cc(576)] Failed to call method: org.freedesktop.DBus.StartServiceByName: object_path= /org/freedesktop/DBus: org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the network connection was broken.
+Debugger ending on ws://127.0.0.1:41415/b40064c0-58b3-4dd4-81bf-556c2eee95ea
+For help, see: https://nodejs.org/en/docs/inspector
+[575491:1106/093858.135013:ERROR:viz_main_impl.cc(166)] Exiting GPU process due to errors during initialization
+[575456:1106/093858.946704:ERROR:object_proxy.cc(576)] Failed to call method: org.freedesktop.DBus.StartServiceByName: object_path= /org/freedesktop/DBus: org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the network connection was broken.
+Debugger ending on ws://127.0.0.1:33337/a8cb278d-97f3-40e4-9d14-42389e0bfb95
+For help, see: https://nodejs.org/en/docs/inspector

@@ -83,6 +83,40 @@ describe('extractPaper', () => {
     expect(client.session?.disposed).toBe(true)
   })
 
+  it.each(['error', 'throw', 'EOF'] as const)('salvages complete JSON but degrades after %s', async (failure) => {
+    let disposed = false
+    const client: AcpClient = {
+      async newSession(backend) {
+        expect(backend).toBe('codex')
+        return {
+          async *prompt() {
+            yield textUpdate(HAPPY_JSON)
+            if (failure === 'throw') throw new Error('stream broke')
+            if (failure === 'error') yield { kind: 'error', data: { message: 'adapter failed' } }
+          },
+          async dispose() { disposed = true },
+        }
+      },
+    }
+
+    const result = await extractPaper('/data/papers/x/paper.md', { client, backend: 'codex' })
+
+    expect(result).toEqual({ ...JSON.parse(HAPPY_JSON), degraded: true })
+    expect(disposed).toBe(true)
+  })
+
+  it.each(['max_tokens', 'max_turn_requests', 'refusal', 'cancelled', 'future_reason'])('salvages JSON but degrades on explicit %s stop reason', async (stopReason) => {
+    const client = new FakeClient([textUpdate(HAPPY_JSON), { kind: 'done', data: { stopReason } }])
+    const result = await extractPaper('/data/papers/x/paper.md', { client })
+    expect(result).toEqual({ ...JSON.parse(HAPPY_JSON), degraded: true })
+    expect(client.session?.disposed).toBe(true)
+  })
+
+  it.each([{}, null, undefined])('accepts legacy done data %j without a stop reason', async (data) => {
+    const client = new FakeClient([textUpdate(HAPPY_JSON), { kind: 'done', data }])
+    expect((await extractPaper('/data/papers/x/paper.md', { client })).degraded).toBe(false)
+  })
+
   it('passes paper.md as a contextFile and never inlines file content in the prompt text', async () => {
     const client = new FakeClient([textUpdate(HAPPY_JSON), doneUpdate])
 

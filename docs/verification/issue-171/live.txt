@@ -1,0 +1,12 @@
+PASS Empty tree, keyboard New Collection, autofocus/Escape cancellation
+PASS Visible nested create, real-paper child filter, cancel retains filter, ancestor delete returns all papers
+PASS Visible nested create, real-paper deep filter, cancel retains filter, ancestor delete returns all papers
+PASS Deleting another subtree preserves unrelated real-paper filter
+PASS switch-out: latest selection reconciled after controlled before-deletion hold
+PASS switch-in: latest selection reconciled after controlled before-deletion hold
+PASS switch-all: latest selection reconciled after controlled before-deletion hold
+PASS ack: latest selection reconciled after controlled after-deletion hold
+PASS Controlled deletion failure preserves subtree/filter/paper and useful feedback; retry clears error/filter
+PASS Direct selected deletion still clears filter
+PASS Full restart preserves unrelated collection/membership, real paper, note/history and exact PDF/markdown hashes; filter usable again
+Isolated state retained: /data/dandapat/.tmp/vellum171-B5lKPx

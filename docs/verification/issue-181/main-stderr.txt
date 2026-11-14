@@ -1,0 +1,40 @@
+[845495:1106/153040.671857:ERROR:object_proxy.cc(576)] Failed to call method: org.freedesktop.DBus.StartServiceByName: object_path= /org/freedesktop/DBus: org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the network connection was broken.
+Error occurred in handler for 'vellum:highlights-create': Error: issue-181 controlled delayed create failure
+    at state.release (eval at evaluate (:311:30), <anonymous>:15:20)
+    at eval (eval at evaluate (:311:30), <anonymous>:1:35)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+Error occurred in handler for 'vellum:highlights-create': Error: issue-181 controlled delayed create failure
+    at state.release (eval at evaluate (:311:30), <anonymous>:15:20)
+    at eval (eval at evaluate (:311:30), <anonymous>:1:35)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+Error occurred in handler for 'vellum:highlights-create': Error: issue-181 controlled delayed create failure
+    at state.release (eval at evaluate (:311:30), <anonymous>:15:20)
+    at eval (eval at evaluate (:311:30), <anonymous>:1:35)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+Error occurred in handler for 'vellum:highlights-create': Error: issue-181 controlled create failure
+    at eval (eval at evaluate (:311:30), <anonymous>:12:34)
+    at WebContents.<anonymous> (node:electron/js2c/browser_init:2:86178)
+    at WebContents.emit (node:events:518:28)
+Error occurred in handler for 'vellum:highlights-create': Error: issue-181 controlled create failure
+    at eval (eval at evaluate (:311:30), <anonymous>:12:34)
+    at WebContents.<anonymous> (node:electron/js2c/browser_init:2:86178)
+    at WebContents.emit (node:events:518:28)
+Error occurred in handler for 'vellum:highlights-create': Error: issue-181 controlled delayed create failure
+    at state.release (eval at evaluate (:311:30), <anonymous>:15:20)
+    at eval (eval at evaluate (:311:30), <anonymous>:1:35)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+Error occurred in handler for 'vellum:highlights-create': Error: issue-181 controlled create failure
+    at eval (eval at evaluate (:311:30), <anonymous>:12:34)
+    at WebContents.<anonymous> (node:electron/js2c/browser_init:2:86178)
+    at WebContents.emit (node:events:518:28)
+Error occurred in handler for 'vellum:highlights-create': Error: issue-181 controlled delayed create failure
+    at state.release (eval at evaluate (:311:30), <anonymous>:15:20)
+    at eval (eval at evaluate (:311:30), <anonymous>:1:35)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+Debugger ending on ws://127.0.0.1:43209/e6f84849-b5ad-4524-8988-1fb5ce20fd0e
+For help, see: https://nodejs.org/en/docs/inspector

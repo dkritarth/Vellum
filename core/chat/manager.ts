@@ -10,11 +10,14 @@
 //
 // Session reuse: `claude-code-acp`'s session/new cold start is ~16s (see
 // core/acp/stdio-client.ts). Re-spawning per turn would tax every follow-up
-// question, so one AcpSession is cached per paper slug and reused across
-// turns until "new chat" (or the paper's tab closes — callers may call
-// `disposeAll()` on app shutdown). "New chat" always gets a genuinely fresh
+// question, so one AcpSession is cached per paper/backend for the selected
+// durable chat. Switching chats evicts the old agent conversation and recaps
+// the selected chat's history. Callers may call
+// `disposeAll()` on app shutdown. "New chat" always gets a genuinely fresh
 // agent conversation: the cached ACP session is disposed, not just the SQL
 // row swapped.
+
+import { randomUUID } from 'node:crypto'
 
 import type { Database } from 'better-sqlite3'
 
@@ -29,11 +32,12 @@ const DEFAULT_BACKEND: AcpBackend = 'claude'
  * projection of AcpUpdate (whose `data` is intentionally `unknown`/raw ACP
  * shape). `text` carries plain accumulable string chunks; `done` carries the
  * persisted assistant ChatMessage so the caller never has to re-fetch it. */
-export type AskStreamEvent =
+export type AskStreamEvent = (
   | { kind: 'text'; text: string }
   | { kind: 'tool_activity' }
   | { kind: 'done'; message: ChatMessage }
   | { kind: 'error'; message: string }
+) & { sequence?: number }
 
 /** Pulls plain text out of an AcpUpdate whose kind is 'text' (a raw ACP
  * ContentBlock in `data`). Mirrors core/ingest/extract.ts's textFromUpdate —
@@ -66,6 +70,9 @@ function buildGroundingPreamble(mdPath: string): string {
   return [
     `You are discussing the paper at ${mdPath}. Read it with your file tools before answering.`,
     'Ground every answer in the paper itself: cite the section it comes from and quote short passages where relevant, rather than answering from general knowledge alone.',
+    'Cite each quote or number to the section where that exact text appears; the abstract is its own location.',
+    'If the paper states different values in different places (e.g. abstract vs. results), report each value with its location instead of picking one.',
+    'If the paper does not contain the answer, say so.',
   ].join('\n')
 }
 
@@ -95,12 +102,24 @@ export interface OpenChatParams {
   chatSessionId?: number
 }
 
+/** Main-process ownership survives paper switches and renderer remounts.
+ * sequence lets a renderer replay queued updates newer than this snapshot. */
+export interface AskActiveTurn {
+  sequence: number
+  requestId: string
+  chatSessionId: number
+  text: string
+}
+
 export interface AskOpenResult {
   session: ChatSession
   messages: ChatMessage[]
+  /** Paper-wide ownership, even when an older chat is being viewed. */
+  activeTurn?: AskActiveTurn | null
 }
 
 export interface RunTurnParams {
+  requestId?: string
   db: Database
   chatSessionId: number
   paperSlug: string
@@ -120,9 +139,15 @@ export interface AskStartParams {
 }
 
 export class ChatManager {
-  // Cache agent conversations by both paper and backend. A Claude session
-  // must never be reused after user switches this chat to Codex.
-  private readonly acpSessions = new Map<AcpBackend, Map<string, AcpSession>>()
+  // Paper identity, durable chat identity, and ACP conversation are distinct.
+  // Reuse requires the same backend, paper, and durable chat; a new ACP
+  // conversation receives only that chat's persisted history.
+  private readonly acpSessions = new Map<AcpBackend, Map<string, { chatSessionId: number; session: AcpSession }>>()
+
+  // ACP conversations are cached per paper. Lock before any async work,
+  // including session creation, and keep ownership outside the renderer.
+  private readonly activeTurns = new Map<string, AskActiveTurn>()
+  private readonly resettingPapers = new Set<string>()
 
   constructor(private readonly client: AcpClient) {}
 
@@ -145,28 +170,61 @@ export class ChatManager {
     }
     const session = existing ?? createChatSession(params.db, { paperSlug: params.paperSlug, backend })
     const messages = getChatMessages(params.db, session.id)
-    return { session, messages }
+    const activeTurn = this.activeTurns.get(params.paperSlug)
+    return { session, messages, activeTurn: activeTurn ? { ...activeTurn } : null }
   }
 
   /**
    * Start a genuinely fresh conversation: disposes any cached ACP session
    * for this paper (so the agent has no memory of the prior thread) and
-   * inserts a new chat_sessions row.
+   * inserts a new chat_sessions row. Rejects while this paper has an active turn.
    */
   async newChat(params: OpenChatParams): Promise<ChatSession> {
     const backend = params.backend ?? DEFAULT_BACKEND
-    await this.disposePaperSessions(params.paperSlug)
-    return createChatSession(params.db, { paperSlug: params.paperSlug, backend })
+    this.requireIdle(params.paperSlug)
+    this.resettingPapers.add(params.paperSlug)
+    try {
+      await this.disposePaperSessions(params.paperSlug)
+      return createChatSession(params.db, { paperSlug: params.paperSlug, backend })
+    } finally {
+      this.resettingPapers.delete(params.paperSlug)
+    }
   }
 
   /**
    * Run one turn: persists the user message immediately, streams the
    * assistant's reply via `onEvent`, and persists the full assistant
-   * message once the turn completes. Never throws — adapter/spawn/stream
-   * failures surface as an `error` AskStreamEvent so callers (the IPC
-   * handler) can forward them to the UI instead of crashing.
+   * message once the turn completes. Overlap throws synchronously before
+   * persistence. Adapter/spawn/stream failures surface as error events.
    */
-  async runTurn(params: RunTurnParams, onEvent: (event: AskStreamEvent) => void): Promise<void> {
+  runTurn(params: RunTurnParams, onEvent: (event: AskStreamEvent) => void): Promise<void> {
+    // Synchronous rejection lets ask-start reject its invoke before returning
+    // a request ID. No rejected prompt is persisted or sent to ACP.
+    this.requireIdle(params.paperSlug)
+    const activeTurn: AskActiveTurn = {
+      requestId: params.requestId ?? randomUUID(),
+      chatSessionId: params.chatSessionId,
+      text: '',
+      sequence: 0,
+    }
+    this.activeTurns.set(params.paperSlug, activeTurn)
+    const release = (): void => {
+      if (this.activeTurns.get(params.paperSlug) === activeTurn) this.activeTurns.delete(params.paperSlug)
+    }
+    return this.runActiveTurn(params, (event) => {
+      if (event.kind === 'text') activeTurn.text += event.text
+      if (event.kind === 'done' || event.kind === 'error') release()
+      onEvent({ ...event, sequence: ++activeTurn.sequence })
+    }).finally(release)
+  }
+
+  private requireIdle(paperSlug: string): void {
+    if (this.activeTurns.has(paperSlug) || this.resettingPapers.has(paperSlug)) {
+      throw new Error('A chat operation is already active for this paper. Wait for it to finish.')
+    }
+  }
+
+  private async runActiveTurn(params: RunTurnParams, onEvent: (event: AskStreamEvent) => void): Promise<void> {
     const backend = params.backend ?? DEFAULT_BACKEND
 
     // Snapshot history *before* adding this turn's user message — this is
@@ -178,7 +236,7 @@ export class ChatManager {
     let acpSession: AcpSession
     let freshlySpawned: boolean
     try {
-      ;({ session: acpSession, freshlySpawned } = await this.getOrCreateAcpSession(params.paperSlug, backend))
+      ;({ session: acpSession, freshlySpawned } = await this.getOrCreateAcpSession(params.paperSlug, backend, params.chatSessionId))
     } catch (err) {
       onEvent({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
       return
@@ -228,7 +286,15 @@ export class ChatManager {
           onEvent({ kind: 'error', message: errorMessageFromUpdate(update) })
           return
         } else if (update.kind === 'done') {
-          const doneData = update.data as { usage?: { inputTokens?: number; outputTokens?: number; thoughtTokens?: number; cachedReadTokens?: number; cachedWriteTokens?: number; totalTokens?: number } | null } | undefined
+          const doneData = update.data as { stopReason?: string; usage?: { inputTokens?: number; outputTokens?: number; thoughtTokens?: number; cachedReadTokens?: number; cachedWriteTokens?: number; totalTokens?: number } | null } | undefined
+          // Cancellation and limits leave incomplete agent context. Reuse the
+          // existing failure path: discard partial output and evict before retry.
+          if (doneData?.stopReason === 'cancelled') {
+            throw new Error('ACP turn cancelled (cancelled). Partial answer was not saved. You can retry.')
+          }
+          if (doneData?.stopReason === 'max_tokens' || doneData?.stopReason === 'max_turn_requests') {
+            throw new Error(`ACP turn reached its limit (${doneData.stopReason}). Partial answer was not saved. You can retry.`)
+          }
           if (doneData?.usage) {
             promptUsage = doneData.usage
           }
@@ -286,13 +352,16 @@ export class ChatManager {
   private async getOrCreateAcpSession(
     paperSlug: string,
     backend: AcpBackend,
+    chatSessionId: number,
   ): Promise<{ session: AcpSession; freshlySpawned: boolean }> {
-    const sessions = this.acpSessions.get(backend)
-    const cached = sessions?.get(paperSlug)
-    if (cached) return { session: cached, freshlySpawned: false }
+    const cached = this.acpSessions.get(backend)?.get(paperSlug)
+    if (cached?.chatSessionId === chatSessionId) return { session: cached.session, freshlySpawned: false }
+    if (cached) await this.disposeSession(paperSlug, backend)
     const session = await this.client.newSession(backend)
-    if (sessions) sessions.set(paperSlug, session)
-    else this.acpSessions.set(backend, new Map([[paperSlug, session]]))
+    const sessions = this.acpSessions.get(backend)
+    const entry = { chatSessionId, session }
+    if (sessions) sessions.set(paperSlug, entry)
+    else this.acpSessions.set(backend, new Map([[paperSlug, entry]]))
     return { session, freshlySpawned: true }
   }
 
@@ -302,10 +371,10 @@ export class ChatManager {
 
   private async disposeSession(paperSlug: string, backend: AcpBackend): Promise<void> {
     const sessions = this.acpSessions.get(backend)
-    const session = sessions?.get(paperSlug)
-    if (!session) return
+    const entry = sessions?.get(paperSlug)
+    if (!entry) return
     sessions?.delete(paperSlug)
     if (sessions?.size === 0) this.acpSessions.delete(backend)
-    await session.dispose().catch(() => undefined)
+    await entry.session.dispose().catch(() => undefined)
   }
 }

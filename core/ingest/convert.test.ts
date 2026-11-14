@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { convertPdfToMarkdown } from './convert'
+import { convertPdfToMarkdown, guessPdfTitle, pickTitleFromTextRuns } from './convert'
 
 const fixturePath = fileURLToPath(new URL('./fixtures/sample.pdf', import.meta.url))
 
@@ -58,5 +58,42 @@ describe('convertPdfToMarkdown', () => {
     expect(h1Title(one)).toBe('Sample Paper Title')
     expect(h1Title(two)).toBe('Sample Paper Two')
     expect(h1Title(one)).not.toBe(h1Title(two))
+  })
+})
+
+describe('pickTitleFromTextRuns', () => {
+  it('returns the largest-font text in reading order, skipping the arXiv margin stamp', () => {
+    expect(
+      pickTitleFromTextRuns([
+        { str: 'arXiv:1706.03762v7 [cs.CL] 2 Aug 2023', fontSize: 20 },
+        { str: 'Provided proper attribution is provided', fontSize: 10 },
+        { str: 'Attention Is', fontSize: 17.2 },
+        { str: 'All You Need', fontSize: 17.2 },
+        { str: 'Ashish Vaswani', fontSize: 10 },
+      ]),
+    ).toBe('Attention Is All You Need')
+  })
+
+  it('returns undefined when the largest text is not word-like or there is no text', () => {
+    expect(pickTitleFromTextRuns([{ str: '1', fontSize: 30 }, { str: 'body text', fontSize: 10 }])).toBeUndefined()
+    expect(pickTitleFromTextRuns([{ str: '   ', fontSize: 12 }])).toBeUndefined()
+    expect(pickTitleFromTextRuns([])).toBeUndefined()
+  })
+
+  it('caps very long titles', () => {
+    const title = pickTitleFromTextRuns([{ str: 'Word '.repeat(200), fontSize: 18 }])
+    expect(title?.length).toBeLessThanOrEqual(300)
+    expect(title?.endsWith('…')).toBe(true)
+  })
+})
+
+describe('guessPdfTitle', () => {
+  it('reads the title from the first page of a real PDF', async () => {
+    const bytes = new Uint8Array(await readFile(fixturePath))
+    expect(await guessPdfTitle(bytes)).toBe('Sample Paper Title')
+  })
+
+  it('returns undefined instead of throwing for bytes that are not a PDF', async () => {
+    expect(await guessPdfTitle(new TextEncoder().encode('not a pdf'))).toBeUndefined()
   })
 })

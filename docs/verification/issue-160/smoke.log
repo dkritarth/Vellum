@@ -1,0 +1,18 @@
+
+> vellum@0.1.0 smoke:acp
+> tsx core/acp/smoke.ts codex .
+
+
+=== codex (codex-acp) ===
+startedAt=2026-11-06T14:39:26.078Z
+text="Warning: Falling back from WebSockets to HTTPS transport. workspace routing discovery unauthorized (401)\n\n"
+text="workspace routing discovery unauthorized (401)\n\n"
+done={"stopReason":"end_turn"}
+updateKinds=tool_result,tool_result,tool_result,tool_result,tool_result,tool_result,text,tool_result,tool_result,tool_result,tool_result,tool_result,tool_result,text,tool_result,done
+VERIFIED — stream ended in a done update.
+endedAt=2026-11-06T14:39:42.798Z
+
+=== . (codex-acp) ===
+startedAt=2026-11-06T14:39:42.798Z
+UNVERIFIED — could not open a session: Cannot read properties of undefined (reading 'command')
+  -> install/sign in the adapter, confirm it's on PATH, then re-run: npm run smoke:acp -- .

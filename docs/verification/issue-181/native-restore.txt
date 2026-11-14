@@ -1,0 +1,5 @@
+node_modules/better-sqlite3/build/Release/better_sqlite3.node: OK
+{ restored: 1 }
+45cb92a176fb758533db6d9a343acdfc73e4de27ac4c20a0cb2a6fb5be3e84f2  /tmp/vellum181-native/node-sqlite.node
+45cb92a176fb758533db6d9a343acdfc73e4de27ac4c20a0cb2a6fb5be3e84f2  node_modules/better-sqlite3/build/Release/better_sqlite3.node
+45cb92a176fb758533db6d9a343acdfc73e4de27ac4c20a0cb2a6fb5be3e84f2  /home/dandapat/.t3/worktrees/Vellum/t3-08f74a66/node_modules/better-sqlite3/build/Release/better_sqlite3.node

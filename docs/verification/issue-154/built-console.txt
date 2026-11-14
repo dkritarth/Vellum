@@ -1,0 +1,4 @@
+[warning] Warning: getTextContent - ignoring errors during "GetTextContent: page 2" task: "Error: Worker task was terminated".
+[warning] Warning: getTextContent - ignoring errors during "GetTextContent: page 0" task: "Error: Worker task was terminated".
+[warning] Warning: getTextContent - ignoring errors during "GetTextContent: page 2" task: "Error: Worker task was terminated".
+[warning] Warning: getTextContent - ignoring errors during "GetTextContent: page 2" task: "Error: Worker task was terminated".

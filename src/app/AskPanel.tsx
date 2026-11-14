@@ -15,7 +15,8 @@ import { SuggestedQuestions } from './SuggestedQuestions'
 //   3. "New chat": `askNewChat(slug)` starts a fresh session + fresh agent
 //      conversation (main process disposes the cached ACP session).
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ModelSelector } from './ModelSelector'
+import type { AskUpdatePayload } from '../../electron/preload'
+import { ModelSelector, isChatBackend } from './ModelSelector'
 import type { ChatBackend } from './ModelSelector'
 import { QuickActions } from './QuickActions'
 import styles from './AskPanel.module.css'
@@ -37,6 +38,8 @@ export interface InjectedPrompt {
   text: string
   autoSend?: boolean
   nonce: number
+  /** Paper the prompt was created for; another paper's Ask panel ignores it. */
+  slug?: string
 }
 
 interface AskPanelProps {
@@ -44,11 +47,26 @@ interface AskPanelProps {
   slug: string
   /** [R1-05] Contextual prompt injected from PDF text selection (Add to chat or Explain) */
   injectedPrompt?: InjectedPrompt | null
+  /** Called once a prompt is consumed, with its nonce. */
+  onInjectedPromptHandled?: (nonce: number) => void
+  /** Successful deletions retained by App across Ask tab remounts. */
+  deletedSessionIds?: readonly number[]
   /** [L2-02] Target chat session ID to restore from Chats library */
   targetSessionId?: number | null
 }
 
-export function AskPanel({ slug, injectedPrompt, targetSessionId }: AskPanelProps): JSX.Element {
+export function AskPanel({
+  slug,
+  injectedPrompt,
+  onInjectedPromptHandled,
+  targetSessionId,
+  deletedSessionIds,
+}: AskPanelProps): JSX.Element {
+  const [deletionRevision, setDeletionRevision] = useState(0)
+  const [loadRevision, setLoadRevision] = useState(0)
+  // Durable IDs are never reused. Keep tombstones across Ask tab remounts.
+  const deletedIds = useRef(deletedSessionIds)
+  deletedIds.current = deletedSessionIds
   const [sessionId, setSessionId] = useState<number | null>(null)
   const [messages, setMessages] = useState<DisplayMessage[]>([])
   const [input, setInput] = useState('')
@@ -58,77 +76,144 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId }: AskPanelProp
   const [backend, setBackend] = useState<ChatBackend>('claude')
   const [switchingSession, setSwitchingSession] = useState(false)
   const activeRequestId = useRef<string | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const activeTurnSessionId = useRef<number | null>(null)
+  const displayedSessionId = useRef<number | null>(null)
+  // Async starts can settle after navigation. They may only update the
+  // paper/session generation that initiated them.
+  const contextGeneration = useRef(0)
+  const awaitingRequest = useRef(false)
+  const queuedUpdates = useRef<AskUpdatePayload[]>([])
+  const lastSequence = useRef(0)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const composing = useRef(false)
   const lastHandledNonce = useRef<number | null>(null)
 
-  // Reload history whenever the open paper changes.
-  useEffect(() => {
-    let cancelled = false
-    setSessionId(null)
-    setMessages([])
-    setError(null)
-    setLoadError(null)
-    activeRequestId.current = null
-
-    window.vellum
-      .askOpen(targetSessionId ? { slug, sessionId: targetSessionId } : slug)
-      .then((result) => {
-        if (cancelled) return
-        setSessionId(result.session.id)
-        setBackend(result.session.backend === 'codex' ? 'codex' : 'claude')
-        setMessages(
-          result.messages.map((m) => ({
-            id: m.id,
-            role: m.role,
-            content: m.content,
-          })),
-        )
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) setLoadError(err instanceof Error ? err.message : String(err))
-      })
-
-    return () => {
-      cancelled = true
+  // Restore main-process ownership on open. Queue updates during IPC calls
+  // and replay only events newer than the snapshot for the active request.
+  const applyUpdate = useCallback(({ requestId, event }: AskUpdatePayload) => {
+    if (requestId !== activeRequestId.current) return
+    if (event.sequence !== undefined) {
+      if (event.sequence <= lastSequence.current) return
+      lastSequence.current = event.sequence
     }
-  }, [slug, targetSessionId])
 
-  // Single subscription for the lifetime of the component. Main broadcasts
-  // to this window; we filter by `activeRequestId.current` so events from an
-  // aborted turn or a previous paper's turn are dropped.
-  useEffect(() => {
-    return window.vellum.onAskUpdate(({ requestId, event }) => {
-      if (requestId !== activeRequestId.current) return
-
-      if (event.kind === 'text') {
-        setMessages((current) => {
-          const last = current[current.length - 1]
-          if (last && last.id === STREAMING_ID) {
-            return [...current.slice(0, -1), { ...last, content: last.content + event.text }]
-          }
-          return [...current, { id: STREAMING_ID, role: 'assistant', content: event.text }]
-        })
-      } else if (event.kind === 'done') {
-        const persisted = event.message
+    if (event.kind === 'text') {
+      if (activeTurnSessionId.current !== displayedSessionId.current) return
+      setMessages((current) => {
+        const last = current[current.length - 1]
+        if (last && last.id === STREAMING_ID) {
+          return [...current.slice(0, -1), { ...last, content: last.content + event.text }]
+        }
+        return [...current, { id: STREAMING_ID, role: 'assistant', content: event.text }]
+      })
+    } else if (event.kind === 'done') {
+      const persisted = event.message
+      if (activeTurnSessionId.current === displayedSessionId.current) {
         setMessages((current) => [
           ...current.filter((m) => m.id !== STREAMING_ID),
           { id: persisted.id, role: persisted.role, content: persisted.content },
         ])
-        setSending(false)
-        activeRequestId.current = null
-      } else if (event.kind === 'error') {
-        setMessages((current) => current.filter((m) => m.id !== STREAMING_ID))
-        setError(event.message)
-        setSending(false)
-        activeRequestId.current = null
       }
-      // 'tool_activity' has no dedicated UI yet — ignored.
-    })
+      setSending(false)
+      activeRequestId.current = null
+    } else if (event.kind === 'error') {
+      setMessages((current) => current.filter((m) => m.id !== STREAMING_ID))
+      setError(event.message)
+      setSending(false)
+      activeRequestId.current = null
+    }
+    // 'tool_activity' has no dedicated UI yet — ignored.
   }, [])
+
+  const replayUpdates = useCallback(() => {
+    awaitingRequest.current = false
+    const queued = queuedUpdates.current
+    queuedUpdates.current = []
+    for (const payload of queued) applyUpdate(payload)
+  }, [applyUpdate])
+
+  useEffect(() => window.vellum.onAskUpdate((payload) => {
+    if (awaitingRequest.current) queuedUpdates.current.push(payload)
+    else applyUpdate(payload)
+  }), [applyUpdate])
+
+  useEffect(() => {
+    if (displayedSessionId.current !== null && deletedSessionIds?.includes(displayedSessionId.current)) {
+      // Invalidate pending starts/New chat immediately, before reopening.
+      contextGeneration.current += 1
+      activeRequestId.current = null
+      setDeletionRevision((revision) => revision + 1)
+    }
+  }, [deletedSessionIds])
+
+  // Reload history whenever the open paper changes.
+  useEffect(() => {
+    let cancelled = false
+    const generation = ++contextGeneration.current
+    awaitingRequest.current = true
+    queuedUpdates.current = []
+    lastSequence.current = 0
+    setSessionId(null)
+    displayedSessionId.current = null
+    setInput('')
+    setMessages([])
+    setError(null)
+    setLoadError(null)
+    setSending(false)
+    setSwitchingSession(false)
+    activeRequestId.current = null
+
+    const open = async () => {
+      const target = targetSessionId && !deletedIds.current?.includes(targetSessionId) ? targetSessionId : null
+      let result = await window.vellum.askOpen(target ? { slug, sessionId: target } : slug)
+      // A delete may finish while this snapshot is in flight.
+      while (!cancelled && generation === contextGeneration.current && deletedIds.current?.includes(result.session.id)) {
+        result = await window.vellum.askOpen(slug)
+      }
+      return result
+    }
+    open()
+      .then((result) => {
+        if (cancelled || generation !== contextGeneration.current) return
+        setSessionId(result.session.id)
+        displayedSessionId.current = result.session.id
+        setBackend(isChatBackend(result.session.backend) ? result.session.backend : 'claude')
+        const turn = result.activeTurn
+        activeRequestId.current = turn?.requestId ?? null
+        activeTurnSessionId.current = turn?.chatSessionId ?? null
+        lastSequence.current = turn?.sequence ?? 0
+        setSending(!!turn)
+        const history: DisplayMessage[] = result.messages.map((m) => ({ id: m.id, role: m.role, content: m.content }))
+        if (turn?.text && turn.chatSessionId === result.session.id) {
+          history.push({ id: STREAMING_ID, role: 'assistant', content: turn.text })
+        }
+        setMessages(history)
+        replayUpdates()
+      })
+      .catch((err: unknown) => {
+        if (!cancelled && generation === contextGeneration.current) {
+          awaitingRequest.current = false
+          queuedUpdates.current = []
+          setLoadError(err instanceof Error ? err.message : String(err))
+        }
+      })
+
+    return () => {
+      cancelled = true
+      contextGeneration.current += 1
+      activeRequestId.current = null
+      queuedUpdates.current = []
+      awaitingRequest.current = false
+    }
+  }, [slug, targetSessionId, deletionRevision, loadRevision, replayUpdates])
 
   const sendTurn = useCallback(async (prompt?: string) => {
     const text = (prompt ?? input).trim()
-    if (!text || sessionId === null || sending) return
+    if (!text || sessionId === null || sending || awaitingRequest.current || activeRequestId.current) return
+    const generation = contextGeneration.current
+    awaitingRequest.current = true
+    queuedUpdates.current = []
+    lastSequence.current = 0
 
     setError(null)
     if (!prompt) setInput('')
@@ -137,18 +222,27 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId }: AskPanelProp
 
     try {
       const { requestId } = await window.vellum.askStart({ chatSessionId: sessionId, slug, text })
+      if (generation !== contextGeneration.current) return
       activeRequestId.current = requestId
+      activeTurnSessionId.current = sessionId
+      replayUpdates()
     } catch (err) {
+      if (generation !== contextGeneration.current) return
+      awaitingRequest.current = false
+      queuedUpdates.current = []
       setError(err instanceof Error ? err.message : String(err))
       setSending(false)
     }
-  }, [input, sessionId, sending, slug])
+  }, [input, sessionId, sending, slug, replayUpdates])
 
   // [R1-05] Process injected prompt from PDF text selection actions
   useEffect(() => {
     if (!injectedPrompt || sessionId === null) return
+    if (injectedPrompt.slug !== undefined && injectedPrompt.slug !== slug) return
     if (lastHandledNonce.current === injectedPrompt.nonce) return
     lastHandledNonce.current = injectedPrompt.nonce
+    // App clears the prompt so a remounted panel (tab switch) never replays it.
+    onInjectedPromptHandled?.(injectedPrompt.nonce)
 
     if (injectedPrompt.autoSend) {
       void sendTurn(injectedPrompt.text)
@@ -156,9 +250,10 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId }: AskPanelProp
       setInput((current) => (current ? `${current}\n\n${injectedPrompt.text}` : injectedPrompt.text))
       inputRef.current?.focus()
     }
-  }, [injectedPrompt, sessionId, sendTurn])
+  }, [injectedPrompt, sessionId, sendTurn, slug, onInjectedPromptHandled])
 
   const startNewChat = useCallback((nextBackend: ChatBackend = backend) => {
+    const generation = ++contextGeneration.current
     setError(null)
     setSending(false)
     setSwitchingSession(true)
@@ -167,12 +262,20 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId }: AskPanelProp
     window.vellum
       .askNewChat({ slug, backend: nextBackend })
       .then((result) => {
+        if (generation !== contextGeneration.current) return
         setSessionId(result.session.id)
-        setBackend(result.session.backend === 'codex' ? 'codex' : 'claude')
+        displayedSessionId.current = result.session.id
+        setBackend(isChatBackend(result.session.backend) ? result.session.backend : 'claude')
         setMessages([])
       })
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
-      .finally(() => setSwitchingSession(false))
+      .catch((err: unknown) => {
+        if (generation === contextGeneration.current) {
+          setError(err instanceof Error ? err.message : String(err))
+        }
+      })
+      .finally(() => {
+        if (generation === contextGeneration.current) setSwitchingSession(false)
+      })
   }, [backend, slug])
 
   const selectBackend = useCallback(
@@ -195,9 +298,16 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId }: AskPanelProp
 
       <div className={styles.thread} aria-live="polite">
         {loadError ? (
-          <p className={styles.error} role="alert">
-            Could not load chat: {loadError}
-          </p>
+          <>
+            <p className={styles.error} role="alert">
+              Could not load chat: {loadError}
+            </p>
+            <button type="button" className={styles.newChatButton} onClick={() => setLoadRevision((revision) => revision + 1)}>
+              Retry
+            </button>
+          </>
+        ) : sessionId === null ? (
+          <p className={styles.placeholder} role="status">Loading chat…</p>
         ) : messages.length === 0 ? (
           <p className={styles.placeholder}>Ask a question about this paper.</p>
         ) : (
@@ -232,14 +342,24 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId }: AskPanelProp
           void sendTurn()
         }}
       >
-        <input
+        <textarea
           ref={inputRef}
-          type="text"
+          rows={3}
           className={styles.textInput}
           placeholder="Ask a question about this paper…"
           aria-label="Ask a question"
           value={input}
           onChange={(event) => setInput(event.target.value)}
+          onCompositionStart={() => { composing.current = true }}
+          onCompositionEnd={() => { composing.current = false }}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || event.shiftKey) return
+            // Composition may end before its commit keydown in some engines;
+            // keyCode 229 still identifies that IME event.
+            if (composing.current || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
+            event.preventDefault()
+            if (!disabled && !event.repeat) event.currentTarget.form?.requestSubmit()
+          }}
           disabled={disabled}
         />
         <button type="submit" className={styles.sendButton} disabled={disabled || !input.trim()}>

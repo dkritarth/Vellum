@@ -14,28 +14,69 @@ interface TabStripProps {
   tabs?: PaperTab[]
   activeTabId?: string | null
   onSelectTab?: (id: string) => void
+  /** Close a tab (close button or middle-click). App decides which tab
+   * becomes active next. */
+  onCloseTab?: (id: string) => void
+  /** "+" button — App opens the Library so another paper can be opened. */
+  onNewTab?: () => void
 }
 
-export function TabStrip({ tabs = [], activeTabId = null, onSelectTab }: TabStripProps): JSX.Element {
+export function TabStrip({
+  tabs = [],
+  activeTabId = null,
+  onSelectTab,
+  onCloseTab,
+  onNewTab,
+}: TabStripProps): JSX.Element {
   return (
     <div className={styles.tabStrip} role="tablist" aria-label="Open papers">
       {tabs.length === 0 ? (
         <div className={styles.empty}>No papers open — open one from Library</div>
       ) : (
         tabs.map((tab) => (
-          <button
+          <div
             key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={tab.id === activeTabId}
-            className={tab.id === activeTabId ? `${styles.tab} ${styles.tabActive}` : styles.tab}
-            onClick={() => onSelectTab?.(tab.id)}
+            role="presentation"
+            className={tab.id === activeTabId ? `${styles.tabItem} ${styles.tabActive}` : styles.tabItem}
           >
-            {tab.title}
-          </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab.id === activeTabId}
+              className={styles.tab}
+              title={tab.title}
+              onClick={() => onSelectTab?.(tab.id)}
+              onAuxClick={(event) => {
+                if (event.button === 1 && onCloseTab) {
+                  event.preventDefault()
+                  onCloseTab(tab.id)
+                }
+              }}
+            >
+              {tab.title}
+            </button>
+            {onCloseTab ? (
+              <button
+                type="button"
+                className={styles.closeButton}
+                aria-label={`Close ${tab.title}`}
+                title="Close tab"
+                onClick={() => onCloseTab(tab.id)}
+              >
+                ×
+              </button>
+            ) : null}
+          </div>
         ))
       )}
-      <button type="button" className={styles.newTabButton} aria-label="New tab" disabled>
+      <button
+        type="button"
+        className={styles.newTabButton}
+        aria-label="Open another paper"
+        title="Open another paper from the Library"
+        disabled={!onNewTab}
+        onClick={onNewTab}
+      >
         +
       </button>
     </div>

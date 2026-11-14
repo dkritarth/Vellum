@@ -1,5 +1,5 @@
 import { resolve } from 'node:path'
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
 // Default environment stays 'node' (core/ tests spawn real subprocesses and
@@ -15,5 +15,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    // Match paths within this checkout, even when it lives inside a worktree.
+    exclude: [...configDefaults.exclude, '**/.claude/worktrees/**'],
   },
 })

@@ -1,0 +1,33 @@
+[649781:1106/102117.432643:ERROR:viz_main_impl.cc(166)] Exiting GPU process due to errors during initialization
+[649839:1106/102117.697550:ERROR:viz_main_impl.cc(166)] Exiting GPU process due to errors during initialization
+[649732:1106/102118.236506:ERROR:object_proxy.cc(576)] Failed to call method: org.freedesktop.DBus.StartServiceByName: object_path= /org/freedesktop/DBus: org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the network connection was broken.
+Error occurred in handler for 'vellum:collections-tree': Error: issue167 latest-loading-error
+    at Object.release (eval at evaluate (:311:30), <anonymous>:13:122)
+    at eval (eval at evaluate (:311:30), <anonymous>:1:226)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+Error occurred in handler for 'vellum:collections-tree': Error: issue167 old-initial-error
+    at Object.release (eval at evaluate (:311:30), <anonymous>:13:122)
+    at eval (eval at evaluate (:311:30), <anonymous>:1:226)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+Error occurred in handler for 'vellum:collections-tree': Error: issue167 old-mutation-error
+    at Object.release (eval at evaluate (:311:30), <anonymous>:13:122)
+    at eval (eval at evaluate (:311:30), <anonymous>:1:226)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+Error occurred in handler for 'vellum:collections-tree': Error: issue167 current failure
+    at eval (eval at evaluate (:311:30), <anonymous>:10:24)
+    at WebContents.<anonymous> (node:electron/js2c/browser_init:2:86178)
+    at WebContents.emit (node:events:518:28)
+Error occurred in handler for 'vellum:collections-tree': Error: issue167 unmounted-error
+    at Object.release (eval at evaluate (:311:30), <anonymous>:13:122)
+    at eval (eval at evaluate (:311:30), <anonymous>:1:226)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+Debugger ending on ws://127.0.0.1:43287/effb3f45-9a2c-44ca-8f07-49bad2257de7
+For help, see: https://nodejs.org/en/docs/inspector
+[649949:1106/102129.528277:ERROR:viz_main_impl.cc(166)] Exiting GPU process due to errors during initialization
+[649915:1106/102130.344054:ERROR:object_proxy.cc(576)] Failed to call method: org.freedesktop.DBus.StartServiceByName: object_path= /org/freedesktop/DBus: org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the network connection was broken.
+Debugger ending on ws://127.0.0.1:34919/f68091bc-f053-4de2-a88a-c4b6d9573934
+For help, see: https://nodejs.org/en/docs/inspector

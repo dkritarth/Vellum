@@ -1,0 +1,398 @@
+
+ RUN  v2.1.9 /home/dandapat/.t3/worktrees/Vellum/t3-8415002d
+
+stderr | src/app/CollectionsTree.test.tsx > CollectionsTree [L2-01] > shows a visible error and keeps the input when creating fails
+Failed to create collection Error: parent not found
+    at /home/dandapat/.t3/worktrees/Vellum/t3-8415002d/src/app/CollectionsTree.test.tsx:126:65
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:146:14
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:533:11
+    at runWithTimeout (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:39:7)
+    at runTest (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1056:17)
+    at runSuite (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1205:15)
+    at runSuite (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1205:15)
+    at runFiles (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1262:5)
+    at startTests (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1271:3)
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11
+
+stderr | src/app/CollectionsTree.test.tsx > CollectionsTree [L2-01] > shows a visible error when renaming fails
+Failed to rename collection Error: Collection 1 not found
+    at /home/dandapat/.t3/worktrees/Vellum/t3-8415002d/src/app/CollectionsTree.test.tsx:143:65
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:146:14
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:533:11
+    at runWithTimeout (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:39:7)
+    at runTest (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1056:17)
+    at runSuite (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1205:15)
+    at runSuite (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1205:15)
+    at runFiles (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1262:5)
+    at startTests (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1271:3)
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11
+
+stderr | src/app/CollectionsTree.test.tsx > CollectionsTree [L2-01] > shows a visible error and keeps selection when deleting fails, then clears it on success
+Failed to delete collection Error: disk I/O error
+    at /home/dandapat/.t3/worktrees/Vellum/t3-8415002d/src/app/CollectionsTree.test.tsx:184:30
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:146:14
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:533:11
+    at runWithTimeout (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:39:7)
+    at runTest (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1056:17)
+    at runSuite (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1205:15)
+    at runSuite (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1205:15)
+    at runFiles (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1262:5)
+    at startTests (file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/@vitest/runner/dist/index.js:1271:3)
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-8415002d/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11
+
+ ❯ src/app/CollectionsTree.test.tsx (26 tests | 5 failed) 3838ms
+   ✓ CollectionsTree [L2-01] > shows one persistent load error while polling fails and clears it on the next successful load 2012ms
+   × recursive deletion selection > clears selected child after real recursive parent deletion 33ms
+     → expect(element).toHaveTextContent()
+
+Expected element to have text content:
+  All Papers
+Received:
+  Filtered collection 2
+   × recursive deletion selection > clears selected deep after real recursive parent deletion 23ms
+     → expect(element).toHaveTextContent()
+
+Expected element to have text content:
+  All Papers
+Received:
+  Filtered collection 3
+   × recursive deletion selection > reconciles latest selection: parent switches to Other research while deletion is pending 36ms
+     → expect(element).toHaveTextContent()
+
+Expected element to have text content:
+  Filtered collection 4
+Received:
+  All Papers
+   × recursive deletion selection > reconciles latest selection: unrelated switches to Deep research while deletion is pending 36ms
+     → expect(element).toHaveTextContent()
+
+Expected element to have text content:
+  All Papers
+Received:
+  Filtered collection 3
+   × recursive deletion selection > retains descendant filter and tree on failure, then clears after retry succeeds 1042ms
+     → expect(element).toHaveTextContent()
+
+Expected element to have text content:
+  All Papers
+Received:
+  Filtered collection 3
+
+Ignored nodes: comments, script, style
+[36m<html>[39m
+  [36m<head />[39m
+  [36m<body>[39m
+    [36m<div>[39m
+      [36m<p[39m
+        [33mdata-testid[39m=[32m"filter"[39m
+      [36m>[39m
+        [0mFiltered collection 3[0m
+      [36m</p>[39m
+      [36m<div[39m
+        [33maria-label[39m=[32m"Collections"[39m
+        [33mclass[39m=[32m"_container_bec57c"[39m
+        [33mrole[39m=[32m"tree"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"_header_bec57c"[39m
+        [36m>[39m
+          [36m<span>[39m
+            [0mCollections[0m
+          [36m</span>[39m
+          [36m<button[39m
+            [33maria-label[39m=[32m"New Collection"[39m
+            [33mclass[39m=[32m"_addButton_bec57c"[39m
+            [33mtitle[39m=[32m"New Collection"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [0m+[0m
+          [36m</button>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33maria-selected[39m=[32m"false"[39m
+          [33mclass[39m=[32m"_allPapersItem_bec57c "[39m
+          [33mrole[39m=[32m"treeitem"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"_itemLabel_bec57c"[39m
+          [36m>[39m
+            [36m<span>[39m
+              [0m📚[0m
+            [36m</span>[39m
+            [36m<span>[39m
+              [0mAll Papers[0m
+            [36m</span>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"_tree_bec57c"[39m
+        [36m>[39m
+          [36m<div>[39m
+            [36m<div[39m
+              [33maria-selected[39m=[32m"false"[39m
+              [33mclass[39m=[32m"_treeItem_bec57c "[39m
+              [33mrole[39m=[32m"treeitem"[39m
+              [33mstyle[39m=[32m"padding-left: 6px;"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"_itemLabel_bec57c"[39m
+              [36m>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"_folderIcon_bec57c"[39m
+                [36m>[39m
+                  [0m📁[0m
+                [36m</span>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"_collectionName_bec57c"[39m
+                  [33mtitle[39m=[32m"Other research"[39m
+                [36m>[39m
+                  [0mOther research[0m
+                [36m</span>[39m
+              [36m</div>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"_itemActions_bec57c"[39m
+              [36m>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"_countBadge_bec57c"[39m
+                [36m>[39m
+                  [0m0[0m
+                [36m</span>[39m
+                [36m<button[39m
+                  [33maria-label[39m=[32m"Add subcollection to Other research"[39m
+                  [33mclass[39m=[32m"_actionBtn_bec57c"[39m
+                  [33mtitle[39m=[32m"Add subcollection"[39m
+                  [33mtype[39m=[32m"button"[39m
+                [36m>[39m
+                  [0m+[0m
+                [36m</button>[39m
+                [36m<button[39m
+                  [33maria-label[39m=[32m"Rename Other research"[39m
+                  [33mclass[39m=[32m"_actionBtn_bec57c"[39m
+                  [33mtitle[39m=[32m"Rename collection"[39m
+                  [33mtype[39m=[32m"button"[39m
+                [36m>[39m
+                  [0m✎[0m
+                [36m</button>[39m
+                [36m<button[39m
+                  [33maria-label[39m=[32m"Delete Other research"[39m
+                  [33mclass[39m=[32m"_actionBtn_bec57c"[39m
+                  [33mtitle[39m=[32m"Delete collection"[39m
+                  [33mtype[39m=[32m"button"[39m
+                [36m>[39m
+                  [0m🗑[0m
+                [36m</button>[39m
+              [36m</div>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+    [36m</div>[39m
+  [36m</body>[39m
+[36m</html>[39m
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/app/CollectionsTree.test.tsx > recursive deletion selection > clears selected child after real recursive parent deletion
+Error: expect(element).toHaveTextContent()
+
+Expected element to have text content:
+  All Papers
+Received:
+  Filtered collection 2
+ ❯ src/app/CollectionsTree.test.tsx:376:44
+    374|       await waitFor(() => expect(screen.queryByText('Parent research')…
+    375|       expect(listCollections(db).map(collection => collection.name)).t…
+    376|       expect(screen.getByTestId('filter')).toHaveTextContent('All Pape…
+       |                                            ^
+    377|       expect(onSelect).toHaveBeenCalledWith(null, null)
+    378|     } finally { db.close() }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/app/CollectionsTree.test.tsx > recursive deletion selection > clears selected deep after real recursive parent deletion
+Error: expect(element).toHaveTextContent()
+
+Expected element to have text content:
+  All Papers
+Received:
+  Filtered collection 3
+ ❯ src/app/CollectionsTree.test.tsx:376:44
+    374|       await waitFor(() => expect(screen.queryByText('Parent research')…
+    375|       expect(listCollections(db).map(collection => collection.name)).t…
+    376|       expect(screen.getByTestId('filter')).toHaveTextContent('All Pape…
+       |                                            ^
+    377|       expect(onSelect).toHaveBeenCalledWith(null, null)
+    378|     } finally { db.close() }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/app/CollectionsTree.test.tsx > recursive deletion selection > reconciles latest selection: parent switches to Other research while deletion is pending
+Error: expect(element).toHaveTextContent()
+
+Expected element to have text content:
+  Filtered collection 4
+Received:
+  All Papers
+ ❯ src/app/CollectionsTree.test.tsx:408:44
+    406|       expect(listCollections(db)).toHaveLength(4)
+    407|       await act(async () => pending.resolve())
+    408|       expect(screen.getByTestId('filter')).toHaveTextContent(
+       |                                            ^
+    409|         clears || next === 'All Papers' ? 'All Papers' : `Filtered col…
+    410|       )
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/app/CollectionsTree.test.tsx > recursive deletion selection > reconciles latest selection: unrelated switches to Deep research while deletion is pending
+Error: expect(element).toHaveTextContent()
+
+Expected element to have text content:
+  All Papers
+Received:
+  Filtered collection 3
+ ❯ src/app/CollectionsTree.test.tsx:408:44
+    406|       expect(listCollections(db)).toHaveLength(4)
+    407|       await act(async () => pending.resolve())
+    408|       expect(screen.getByTestId('filter')).toHaveTextContent(
+       |                                            ^
+    409|         clears || next === 'All Papers' ? 'All Papers' : `Filtered col…
+    410|       )
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  src/app/CollectionsTree.test.tsx > recursive deletion selection > retains descendant filter and tree on failure, then clears after retry succeeds
+Error: expect(element).toHaveTextContent()
+
+Expected element to have text content:
+  All Papers
+Received:
+  Filtered collection 3
+
+Ignored nodes: comments, script, style
+[36m<html>[39m
+  [36m<head />[39m
+  [36m<body>[39m
+    [36m<div>[39m
+      [36m<p[39m
+        [33mdata-testid[39m=[32m"filter"[39m
+      [36m>[39m
+        [0mFiltered collection 3[0m
+      [36m</p>[39m
+      [36m<div[39m
+        [33maria-label[39m=[32m"Collections"[39m
+        [33mclass[39m=[32m"_container_bec57c"[39m
+        [33mrole[39m=[32m"tree"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"_header_bec57c"[39m
+        [36m>[39m
+          [36m<span>[39m
+            [0mCollections[0m
+          [36m</span>[39m
+          [36m<button[39m
+            [33maria-label[39m=[32m"New Collection"[39m
+            [33mclass[39m=[32m"_addButton_bec57c"[39m
+            [33mtitle[39m=[32m"New Collection"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [0m+[0m
+          [36m</button>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33maria-selected[39m=[32m"false"[39m
+          [33mclass[39m=[32m"_allPapersItem_bec57c "[39m
+          [33mrole[39m=[32m"treeitem"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"_itemLabel_bec57c"[39m
+          [36m>[39m
+            [36m<span>[39m
+              [0m📚[0m
+            [36m</span>[39m
+            [36m<span>[39m
+              [0mAll Papers[0m
+            [36m</span>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"_tree_bec57c"[39m
+        [36m>[39m
+          [36m<div>[39m
+            [36m<div[39m
+              [33maria-selected[39m=[32m"false"[39m
+              [33mclass[39m=[32m"_treeItem_bec57c "[39m
+              [33mrole[39m=[32m"treeitem"[39m
+              [33mstyle[39m=[32m"padding-left: 6px;"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"_itemLabel_bec57c"[39m
+              [36m>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"_folderIcon_bec57c"[39m
+                [36m>[39m
+                  [0m📁[0m
+                [36m</span>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"_collectionName_bec57c"[39m
+                  [33mtitle[39m=[32m"Other research"[39m
+                [36m>[39m
+                  [0mOther research[0m
+                [36m</span>[39m
+              [36m</div>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"_itemActions_bec57c"[39m
+              [36m>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"_countBadge_bec57c"[39m
+                [36m>[39m
+                  [0m0[0m
+                [36m</span>[39m
+                [36m<button[39m
+                  [33maria-label[39m=[32m"Add subcollection to Other research"[39m
+                  [33mclass[39m=[32m"_actionBtn_bec57c"[39m
+                  [33mtitle[39m=[32m"Add subcollection"[39m
+                  [33mtype[39m=[32m"button"[39m
+                [36m>[39m
+                  [0m+[0m
+                [36m</button>[39m
+                [36m<button[39m
+                  [33maria-label[39m=[32m"Rename Other research"[39m
+                  [33mclass[39m=[32m"_actionBtn_bec57c"[39m
+                  [33mtitle[39m=[32m"Rename collection"[39m
+                  [33mtype[39m=[32m"button"[39m
+                [36m>[39m
+                  [0m✎[0m
+                [36m</button>[39m
+                [36m<button[39m
+                  [33maria-label[39m=[32m"Delete Other research"[39m
+                  [33mclass[39m=[32m"_actionBtn_bec57c"[39m
+                  [33mtitle[39m=[32m"Delete collection"[39m
+                  [33mtype[39m=[32m"button"[39m
+                [36m>[39m
+                  [0m🗑[0m
+                [36m</button>[39m
+              [36m</div>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+    [36m</div>[39m
+  [36m</body>[39m
+[36m</html>[39m
+ ❯ src/app/CollectionsTree.test.tsx:429:64
+    427|       expect(onSelect).not.toHaveBeenCalled()
+    428|       fireEvent.click(screen.getByRole('button', { name: 'Delete Paren…
+    429|       await waitFor(() => expect(screen.getByTestId('filter')).toHaveT…
+       |                                                                ^
+    430|       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    431|     } finally { db.close() }
+ ❯ runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ❯ checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ❯ Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 21 passed (26)
+   Start at  10:39:38
+   Duration  4.83s (transform 146ms, setup 0ms, collect 282ms, tests 3.84s, environment 384ms, prepare 83ms)

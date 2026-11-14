@@ -1,0 +1,8 @@
+PASS Visible Notes placeholder, real-paper ingestion/rendering, true missing-note editor and normal autosave
+PASS Delayed failure blocks keyboard edits/Clear; accessible repeated error; keyboard Retry recovers original without mutation
+PASS Switch and unmount during retry retire stale success/error, preserve A/B, and issue no save/delete
+PASS Complete process restart preserves original A, unrelated B note and history before explicit edit
+PASS Loaded keyboard editing retains focus and autosaves; outgoing unmount flush and normal Clear/missing-note recovery work
+PASS Second restart retains final edit, unrelated note/history message and byte-identical ingested PDFs
+PASS Zero renderer errors, warnings or page errors across three launches
+Isolated run data: /data/dandapat/.tmp/vellum-163-pEmYWX

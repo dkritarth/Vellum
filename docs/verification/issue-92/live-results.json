@@ -1,0 +1,18 @@
+{
+  "papers": [
+    "local-attention",
+    "local-bert"
+  ],
+  "results": [
+    "Visible empty state, two real PDF ingests/renders, labeled editor, focus and debounced saves",
+    "Delayed Clear(A) rejection preserves B and outgoing flush persists B under B only",
+    "Current Clear failure restores A and normal outgoing flush retries it",
+    "Outgoing autosave resolve preserves B's newer editor and Saved status",
+    "Outgoing autosave reject preserves B's newer editor and Saved status",
+    "Outgoing flush failure cannot dirty B or clear its Saved status",
+    "Normal Clear removes persisted note and disables empty action; typing saves again",
+    "Full Electron restart retains distinct A/B notes through visible Library and paper controls",
+    "Renderer console has no errors, warnings or page errors across both launches"
+  ],
+  "consoleLines": []
+}

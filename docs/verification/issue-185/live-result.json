@@ -1,0 +1,60 @@
+{
+  "passed": true,
+  "dir": "/tmp/vellum185-live-uAQaq4",
+  "records": [
+    "Delayed initial open, keyboard Retry, repeated failure, same requested session/history, no extra conversations.",
+    "Exact native multiline Send; real ChatManager held turn restored after failed open/Retry, then completed without duplicate start.",
+    "Navigation to other session and revisit while retry pending; stale success leaves destination draft/history intact.",
+    "Process restart preserves exact requested history, multiline user text, note, PDF and markdown hashes."
+  ],
+  "opens": [
+    {
+      "slug": "attention",
+      "sessionId": 1
+    },
+    {
+      "slug": "attention",
+      "sessionId": 1
+    },
+    {
+      "slug": "attention",
+      "sessionId": 1
+    }
+  ],
+  "starts": [
+    {
+      "chatSessionId": 1,
+      "slug": "attention",
+      "text": "First paragraph\n\nSecond paragraph"
+    }
+  ],
+  "restored": [
+    {
+      "id": 1,
+      "sessionId": 1,
+      "role": "assistant",
+      "content": "Saved requested history",
+      "createdAt": "2026-11-06T20:59:28.359Z"
+    },
+    {
+      "id": 3,
+      "sessionId": 1,
+      "role": "user",
+      "content": "First paragraph\n\nSecond paragraph",
+      "createdAt": "2026-11-06T20:59:30.644Z"
+    },
+    {
+      "id": 4,
+      "sessionId": 1,
+      "role": "assistant",
+      "content": "Controlled active prefix and final reply",
+      "createdAt": "2026-11-06T20:59:31.178Z"
+    }
+  ],
+  "hashes": [
+    "bdfaa68d8984f0dc02beaca527b76f207d99b666d31d1da728ee0728182df697",
+    "54c5d19767eab70f0de281b7bba5f9e3317b47c4ec6c829aae3e77609d8ac6a2"
+  ],
+  "errors": [],
+  "pdfBytes": 2215244
+}

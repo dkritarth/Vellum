@@ -1,9 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync, truncateSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import * as fs from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
-import { fetchSource, fetchPdfFromUrl } from './fetch'
+import { fetchSource, fetchPdfFromUrl, DEFAULT_MAX_PDF_BYTES } from './fetch'
 import type { ClassifiedInput } from './classify'
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  return { ...actual, open: vi.fn(actual.open) }
+})
 
 const ARXIV_ATOM_FIXTURE = `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
@@ -86,6 +93,65 @@ describe('fetchSource', () => {
     expect(calledUrls.some((u) => u.includes('id_list=2401.12345'))).toBe(true)
   })
 
+  it('decodes predefined XML entities once in arXiv metadata after field extraction', async () => {
+    const xml = ARXIV_ATOM_FIXTURE
+      .replace('Attention Is All You Need, Again', 'Graphs &amp; Attention &quot;A&quot; &gt; B')
+      .replace('Jane Doe', 'A. O&apos;Neil')
+      .replace('John Smith', 'Literal &amp;apos; &amp;#65;')
+      .replace('This paper revisits attention mechanisms.', 'x &lt; y &lt;/summary&gt; &lt;tag&gt;')
+      .replace('NeurIPS 2024', '  Research &amp; Science\n 2024  ')
+    fetchMock.mockImplementation((url: string) => Promise.resolve(new Response(
+      url.includes('/api/query') ? new TextEncoder().encode(xml) : new Uint8Array([1, 2, 3]),
+    )))
+
+    const result = await fetchSource(
+      { kind: 'arxiv', slug: 'arxiv-2401.12345', value: '2401.12345' },
+      { lookup: async () => [{ address: '93.184.216.34', family: 4 }] },
+    )
+
+    expect(result.metadata).toEqual({
+      title: 'Graphs & Attention "A" > B',
+      authors: ["A. O'Neil", 'Literal &apos; &#65;'],
+      year: 2024,
+      venue: 'Research & Science 2024',
+      abstract: 'x < y </summary> <tag>',
+    })
+    expect(result.pdfBytes).toEqual(new Uint8Array([1, 2, 3]))
+  })
+
+  it.each([
+    ['decimal and hexadecimal', '&#65; &#000233; &#x3B1; &#x1F4DA;', 'A é α 📚'],
+    ['XML 1.0 boundaries', '&#32;&#xD7FF;&#xE000;&#xFFFD;&#x10000;&#x10FFFF;', '\uD7FF\uE000\uFFFD\u{10000}\u{10FFFF}'],
+    ['discouraged but legal characters', '&#x7F;&#x85;&#xFDD0;&#x1FFFE;', '\u007F\u0085\uFDD0\u{1FFFE}'],
+    ['whitespace references', ' A&#9;B&#10;C&#13;D ', 'A B C D'],
+    ['numeric escaped literals', '&#38;lt; &#x26;#65; &amp;#x41;', '&lt; &#65; &#x41;'],
+    ['unknown and malformed references', '&nbsp; &AMP; &#; &#x; &#X41; &#-1; &#xGG; &#12oops; &amp', '&nbsp; &AMP; &#; &#x; &#X41; &#-1; &#xGG; &#12oops; &amp'],
+    ['illegal XML characters', '&#0; &#8; &#11; &#12; &#14; &#31; &#xD800; &#xDFFF; &#xFFFE; &#xFFFF;', '&#0; &#8; &#11; &#12; &#14; &#31; &#xD800; &#xDFFF; &#xFFFE; &#xFFFF;'],
+    ['out-of-range references', '&#1114112; &#x110000; &#99999999999999999999999999999999999999999999;', '&#1114112; &#x110000; &#99999999999999999999999999999999999999999999;'],
+  ])('handles %s in arXiv XML text safely', async (_label, encoded, decoded) => {
+    const xml = ARXIV_ATOM_FIXTURE
+      .replace('Attention Is All You Need, Again', encoded)
+      .replace('Jane Doe', encoded)
+      .replace('This paper revisits attention mechanisms.', encoded)
+      .replace('NeurIPS 2024', encoded)
+    fetchMock.mockImplementation((url: string) => Promise.resolve(new Response(
+      url.includes('/api/query') ? new TextEncoder().encode(xml) : new Uint8Array([1]),
+    )))
+
+    const result = await fetchSource(
+      { kind: 'arxiv', slug: 'arxiv-2401.12345', value: '2401.12345' },
+      { lookup: async () => [{ address: '93.184.216.34', family: 4 }] },
+    )
+
+    expect(result.metadata).toEqual({
+      title: decoded,
+      authors: [decoded, 'John Smith'],
+      year: 2024,
+      venue: decoded,
+      abstract: decoded,
+    })
+  })
+
   it('fetches DOI metadata from Crossref and PDF bytes from the DOI URL', async () => {
     fetchMock.mockImplementation((url: string) => {
       if (url.includes('api.crossref.org/works/')) {
@@ -156,6 +222,26 @@ describe('fetchSource', () => {
     ])
   })
 
+  it('rejects a DOI publisher landing page with a direct-PDF or local-file remedy', async () => {
+    const landingPage = 'https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0000308'
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('api.crossref.org/works/')) {
+        return Response.json(CROSSREF_FIXTURE)
+      }
+      if (url.startsWith('https://doi.org/')) {
+        return new Response(null, { status: 302, headers: { location: landingPage } })
+      }
+      return new Response('<html>Publisher landing page</html>', {
+        headers: { 'content-type': 'text/html;charset=UTF-8' },
+      })
+    })
+
+    await expect(fetchSource({
+      kind: 'doi', slug: 'doi-plos', value: '10.1371/journal.pone.0000308',
+    }, { lookup: async () => [{ address: '93.184.216.34', family: 4 }] }))
+      .rejects.toThrow('DOI PDF resolved to a web page, not a PDF. Supply a direct PDF URL or download the PDF and import the local file.')
+  })
+
   it('fetches raw PDF bytes for a direct pdf_url with no metadata', async () => {
     fetchMock.mockImplementation((url: string) => {
       if (url === 'https://example.com/paper.pdf') {
@@ -197,6 +283,162 @@ describe('fetchSource', () => {
     const input: ClassifiedInput = { kind: 'doi', slug: 'doi-x', value: '10.1/doesnotexist' }
     await expect(fetchSource(input)).rejects.toThrow(/Crossref/)
   })
+
+  // A metadata server that accepts the connection but never answers must not
+  // hang ingest forever: metadata requests honor the same timeout as the PDF.
+  function hangUntilAborted(_url: string, init?: RequestInit): Promise<Response> {
+    return new Promise((_resolve, reject) => {
+      const signal = init?.signal
+      if (!signal) return // no signal: hang forever (the bug)
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+    })
+  }
+
+  it('times out a hung Crossref metadata request', { timeout: 2000 }, async () => {
+    fetchMock.mockImplementation(hangUntilAborted)
+    const input: ClassifiedInput = { kind: 'doi', slug: 'doi-hang', value: '10.1/hang' }
+    await expect(fetchSource(input, { timeoutMs: 50 })).rejects.toThrow(/Crossref.*timed out after 50ms/)
+  })
+
+  it('times out a hung arXiv metadata request', { timeout: 2000 }, async () => {
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url.startsWith('https://export.arxiv.org/pdf/')) {
+        return Promise.resolve(new Response(new Uint8Array([1, 2, 3]), { status: 200 }))
+      }
+      return hangUntilAborted(url, init)
+    })
+    const input: ClassifiedInput = { kind: 'arxiv', slug: 'arxiv-2401.00001', value: '2401.00001' }
+    await expect(
+      fetchSource(input, {
+        timeoutMs: 50,
+        lookup: async () => [{ address: '93.184.216.34', family: 4 }],
+      }),
+    ).rejects.toThrow(/arXiv API.*timed out after 50ms/)
+  })
+})
+
+describe('fetchSource local PDF limits', () => {
+  let dir: string
+  let input: ClassifiedInput
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'vellum-local-limit-'))
+    input = { kind: 'local_pdf', slug: 'local-paper', value: join(dir, 'paper.pdf') }
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('rejects a regular file one byte over the configured cap', async () => {
+    writeFileSync(input.value, new Uint8Array([1, 2, 3, 4, 5]))
+    await expect(fetchSource(input, { maxBytes: 4 })).rejects.toThrow(
+      'Local PDF exceeds maximum allowed size of 4 bytes',
+    )
+  })
+
+  it.each([3, 4])('preserves all %i bytes at or below a four-byte cap', async (size) => {
+    const bytes = new Uint8Array([1, 2, 3, 4]).slice(0, size)
+    writeFileSync(input.value, bytes)
+    await expect(fetchSource(input, { maxBytes: 4 })).resolves.toEqual({
+      pdfBytes: bytes, metadata: undefined,
+    })
+  })
+
+  it('accepts an empty regular file at a zero-byte cap', async () => {
+    writeFileSync(input.value, '')
+    expect((await fetchSource(input, { maxBytes: 0 })).pdfBytes).toHaveLength(0)
+  })
+
+  it('rejects a sparse file above the default 50 MiB cap and closes without reading', async () => {
+    writeFileSync(input.value, '')
+    truncateSync(input.value, DEFAULT_MAX_PDF_BYTES + 1)
+    const handle = await fs.open(input.value, 'r')
+    vi.mocked(fs.open).mockResolvedValueOnce(handle)
+    const read = vi.spyOn(handle, 'read')
+    try {
+      await expect(fetchSource(input)).rejects.toThrow('maximum allowed size of 52428800 bytes')
+      expect(read).not.toHaveBeenCalled()
+      expect(handle.fd).toBe(-1)
+    } finally {
+      await handle.close()
+    }
+  })
+
+  it('rejects a directory before reading and closes its handle', async () => {
+    // Windows rejects opening directories itself; exercise handle cleanup on POSIX.
+    if (process.platform === 'win32') {
+      await expect(fetchSource({ ...input, value: dir })).rejects.toThrow()
+      return
+    }
+    const handle = await fs.open(dir, 'r')
+    vi.mocked(fs.open).mockResolvedValueOnce(handle)
+    const read = vi.spyOn(handle, 'read')
+    try {
+      await expect(fetchSource({ ...input, value: dir })).rejects.toThrow('must be a regular file')
+      expect(read).not.toHaveBeenCalled()
+      expect(handle.fd).toBe(-1)
+    } finally {
+      await handle.close()
+    }
+  })
+
+  it.skipIf(process.platform === 'win32')('rejects a FIFO without waiting for a writer', async () => {
+    execFileSync('mkfifo', [input.value])
+    await expect(fetchSource(input)).rejects.toThrow('must be a regular file')
+  })
+
+  it.each(['stat', 'read'] as const)('closes the handle when %s fails', async (operation) => {
+    writeFileSync(input.value, 'paper')
+    const handle = await fs.open(input.value, 'r')
+    vi.mocked(fs.open).mockResolvedValueOnce(handle)
+    vi.spyOn(handle, operation).mockRejectedValueOnce(new Error('disk failure'))
+    try {
+      await expect(fetchSource(input)).rejects.toThrow('disk failure')
+      expect(handle.fd).toBe(-1)
+    } finally {
+      await handle.close()
+    }
+  })
+
+  it('propagates a missing-file error', async () => {
+    await expect(fetchSource(input)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('preserves bytes across multiple reads and closes on success', async () => {
+    const bytes = new Uint8Array(65_537).fill(7)
+    bytes[65_536] = 9
+    writeFileSync(input.value, bytes)
+    const handle = await fs.open(input.value, 'r')
+    vi.mocked(fs.open).mockResolvedValueOnce(handle)
+    try {
+      expect((await fetchSource(input, { maxBytes: bytes.length })).pdfBytes).toEqual(bytes)
+      expect(handle.fd).toBe(-1)
+    } finally {
+      await handle.close()
+    }
+  })
+
+  it('rejects growth beyond the cap after the size check and closes the file', async () => {
+    writeFileSync(input.value, new Uint8Array([1, 2, 3, 4]))
+    const handle = await fs.open(input.value, 'r')
+    const stat = await handle.stat()
+    vi.mocked(fs.open).mockResolvedValueOnce(handle)
+    vi.spyOn(handle, 'stat').mockImplementationOnce(async () => {
+      // Deterministic filesystem race: grow the real file after capturing its size.
+      writeFileSync(input.value, new Uint8Array([1, 2, 3, 4, 5]))
+      return stat
+    })
+    try {
+      await expect(fetchSource(input, { maxBytes: 4 })).rejects.toThrow(
+        'Local PDF exceeds maximum allowed size of 4 bytes',
+      )
+      expect(handle.fd).toBe(-1)
+    } finally {
+      await handle.close()
+    }
+  })
 })
 
 describe('fetchPdfFromUrl security and resource limits', () => {
@@ -210,6 +452,36 @@ describe('fetchPdfFromUrl security and resource limits', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
   })
+
+  it.each(['text/html', 'TeXt/HtMl; charset=UTF-8', 'application/xhtml+xml', 'Application/XHTML+XML; charset=utf-8'])(
+    'rejects %s without reading the body and cancels it', async (contentType) => {
+      const pull = vi.fn()
+      const cancel = vi.fn()
+      const body = new ReadableStream<Uint8Array>({ pull, cancel }, { highWaterMark: 0 })
+      fetchMock.mockResolvedValue(new Response(body, {
+        headers: { 'content-type': contentType },
+      }))
+
+      await expect(fetchPdfFromUrl('https://example.com/paper.pdf', 'PDF URL', {
+        lookup: async () => [{ address: '93.184.216.34', family: 4 }],
+      })).rejects.toThrow(/web page.*direct PDF URL.*import the local file/)
+      expect(pull).not.toHaveBeenCalled()
+      expect(cancel).toHaveBeenCalledOnce()
+    },
+  )
+
+  it.each([undefined, 'application/octet-stream', 'application/pdf; charset=binary'])(
+    'preserves PDF bytes with content type %s', async (contentType) => {
+      const pdf = new TextEncoder().encode('%PDF-1.4\n')
+      fetchMock.mockResolvedValue(new Response(pdf, {
+        headers: contentType ? { 'content-type': contentType } : {},
+      }))
+
+      await expect(fetchPdfFromUrl('https://example.com/paper.pdf', 'PDF URL', {
+        lookup: async () => [{ address: '93.184.216.34', family: 4 }],
+      })).resolves.toEqual(pdf)
+    },
+  )
 
   describe('SSRF protection', () => {
     it('rejects loopback IPv4 addresses', async () => {

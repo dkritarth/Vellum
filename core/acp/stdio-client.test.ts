@@ -8,7 +8,7 @@
 //    session/update routing) without requiring a live, signed-in adapter CLI
 //    on PATH. See core/acp/README.md for the separate *live* smoke test.
 
-import { spawn, type ChildProcessByStdio } from 'node:child_process'
+import { spawn, spawnSync, type ChildProcessByStdio } from 'node:child_process'
 import type { Readable, Writable } from 'node:stream'
 import { describe, expect, it } from 'vitest'
 
@@ -17,7 +17,9 @@ import {
   StdioAcpClient,
   buildAdapterArgs,
   buildAdapterEnv,
+  describeSessionError,
   mapSessionUpdate,
+  resolveAdapterCommand,
   type SpawnAdapter,
 } from './stdio-client.js'
 
@@ -80,6 +82,27 @@ rl.on('line', (line) => {
       setTimeout(sendChunk, 30)
       return
     }
+    // 'echo-stream' streams three chunks tagged with this prompt's own text,
+    // spaced 30ms apart, so overlapping turns are distinguishable on the wire.
+    if (mode === 'echo-stream') {
+      const tag = msg.params.prompt[0].text
+      let i = 0
+      const sendChunk = () => {
+        i++
+        send({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: msg.params.sessionId,
+            update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: tag + '-' + i } },
+          },
+        })
+        if (i < 3) setTimeout(sendChunk, 30)
+        else send({ jsonrpc: '2.0', id: msg.id, result: { stopReason: 'end_turn' } })
+      }
+      setTimeout(sendChunk, 30)
+      return
+    }
     if (mode === 'prompt-error') {
       send({ jsonrpc: '2.0', id: msg.id, error: { code: -32000, message: 'boom' } })
       return
@@ -87,6 +110,9 @@ rl.on('line', (line) => {
     // 'stall' never answers session/prompt, simulating an adapter that hangs
     // mid-turn (e.g. an errored codex-acp turn, or any other stall).
     if (mode === 'stall') return
+    // 'crash-mid-turn' accepts the prompt, then dies without answering it
+    // (an adapter crash or OOM kill in the middle of a turn).
+    if (mode === 'crash-mid-turn') process.exit(9)
     send({
       jsonrpc: '2.0',
       method: 'session/update',
@@ -121,6 +147,13 @@ describe('mapSessionUpdate', () => {
       content: { type: 'text', text: 'hi' },
     } as never)
     expect(result).toEqual({ kind: 'text', data: { type: 'text', text: 'hi' } })
+  })
+
+  it('keeps echoed user prompts and agent reasoning out of answer text', () => {
+    for (const sessionUpdate of ['user_message_chunk', 'agent_thought_chunk']) {
+      const raw = { sessionUpdate, content: { type: 'text', text: 'not the answer' } }
+      expect(mapSessionUpdate(raw as never)).toEqual({ kind: 'tool_result', data: raw })
+    }
   })
 
   it('maps tool_call to a tool_call update', () => {
@@ -262,6 +295,90 @@ describe('StdioAcpClient', () => {
     }
   })
 
+  it('keeps overlapping prompt() calls on one session from stealing each other\'s updates', async () => {
+    // A second Ask on the same paper can start while the first is still
+    // streaming (e.g. the Ask panel remounts and re-enables its input). Each
+    // turn must receive only its own updates and its own terminal `done`.
+    const client = new StdioAcpClient(spawnFakeAgent('echo-stream'))
+    const session = await client.newSession('codex')
+    try {
+      const first = collect(session.prompt({ text: 'first' }))
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      const second = collect(session.prompt({ text: 'second' }))
+      const texts = (updates: AcpUpdate[]): string[] =>
+        updates.filter((u) => u.kind === 'text').map((u) => (u.data as { text: string }).text)
+
+      const [firstUpdates, secondUpdates] = await Promise.all([first, second])
+
+      expect(texts(firstUpdates)).toEqual(['first-1', 'first-2', 'first-3'])
+      expect(firstUpdates.at(-1)).toEqual({ kind: 'done', data: { stopReason: 'end_turn' } })
+      expect(texts(secondUpdates)).toEqual(['second-1', 'second-2', 'second-3'])
+      expect(secondUpdates.at(-1)).toEqual({ kind: 'done', data: { stopReason: 'end_turn' } })
+    } finally {
+      await session.dispose()
+    }
+  })
+
+  it('does not let a queued prompt\'s idle timer run while an earlier turn is still streaming', async () => {
+    // Idle budget 60ms; each turn streams for ~90ms with 30ms gaps. A second
+    // turn waiting behind the first must not start its idle clock (and kill
+    // the adapter) before it has actually been sent.
+    const client = new StdioAcpClient(spawnFakeAgent('echo-stream'), { turnMs: 60 })
+    const session = await client.newSession('codex')
+    try {
+      const [firstUpdates, secondUpdates] = await Promise.all([
+        collect(session.prompt({ text: 'first' })),
+        collect(session.prompt({ text: 'second' })),
+      ])
+      expect(firstUpdates.at(-1)).toEqual({ kind: 'done', data: { stopReason: 'end_turn' } })
+      expect(secondUpdates.at(-1)).toEqual({ kind: 'done', data: { stopReason: 'end_turn' } })
+    } finally {
+      await session.dispose()
+    }
+  })
+
+  it('releases a prompt queued behind a stalled turn when the session is disposed', async () => {
+    const client = new StdioAcpClient(spawnFakeAgent('stall'), { turnMs: 30_000 })
+    const session = await client.newSession('codex')
+    const first = collect(session.prompt({ text: 'first' }))
+    const second = collect(session.prompt({ text: 'second' }))
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    await session.dispose()
+
+    expect(await second).toEqual([{ kind: 'error', data: { message: 'session disposed' } }])
+    await first
+  }, 10_000)
+
+  it('ends an in-flight prompt() with an error, not a silent end, when the session is disposed mid-turn', async () => {
+    // ChatManager treats an iterator that ends without `error` as a finished
+    // turn and persists the partial text as the assistant reply. Disposal
+    // mid-turn (New chat, paper removal, app shutdown) must say so.
+    const client = new StdioAcpClient(spawnFakeAgent('stall'), { turnMs: 30_000 })
+    const session = await client.newSession('codex')
+    const updates = collect(session.prompt({ text: 'hi' }))
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    await session.dispose()
+
+    expect(await updates).toEqual([{ kind: 'error', data: { message: 'session disposed' } }])
+  }, 10_000)
+
+  it('reports the adapter exit diagnostic when the adapter dies mid-turn', async () => {
+    // Idle budget far above the test's patience: the error must come from
+    // the child exiting, not from the idle timer eventually firing.
+    const client = new StdioAcpClient(spawnFakeAgent('crash-mid-turn'), { turnMs: 30_000 })
+    const session = await client.newSession('codex')
+    try {
+      const updates = await collect(session.prompt({ text: 'hi' }))
+      expect(updates).toEqual([
+        { kind: 'error', data: { message: "ACP adapter 'codex-acp' exited with code 9" } },
+      ])
+    } finally {
+      await session.dispose()
+    }
+  }, 10_000)
+
   it('fails newSession() via the handshake timeout when the adapter never answers initialize', async () => {
     let child: AdapterChildProcess | undefined
     const captureChild: SpawnAdapter = (backend) => {
@@ -275,6 +392,65 @@ describe('StdioAcpClient', () => {
 })
 
 describe('buildAdapterEnv', () => {
+  it('delivers a trimmed Codex model and existing config to a real subprocess without mutating source', () => {
+    const sourceEnv = Object.freeze({
+      VELLUM_CODEX_MODEL: '  model "quoted" \n name  ',
+      CODEX_CONFIG: '{"model":"old","service_tier":"default","nested":{"keep":true}}',
+    })
+    const child = spawnSync(process.execPath, ['-e', 'process.stdout.write(process.env.CODEX_CONFIG)'], {
+      env: buildAdapterEnv(sourceEnv, 'codex'),
+      encoding: 'utf8',
+    })
+    expect(child.status).toBe(0)
+    expect(JSON.parse(child.stdout)).toEqual({
+      model: 'model "quoted" \n name',
+      service_tier: 'default',
+      nested: { keep: true },
+    })
+    expect(sourceEnv.CODEX_CONFIG).toBe('{"model":"old","service_tier":"default","nested":{"keep":true}}')
+  })
+
+  it('creates Codex config when absent without introducing unrelated defaults', () => {
+    const sourceEnv = Object.freeze({ VELLUM_CODEX_MODEL: '  gpt-6.1-sol  ' })
+    expect(buildAdapterEnv(sourceEnv, 'codex')).toEqual({
+      ...sourceEnv,
+      CODEX_CONFIG: '{"model":"gpt-6.1-sol"}',
+    })
+    expect(sourceEnv).not.toHaveProperty('CODEX_CONFIG')
+  })
+
+  it.each([undefined, '', ' \n '])('preserves raw config with no override (%j)', (model) => {
+    const sourceEnv = { VELLUM_CODEX_MODEL: model, CODEX_CONFIG: 'invalid but untouched' }
+    expect(buildAdapterEnv(sourceEnv, 'codex')).toEqual(sourceEnv)
+    expect(buildAdapterArgs('codex', sourceEnv)).toEqual([])
+  })
+
+  it.each(['{"secret":"do-not-echo"', 'null', '[]', '"do-not-echo"', '42', 'true', ''])(
+    'rejects invalid config safely when merging (%j)',
+    (config) => {
+      const sourceEnv = Object.freeze({ VELLUM_CODEX_MODEL: 'gpt-6.1-sol', CODEX_CONFIG: config })
+      let error: unknown
+      try {
+        buildAdapterEnv(sourceEnv, 'codex')
+      } catch (caught) {
+        error = caught
+      }
+      expect(error).toBeInstanceOf(Error)
+      if (!(error instanceof Error)) throw new Error('Expected a config validation error')
+      expect(error.message).toBe(
+        'Cannot apply VELLUM_CODEX_MODEL: CODEX_CONFIG must be a JSON object',
+      )
+      expect(error).not.toHaveProperty('cause')
+      expect(sourceEnv.CODEX_CONFIG).toBe(config)
+    },
+  )
+
+  it('leaves Claude config untouched even with a model override and invalid JSON', () => {
+    const sourceEnv = Object.freeze({ VELLUM_CODEX_MODEL: 'gpt-6.1-sol', CODEX_CONFIG: 'invalid' })
+    expect(buildAdapterEnv(sourceEnv, 'claude')).toEqual(sourceEnv)
+    expect(buildAdapterArgs('claude', sourceEnv)).toEqual([])
+  })
+
   it('strips CLAUDECODE and CLAUDE_CODE_SSE_PORT from the adapter child env', () => {
     const sourceEnv = {
       CLAUDECODE: '1',
@@ -295,7 +471,7 @@ describe('buildAdapterEnv', () => {
 })
 
 describe('buildAdapterArgs', () => {
-  it('passes an explicit Codex model override through the first-party adapter config interface', () => {
+  it('passes an explicit Codex model override through legacy adapter argv', () => {
     expect(buildAdapterArgs('codex', { VELLUM_CODEX_MODEL: 'gpt-5.5' })).toEqual([
       '-c',
       'model="gpt-5.5"',
@@ -305,5 +481,53 @@ describe('buildAdapterArgs', () => {
   it('uses normal adapter configuration when no Codex model override is set', () => {
     expect(buildAdapterArgs('codex', {})).toEqual([])
     expect(buildAdapterArgs('claude', { VELLUM_CODEX_MODEL: 'gpt-5.5' })).toEqual([])
+  })
+})
+
+describe('antigravity backend', () => {
+  it('starts agy as an ACP stdio server with its own app-data dir', () => {
+    expect(buildAdapterArgs('antigravity', {})).toEqual(['acp', '--app-data-dir', 'antigravity-acp'])
+  })
+
+  it('strips raw Google API keys and cloud credentials so auth comes from agy sign-in', () => {
+    const env = buildAdapterEnv(
+      { PATH: '/usr/bin', GEMINI_API_KEY: 'k', GOOGLE_API_KEY: 'k', GOOGLE_APPLICATION_CREDENTIALS: '/x.json' },
+      'antigravity',
+    )
+    expect(env).toEqual({ PATH: '/usr/bin' })
+  })
+
+  it('strips raw Anthropic and OpenAI API keys for every backend', () => {
+    const keys = { ANTHROPIC_API_KEY: 'a', ANTHROPIC_AUTH_TOKEN: 't', OPENAI_API_KEY: 'o', CODEX_API_KEY: 'c' }
+    for (const backend of ['claude', 'codex', 'antigravity'] as const) {
+      expect(buildAdapterEnv({ PATH: '/usr/bin', ...keys }, backend)).toEqual({ PATH: '/usr/bin' })
+    }
+  })
+
+  it('prefers claude-agent-acp on PATH and falls back to legacy claude-code-acp', () => {
+    expect(resolveAdapterCommand('claude', { PATH: '/a:/b' }, (f) => f === '/b/claude-agent-acp')).toBe('claude-agent-acp')
+    expect(resolveAdapterCommand('claude', { PATH: '/a:/b' }, () => false)).toBe('claude-code-acp')
+  })
+
+  it('leaves Google env alone for other backends', () => {
+    expect(buildAdapterEnv({ GEMINI_API_KEY: 'k' }, 'codex')).toEqual({ GEMINI_API_KEY: 'k' })
+  })
+
+  it('resolves agy from VELLUM_AGY_PATH, then PATH, then ~/.local/bin', () => {
+    const none = (): boolean => false
+    expect(resolveAdapterCommand('antigravity', { VELLUM_AGY_PATH: '/opt/agy' }, none)).toBe('/opt/agy')
+    expect(resolveAdapterCommand('antigravity', { PATH: '/a:/b', HOME: '/h' }, (f) => f === '/b/agy')).toBe('agy')
+    expect(resolveAdapterCommand('antigravity', { PATH: '/a', HOME: '/h' }, (f) => f === '/h/.local/bin/agy')).toBe(
+      '/h/.local/bin/agy',
+    )
+    expect(resolveAdapterCommand('antigravity', { PATH: '/a', HOME: '/h' }, none)).toBe('agy')
+    expect(resolveAdapterCommand('codex', { VELLUM_AGY_PATH: '/opt/agy' }, none)).toBe('codex-acp')
+  })
+
+  it('maps ACP auth-required errors to a sign-in instruction', () => {
+    expect(describeSessionError('antigravity', { code: -32000, message: 'Authentication required' })?.message).toMatch(
+      /agy acp --login/,
+    )
+    expect(describeSessionError('antigravity', new Error('boom'))).toBeUndefined()
   })
 })

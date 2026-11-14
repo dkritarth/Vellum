@@ -1,0 +1,13 @@
+[691400:1106/104258.613007:ERROR:viz_main_impl.cc(166)] Exiting GPU process due to errors during initialization
+[691449:1106/104258.879962:ERROR:viz_main_impl.cc(166)] Exiting GPU process due to errors during initialization
+[691363:1106/104259.431079:ERROR:object_proxy.cc(576)] Failed to call method: org.freedesktop.DBus.StartServiceByName: object_path= /org/freedesktop/DBus: org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the network connection was broken.
+Error occurred in handler for 'vellum:collections-delete': Error: issue171 controlled disk I/O error
+    at eval (eval at evaluate (:311:30), <anonymous>:9:34)
+    at WebContents.<anonymous> (node:electron/js2c/browser_init:2:86178)
+    at WebContents.emit (node:events:518:28)
+Debugger ending on ws://127.0.0.1:43057/1ec04027-efb5-44c5-b053-b41d0ad395f0
+For help, see: https://nodejs.org/en/docs/inspector
+[692101:1106/104306.071999:ERROR:viz_main_impl.cc(166)] Exiting GPU process due to errors during initialization
+Debugger ending on ws://127.0.0.1:43537/b70e3627-c172-470c-ab6e-00fa68ead576
+For help, see: https://nodejs.org/en/docs/inspector
+[692045:1106/104306.880726:ERROR:object_proxy.cc(576)] Failed to call method: org.freedesktop.DBus.StartServiceByName: object_path= /org/freedesktop/DBus: org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the network connection was broken.

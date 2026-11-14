@@ -1,0 +1,1 @@
+PASS npm run dev: keyboard create, input autofocus, Tab to Add, Enter submit, rename, delete, empty state; no captured renderer errors/warnings /data/dandapat/.tmp/vellum171-dev-PVm26W

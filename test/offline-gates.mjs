@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process'
 const root = mkdtempSync(join(tmpdir(), 'vellum-offline-'))
 const bin = join(root, 'bin')
 mkdirSync(bin)
-for (const adapter of ['codex-acp', 'claude-code-acp']) {
+for (const adapter of ['codex-acp', 'claude-agent-acp', 'claude-code-acp', 'agy']) {
   writeFileSync(join(bin, adapter), '#!/bin/sh\nexit 127\n', { mode: 0o755 })
 }
 

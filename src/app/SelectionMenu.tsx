@@ -16,6 +16,9 @@ export interface SelectionMenuProps {
   y: number
   quote: string
   page: number
+  /** False when the selection can't be stored as a highlight (it spans
+   * pages); the colour swatches are hidden. Defaults to true. */
+  canHighlight?: boolean
   onAddToChat: () => void
   onExplain: () => void
   onHighlight: (color: HighlightColor) => void
@@ -27,6 +30,7 @@ export function SelectionMenu({
   y,
   quote: _quote,
   page: _page,
+  canHighlight = true,
   onAddToChat,
   onExplain,
   onHighlight,
@@ -72,20 +76,22 @@ export function SelectionMenu({
       >
         Explain
       </button>
-      <div className={styles.divider} />
-      <div className={styles.swatches}>
-        {HIGHLIGHT_COLORS.map((color) => (
-          <button
-            key={color}
-            type="button"
-            className={styles.swatchButton}
-            style={{ backgroundColor: SWATCH_HEX[color] }}
-            aria-label={`Highlight ${color}`}
-            title={`Highlight ${color}`}
-            onClick={() => onHighlight(color)}
-          />
-        ))}
-      </div>
+      {canHighlight ? <div className={styles.divider} /> : null}
+      {canHighlight ? (
+        <div className={styles.swatches}>
+          {HIGHLIGHT_COLORS.map((color) => (
+            <button
+              key={color}
+              type="button"
+              className={styles.swatchButton}
+              style={{ backgroundColor: SWATCH_HEX[color] }}
+              aria-label={`Highlight ${color}`}
+              title={`Highlight ${color}`}
+              onClick={() => onHighlight(color)}
+            />
+          ))}
+        </div>
+      ) : null}
     </div>
   )
 }

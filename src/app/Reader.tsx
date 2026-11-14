@@ -173,12 +173,17 @@ async function resolveDestPage(pdf: PDFDocumentProxy, dest: string | unknown[] |
 }
 
 /** Search every page's text content for `query`, returning one entry per page with >0 hits. */
-export async function searchDocument(pdf: PDFDocumentProxy, query: string): Promise<SearchMatch[]> {
+export async function searchDocument(
+  pdf: PDFDocumentProxy,
+  query: string,
+  isCancelled: () => boolean = () => false,
+): Promise<SearchMatch[]> {
   const trimmed = query.trim()
   if (!trimmed) return []
 
   const results: SearchMatch[] = []
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    if (isCancelled()) return results
     const page = await pdf.getPage(pageNumber)
     const textContent = await page.getTextContent()
     const pageText = textContent.items.map((item) => ('str' in item ? item.str : '')).join(' ')
@@ -188,6 +193,9 @@ export async function searchDocument(pdf: PDFDocumentProxy, query: string): Prom
   return results
 }
 
+
+/** Longest wait for in-flight document reads before the PDF worker is released. */
+const WORKER_RELEASE_WAIT_MS = 2000
 
 interface ReaderProps {
   /** Paper slug (data/papers/<slug>/). Undefined = no paper open (empty state). */
@@ -326,6 +334,8 @@ export function Reader({
   const [searchError, setSearchError] = useState<string | null>(null)
   // Each search owns its result; editing, clearing or leaving the paper retires it (#158).
   const searchRequestRef = useRef(0)
+  /** In-flight search on the current document; teardown waits for it. */
+  const searchWorkRef = useRef<Promise<unknown> | null>(null)
   const [searchFocus, setSearchFocus] = useState<{ page: number; nonce: number } | null>(null)
   const [highlights, setHighlights] = useState<HighlightRecord[]>([])
   const [flashId, setFlashId] = useState<string | null>(null)
@@ -483,11 +493,18 @@ export function Reader({
         })
       }
       // A loaded document may still be mid-way through its reference-index
-      // pass. Let that settle (it stops at its next cancellation check) so the
-      // worker is not terminated under an in-flight getTextContent, which
-      // pdf.js reports as a console warning. A pending load is aborted now.
-      if (documentReady) void work.finally(destroy)
-      else destroy()
+      // pass or a search. Let those settle (both stop at their next
+      // cancellation check) so the worker is not terminated under an
+      // in-flight getTextContent, which pdf.js reports as a console warning.
+      // The wait is capped so a wedged worker is still released. A pending
+      // load is aborted now.
+      const search = searchWorkRef.current
+      searchWorkRef.current = null
+      if (documentReady) {
+        const settled = Promise.allSettled([work, search])
+        const cap = new Promise((resolve) => setTimeout(resolve, WORKER_RELEASE_WAIT_MS))
+        void Promise.race([settled, cap]).finally(destroy)
+      } else destroy()
     }
   }, [slug])
 
@@ -513,14 +530,14 @@ export function Reader({
     setHighlightSave(null)
   }
 
-  // A paper switch or re-rasterised zoom retires the captured save context
-  // (its text layer is replaced). Scrolling alone keeps it: pages stay mounted.
+  // A paper switch retires the captured save context. Zoom and scrolling keep
+  // it: the saved input is text offsets, and pages stay mounted.
   useEffect(() => {
     retireHighlightSave()
     return () => {
       currentSave.current = null
     }
-  }, [slug, renderScale])
+  }, [slug])
 
   useEffect(() => {
     function handleSelectionChange(): void {
@@ -900,7 +917,9 @@ export function Reader({
     setSearching(true)
     setSearchError(null)
     try {
-      const results = await searchDocument(doc, trimmed)
+      const search = searchDocument(doc, trimmed, () => !isCurrent())
+      searchWorkRef.current = search.catch(() => undefined)
+      const results = await search
       if (!isCurrent()) return
       setSubmittedQuery(trimmed)
       setSearchResults(results)

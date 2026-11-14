@@ -199,6 +199,20 @@ for (const change of ['page', 'paper', 'selection'] as const) {
   })
 }
 
+it('keeps a failed save retryable across zoom', async () => {
+  create.mockRejectedValueOnce(new Error('Failure'))
+  render(<App />)
+  await openPaper()
+  await openAnnotations()
+  await submit('menu')
+  await screen.findByRole('alert')
+  fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }))
+  await new Promise((resolve) => setTimeout(resolve, 250)) // Past the render-scale debounce.
+  expect(screen.getByRole('alert')).toHaveTextContent('Highlight was not saved')
+  fireEvent.click(retry())
+  await waitFor(() => expect(records).toHaveLength(1))
+})
+
 it('retires failed retry on page navigation, including annotation jump', async () => {
   render(<App />)
   await openPaper()

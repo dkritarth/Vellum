@@ -14,7 +14,7 @@ const evidence = path.join(ROOT, 'test-artifacts/issue-92')
 fs.mkdirSync(evidence, { recursive: true })
 const bin = path.join(root, 'bin')
 fs.mkdirSync(bin)
-for (const adapter of ['codex-acp', 'claude-code-acp']) {
+for (const adapter of ['codex-acp', 'claude-agent-acp', 'claude-code-acp', 'agy']) {
   fs.writeFileSync(path.join(bin, adapter), '#!/bin/sh\nexit 127\n', { mode: 0o755 })
 }
 process.env.PATH = `${bin}:${process.env.PATH}`

@@ -7,7 +7,7 @@
 // Claude Pro/Max or ChatGPT plan on this machine. Run with:
 //
 //   npm run smoke:acp                 # tries both backends
-//   npm run smoke:acp -- claude       # just claude-code-acp
+//   npm run smoke:acp -- claude       # just claude-agent-acp
 //   npm run smoke:acp -- codex        # just codex-acp
 //   npm run smoke:acp -- antigravity  # just `agy acp`
 //
@@ -42,7 +42,7 @@ import type { AcpBackend, AcpClient } from './client.js'
 const PROMPT = 'Reply with exactly the word "pong" and nothing else.'
 
 const ADAPTER_NAMES: Record<AcpBackend, string> = {
-  claude: 'claude-code-acp',
+  claude: 'claude-agent-acp (or legacy claude-code-acp)',
   codex: 'codex-acp',
   antigravity: 'agy acp',
 }

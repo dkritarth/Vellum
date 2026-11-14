@@ -6,7 +6,7 @@ import type { AcpBackend } from '../../core/acp/client.js'
 import styles from './UsageView.module.css'
 
 const USAGE_CARDS: Array<{ backend: AcpBackend; title: string }> = [
-  { backend: 'claude', title: 'Claude (claude-code-acp)' },
+  { backend: 'claude', title: 'Claude (claude-agent-acp)' },
   { backend: 'codex', title: 'Codex (codex-acp)' },
   { backend: 'antigravity', title: 'Gemini (agy acp)' },
 ]
@@ -98,7 +98,7 @@ export function UsageView({ onBackToLibrary }: UsageViewProps): JSX.Element {
 
       <div className={styles.noticeBanner} role="note">
         <strong>First-Party Telemetry Only:</strong> Vellum connects directly to official ACP adapters
-        (<code>claude-code-acp</code> via Agent-SDK credit, <code>codex-acp</code> via ChatGPT subscription, <code>agy acp</code> via Google AI plan).
+        (<code>claude-agent-acp</code> via Agent-SDK credit, <code>codex-acp</code> via ChatGPT subscription, <code>agy acp</code> via Google AI plan).
         Metrics are displayed exactly as emitted by adapter streams. When an adapter omits token counts, Vellum
         reports <em>Unavailable</em> rather than fabricating zero values.
       </div>

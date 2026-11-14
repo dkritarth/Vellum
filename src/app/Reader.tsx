@@ -370,6 +370,7 @@ export function Reader({
   useEffect(() => {
     let cancelled = false
     let loadingTask: PDFDocumentLoadingTask | null = null
+    let documentReady = false
 
     setDoc(null)
     setDocSlug(null)
@@ -402,7 +403,7 @@ export function Reader({
     if (!slug) return
 
     setLoading(true)
-    void (async () => {
+    const work = (async () => {
       try {
         const bytes = await window.vellum.readPaperFile(slug)
         if (cancelled) return
@@ -419,6 +420,7 @@ export function Reader({
           useWorkerFetch: false,
         })
         const pdf = await loadingTask.promise
+        documentReady = true
         if (cancelled) return
 
         // Every page's unscaled size up front, so the scroll column has its
@@ -475,9 +477,17 @@ export function Reader({
       // The loading task owns the document transport and its worker, even
       // while loading is pending or after it failed (#154). Destroying it
       // releases the PDF worker when the paper leaves the reader.
-      void loadingTask?.destroy().catch(() => {
-        // Best-effort teardown after this paper has left the reader.
-      })
+      const destroy = (): void => {
+        void loadingTask?.destroy().catch(() => {
+          // Best-effort teardown after this paper has left the reader.
+        })
+      }
+      // A loaded document may still be mid-way through its reference-index
+      // pass. Let that settle (it stops at its next cancellation check) so the
+      // worker is not terminated under an in-flight getTextContent, which
+      // pdf.js reports as a console warning. A pending load is aborted now.
+      if (documentReady) void work.finally(destroy)
+      else destroy()
     }
   }, [slug])
 

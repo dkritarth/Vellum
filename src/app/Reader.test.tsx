@@ -974,10 +974,19 @@ describe('Reader document ownership and search errors (ported stack)', () => {
     expect(destroyA).not.toHaveBeenCalled()
 
     rerender(<Reader slug="paper-b" />)
-    expect(destroyA).toHaveBeenCalledTimes(1)
-    await waitFor(() => expect(getDocumentMock).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(destroyA).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(container.querySelectorAll('[data-page-slot]')).toHaveLength(2))
     unmount()
-    expect(destroyB).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(destroyB).toHaveBeenCalledTimes(1))
+  })
+
+  it('destroys a still-pending loading task immediately when the paper leaves', async () => {
+    const destroy = vi.fn().mockResolvedValue(undefined)
+    getDocumentMock.mockReturnValueOnce({ promise: new Promise(() => {}), destroy })
+    const { rerender } = render(<Reader slug="paper-a" />)
+    await waitFor(() => expect(getDocumentMock).toHaveBeenCalledTimes(1))
+    rerender(<Reader slug="paper-b" />)
+    expect(destroy).toHaveBeenCalledTimes(1)
   })
 
   it('shows a recoverable search error and clears it on a successful retry', async () => {

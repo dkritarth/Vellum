@@ -1,6 +1,8 @@
 // ChatManager — orchestrates one Ask-tab turn: sends the user's text through
 // core/acp with the open paper's paper.md as a context file (grounding —
-// see AGENTS.md, no RAG: the agent reads the file itself), streams updates
+// see AGENTS.md, no RAG: the whole file goes to the agent, embedded on a
+// session's first turn when the adapter accepts embedded context, else read
+// by the agent's own file tools), streams updates
 // back to the caller, and persists both sides of the turn to SQLite via
 // core/chat/repo.ts.
 //

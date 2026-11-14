@@ -9,17 +9,23 @@
 //    on PATH. See core/acp/README.md for the separate *live* smoke test.
 
 import { spawn, spawnSync, type ChildProcessByStdio } from 'node:child_process'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { Readable, Writable } from 'node:stream'
 import { describe, expect, it } from 'vitest'
 
 import type { AcpBackend, AcpUpdate } from './client.js'
 import {
+  MAX_EMBEDDED_CONTEXT_BYTES,
   StdioAcpClient,
   buildAdapterArgs,
   buildAdapterEnv,
   describeSessionError,
   mapSessionUpdate,
+  readEmbeddableContext,
   resolveAdapterCommand,
+  toPromptBlocks,
   type SpawnAdapter,
 } from './stdio-client.js'
 
@@ -57,7 +63,8 @@ rl.on('line', (line) => {
     // 'stall-handshake' never answers initialize, simulating a hung adapter
     // before the handshake completes.
     if (mode === 'stall-handshake') return
-    send({ jsonrpc: '2.0', id: msg.id, result: { protocolVersion: 1, agentCapabilities: {} } })
+    const agentCapabilities = mode.startsWith('embed') ? { promptCapabilities: { embeddedContext: true } } : {}
+    send({ jsonrpc: '2.0', id: msg.id, result: { protocolVersion: 1, agentCapabilities } })
   } else if (msg.method === 'session/new') {
     send({ jsonrpc: '2.0', id: msg.id, result: { sessionId: 'sess-1' } })
   } else if (msg.method === 'session/prompt') {
@@ -101,6 +108,22 @@ rl.on('line', (line) => {
         else send({ jsonrpc: '2.0', id: msg.id, result: { stopReason: 'end_turn' } })
       }
       setTimeout(sendChunk, 30)
+      return
+    }
+    // 'embed-echo' / 'link-echo' reply with a summary of the prompt blocks.
+    if (mode === 'embed-echo' || mode === 'link-echo') {
+      const summary = msg.params.prompt
+        .map((b) => (b.type === 'resource' ? 'resource:' + b.resource.text : b.type))
+        .join('|')
+      send({
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: {
+          sessionId: msg.params.sessionId,
+          update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: summary } },
+        },
+      })
+      send({ jsonrpc: '2.0', id: msg.id, result: { stopReason: 'end_turn' } })
       return
     }
     if (mode === 'prompt-error') {
@@ -388,6 +411,55 @@ describe('StdioAcpClient', () => {
     const client = new StdioAcpClient(captureChild, { handshakeMs: 50 })
     await expect(client.newSession('claude')).rejects.toThrow('ACP handshake timed out after 50ms')
     expect(child?.exitCode !== null || child?.signalCode !== null).toBe(true)
+  })
+})
+
+describe('paper context embedding (#101)', () => {
+  const text = (updates: AcpUpdate[]): string =>
+    updates.map((u) => (u.kind === 'text' ? (u.data as { text: string }).text : '')).join('')
+
+  it('embeds a context file once per session when the agent accepts embedded context', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vellum-embed-'))
+    const md = join(dir, 'paper.md')
+    writeFileSync(md, '# Paper body')
+    const client = new StdioAcpClient(spawnFakeAgent('embed-echo'))
+    const session = await client.newSession('codex')
+    try {
+      expect(text(await collect(session.prompt({ text: 'q1', contextFiles: [md] })))).toBe('text|resource:# Paper body')
+      expect(text(await collect(session.prompt({ text: 'q2', contextFiles: [md] })))).toBe('text|resource_link')
+    } finally {
+      await session.dispose()
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('only links context files when the agent does not accept embedded context', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vellum-embed-'))
+    const md = join(dir, 'paper.md')
+    writeFileSync(md, '# Paper body')
+    const client = new StdioAcpClient(spawnFakeAgent('link-echo'))
+    const session = await client.newSession('codex')
+    try {
+      expect(text(await collect(session.prompt({ text: 'q1', contextFiles: [md] })))).toBe('text|resource_link')
+    } finally {
+      await session.dispose()
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('links instead of embedding missing or oversized files', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vellum-embed-'))
+    try {
+      const big = join(dir, 'big.md')
+      writeFileSync(big, 'x'.repeat(MAX_EMBEDDED_CONTEXT_BYTES + 1))
+      expect(readEmbeddableContext(big)).toBeNull()
+      expect(readEmbeddableContext(join(dir, 'missing.md'))).toBeNull()
+      expect(readEmbeddableContext(dir)).toBeNull()
+      const blocks = toPromptBlocks({ text: 'q', contextFiles: [big] }, readEmbeddableContext)
+      expect(blocks.map((b) => b.type)).toEqual(['text', 'resource_link'])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 

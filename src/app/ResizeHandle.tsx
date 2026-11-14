@@ -2,7 +2,7 @@
 // resizes, arrow keys nudge, Home/double-click reset to the default width.
 // Dragging well past the minimum collapses the panel.
 
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import type { KeyboardEvent, PointerEvent } from 'react'
 
 import { PANEL_LIMITS, type PanelSide } from './panelLayout'
@@ -25,6 +25,10 @@ export function ResizeHandle({ side, width, onResize, onReset, onCollapse }: Res
   // Moving right widens the left panel and narrows the right panel.
   const direction = side === 'left' ? 1 : -1
   const label = side === 'left' ? 'Resize sidebar' : 'Resize paper panel'
+
+  useEffect(() => () => {
+    if (drag.current) delete document.body.dataset.resizing
+  }, [])
 
   function onPointerDown(event: PointerEvent<HTMLDivElement>) {
     if (event.button !== 0) return
@@ -82,6 +86,7 @@ export function ResizeHandle({ side, width, onResize, onReset, onCollapse }: Res
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
+      onLostPointerCapture={endDrag}
       onDoubleClick={onReset}
       onKeyDown={onKeyDown}
     />

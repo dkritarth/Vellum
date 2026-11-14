@@ -1,0 +1,39 @@
+{
+  "dir": "/tmp/vellum173-live-fQgtTf",
+  "sourcePdf": "/tmp/vellum-121-attention.pdf",
+  "rendererUrl": "http://localhost:5173",
+  "checks": [
+    "empty annotations state",
+    "native page 1 selection then visible page 2 annotation removes actions, renders destination and flashes; row retains focus",
+    "same-page selection retirement, flash expiry and keyboard reflash",
+    "rapid annotation jumps finish on latest page with flash and no stale actions",
+    "fresh destination native quote enters Ask composer with page 2, composer focused, no send/model call",
+    "process restart preserves both native-created highlights and note; restored page 2 annotation works"
+  ],
+  "selections": [
+    {
+      "page": "1 of 15",
+      "quote": "All"
+    },
+    {
+      "page": "2 of 15",
+      "quote": "Introduction"
+    },
+    {
+      "page": "1 of 15",
+      "quote": "All"
+    },
+    {
+      "page": "2 of 15",
+      "quote": "Introduction"
+    },
+    {
+      "page": "2 of 15",
+      "quote": "Introduction"
+    }
+  ],
+  "errors": [],
+  "terminationWarnings": [],
+  "injection": "upsertPaper(getDb(), {\"slug\":\"attention\",\"title\":\"Attention Is All You Need\",\"authors\":[],\"pdfPath\":\"/tmp/vellum173-live-fQgtTf/papers/attention/paper.pdf\",\"mdPath\":\"/tmp/vellum173-live-fQgtTf/papers/attention/paper.md\",\"addedAt\":\"2026-11-06T00:00:00.000Z\"});\n  createWindow();",
+  "rendererInjection": "None"
+}

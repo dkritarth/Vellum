@@ -15,7 +15,7 @@ vi.mock('pdfjs-dist', () => ({
       return Promise.resolve()
     }
   },
-  getDocument: () => ({ promise: new Promise(() => {}) }),
+  getDocument: () => ({ promise: new Promise(() => {}), destroy: async () => {} }),
 }))
 
 vi.mock('pdfjs-dist/build/pdf.worker.mjs?url', () => ({ default: 'worker-url' }))

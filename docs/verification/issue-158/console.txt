@@ -1,0 +1,1 @@
+[warning] Warning: getTextContent - ignoring errors during "GetTextContent: page 3" task: "Error: Worker task was terminated".

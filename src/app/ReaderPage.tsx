@@ -132,7 +132,12 @@ export function ReaderPage({
             viewport,
             transform: outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : undefined,
           })
-          await task.promise
+          try {
+            await task.promise
+          } finally {
+            // Only a pending task may be cancelled on cleanup (#93).
+            task = null
+          }
         }
         if (cancelled) return
         canvasHostRef.current?.replaceChildren(canvas)

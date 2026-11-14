@@ -92,7 +92,7 @@ beforeEach(() => {
   // getContext; return null quietly (ReaderPage skips the raster then).
   HTMLCanvasElement.prototype.getContext = (() => null) as typeof HTMLCanvasElement.prototype.getContext
   getDocumentMock.mockReset()
-  getDocumentMock.mockReturnValue({ promise: Promise.resolve(fakePdfDoc()) })
+  getDocumentMock.mockReturnValue({ promise: Promise.resolve(fakePdfDoc()), destroy: async () => {} })
 
   // jsdom implements Element.getBoundingClientRect (zero rect) but doesn't
   // implement Range.prototype.getClientRects at all — Reader's highlight
@@ -599,7 +599,7 @@ async function findCitationMarker(container: HTMLElement, number: number): Promi
 
 describe('Reader inline citation click-through [P2-03]', () => {
   it('renders a resolved [n] marker as a clickable button and jumps to its reference page on click', async () => {
-    getDocumentMock.mockReturnValue({ promise: Promise.resolve(citationPdfDoc()) })
+    getDocumentMock.mockReturnValue({ promise: Promise.resolve(citationPdfDoc()), destroy: async () => {} })
     const user = userEvent.setup()
 
     const { container } = render(<Reader slug="my-paper" />)
@@ -614,7 +614,7 @@ describe('Reader inline citation click-through [P2-03]', () => {
   })
 
   it('shows the reference text in a tooltip on hover', async () => {
-    getDocumentMock.mockReturnValue({ promise: Promise.resolve(citationPdfDoc()) })
+    getDocumentMock.mockReturnValue({ promise: Promise.resolve(citationPdfDoc()), destroy: async () => {} })
 
     const { container } = render(<Reader slug="my-paper" />)
     await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2'))
@@ -627,7 +627,7 @@ describe('Reader inline citation click-through [P2-03]', () => {
   })
 
   it('leaves [n] markers as plain text when no references section is found (feature stays inert, no crash)', async () => {
-    getDocumentMock.mockReturnValue({ promise: Promise.resolve(noReferencesPdfDoc()) })
+    getDocumentMock.mockReturnValue({ promise: Promise.resolve(noReferencesPdfDoc()), destroy: async () => {} })
 
     const { container } = render(<Reader slug="my-paper" />)
     await waitFor(() => expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 1'))
@@ -648,7 +648,7 @@ describe('Reader highlight overlay + citation marker interaction [P2-02 x P2-03]
     // button) nodes — `rangeFromAnchor`'s character-offset walk over the
     // container's text nodes must still land on the same characters
     // afterwards, since total text content is unchanged, just re-split.
-    getDocumentMock.mockReturnValue({ promise: Promise.resolve(citationPdfDoc()) })
+    getDocumentMock.mockReturnValue({ promise: Promise.resolve(citationPdfDoc()), destroy: async () => {} })
     const highlight = {
       id: 'h1',
       paperSlug: 'my-paper',
@@ -958,5 +958,91 @@ describe('local PDF resources', () => {
     } finally {
       element.remove()
     }
+  })
+})
+
+// Intents of the #99/#153/#157/#161 stack, ported onto the continuous-scroll Reader.
+describe('Reader document ownership and search errors (ported stack)', () => {
+  it('destroys each loading task when its paper leaves the reader, releasing the PDF worker', async () => {
+    const destroyA = vi.fn().mockResolvedValue(undefined)
+    const destroyB = vi.fn().mockResolvedValue(undefined)
+    getDocumentMock
+      .mockReturnValueOnce({ promise: Promise.resolve(fakePdfDoc()), destroy: destroyA })
+      .mockReturnValueOnce({ promise: Promise.resolve(fakePdfDoc()), destroy: destroyB })
+    const { container, rerender, unmount } = render(<Reader slug="paper-a" />)
+    await waitFor(() => expect(container.querySelectorAll('[data-page-slot]')).toHaveLength(2))
+    expect(destroyA).not.toHaveBeenCalled()
+
+    rerender(<Reader slug="paper-b" />)
+    expect(destroyA).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(getDocumentMock).toHaveBeenCalledTimes(2))
+    unmount()
+    expect(destroyB).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows a recoverable search error and clears it on a successful retry', async () => {
+    let failSearch = false
+    getDocumentMock.mockReturnValue({
+      promise: Promise.resolve({
+        ...(fakePdfDoc() as object),
+        getPage: (pageNumber: number) => {
+          const page = fakePage(PAGE_TEXT[pageNumber - 1] ?? '')
+          return Promise.resolve({
+            ...page,
+            getTextContent: () => (failSearch ? Promise.reject(new Error('worker gone')) : page.getTextContent()),
+          })
+        },
+      }),
+      destroy: async () => {},
+    })
+    const user = userEvent.setup()
+    const { container } = render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(getTextLayer(container, 2)?.querySelector('span')).not.toBeNull())
+
+    failSearch = true
+    await user.type(screen.getByLabelText('Search in document'), 'vellum{Enter}')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not search this PDF: worker gone. Try Search again.')
+    expect(screen.queryByLabelText('Search matches')).toBeNull()
+
+    failSearch = false
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(screen.getByLabelText('Search matches')).toHaveTextContent('1 / 2'))
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('ignores a pending search once its query is edited', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let gated = false
+    getDocumentMock.mockReturnValue({
+      promise: Promise.resolve({
+        ...(fakePdfDoc() as object),
+        getPage: (pageNumber: number) => {
+          const page = fakePage(PAGE_TEXT[pageNumber - 1] ?? '')
+          return Promise.resolve({
+            ...page,
+            getTextContent: async () => {
+              if (gated) await gate
+              return page.getTextContent()
+            },
+          })
+        },
+      }),
+      destroy: async () => {},
+    })
+    const user = userEvent.setup()
+    const { container } = render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(getTextLayer(container, 2)?.querySelector('span')).not.toBeNull())
+
+    gated = true
+    const input = screen.getByLabelText('Search in document')
+    await user.type(input, 'vellum{Enter}')
+    expect(await screen.findByRole('status')).toHaveTextContent('Searching…')
+    await user.type(input, 'x')
+    expect(screen.queryByText('Searching…')).toBeNull()
+    await act(async () => release())
+    expect(screen.queryByLabelText('Search matches')).toBeNull()
   })
 })

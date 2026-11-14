@@ -31,7 +31,12 @@ import {
   type MouseEvent,
 } from 'react'
 import { flushSync } from 'react-dom'
-import { GlobalWorkerOptions, getDocument, type PDFDocumentProxy } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import {
+  GlobalWorkerOptions,
+  getDocument,
+  type PDFDocumentLoadingTask,
+  type PDFDocumentProxy,
+} from 'pdfjs-dist/legacy/build/pdf.mjs'
 import workerSrc from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url'
 import type { HighlightColor } from './ReaderToolbar'
 import type { HighlightRecord } from '../../core/highlights/repo'
@@ -299,6 +304,10 @@ export function Reader({
   // Each highlight refresh owns its result. Local creations also retire outstanding reads.
   const highlightRequest = useRef(0)
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
+  // Paper the loaded document belongs to. Pages render only while it matches
+  // `slug`, so the outgoing paper's pages and overlays never show under the
+  // incoming paper during the commit before the load effect resets (#148).
+  const [docSlug, setDocSlug] = useState<string | null>(null)
   const [pageSizes, setPageSizes] = useState<PageSize[]>([])
   const [pageNumber, setPageNumber] = useState(1)
   const [scale, setScale] = useState(DEFAULT_SCALE)
@@ -314,6 +323,9 @@ export function Reader({
   const [searchResults, setSearchResults] = useState<SearchMatch[]>([])
   const [searchIndex, setSearchIndex] = useState(0)
   const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+  // Each search owns its result; editing, clearing or leaving the paper retires it (#158).
+  const searchRequestRef = useRef(0)
   const [searchFocus, setSearchFocus] = useState<{ page: number; nonce: number } | null>(null)
   const [highlights, setHighlights] = useState<HighlightRecord[]>([])
   const [flashId, setFlashId] = useState<string | null>(null)
@@ -357,8 +369,12 @@ export function Reader({
   // Load the document whenever the open paper changes.
   useEffect(() => {
     let cancelled = false
+    let loadingTask: PDFDocumentLoadingTask | null = null
 
     setDoc(null)
+    setDocSlug(null)
+    setSearching(false)
+    setSearchError(null)
     setPageSizes([])
     setPageNumber(1)
     setRenderWindow({ first: 1, last: 1 })
@@ -394,14 +410,15 @@ export function Reader({
           setError('No PDF found for this paper.')
           return
         }
-        const pdf = await getDocument({
+        loadingTask = getDocument({
           data: bytes,
           standardFontDataUrl: new URL('./pdfjs/standard_fonts/', document.baseURI).href,
           wasmUrl: new URL('./pdfjs/wasm/', document.baseURI).href,
           // Workers cannot fetch file:// resources. PDF.js's display factory
           // uses local XHR, preserving the existing CSP and renderer isolation.
           useWorkerFetch: false,
-        }).promise
+        })
+        const pdf = await loadingTask.promise
         if (cancelled) return
 
         // Every page's unscaled size up front, so the scroll column has its
@@ -421,11 +438,14 @@ export function Reader({
         setRenderScale(restoredScale)
         setPageSizes(sizes)
         setDoc(pdf)
+        setDocSlug(slug)
         setLoading(false)
 
         const rawOutline = (await pdf.getOutline()) as RawOutlineNode[] | null
         if (cancelled) return
-        setOutline(rawOutline ? await resolveOutline(pdf, rawOutline) : [])
+        const resolvedOutline = rawOutline ? await resolveOutline(pdf, rawOutline) : []
+        if (cancelled) return
+        setOutline(resolvedOutline)
 
         // [P2-03] One pass over every page's text to build the reference
         // index — done once per doc load (not on every page/zoom change).
@@ -440,8 +460,10 @@ export function Reader({
         if (cancelled) return
         setReferenceIndex(buildReferenceIndex(pagesText))
       } catch (err: unknown) {
+        // Teardown of a paper that already left rejects its pending work.
+        if (cancelled) return
         console.error('[Reader] Failed to load PDF:', err)
-        if (!cancelled) setError('Could not open this PDF.')
+        setError('Could not open this PDF.')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -449,6 +471,13 @@ export function Reader({
 
     return () => {
       cancelled = true
+      searchRequestRef.current += 1
+      // The loading task owns the document transport and its worker, even
+      // while loading is pending or after it failed (#154). Destroying it
+      // releases the PDF worker when the paper leaves the reader.
+      void loadingTask?.destroy().catch(() => {
+        // Best-effort teardown after this paper has left the reader.
+      })
     }
   }, [slug])
 
@@ -835,6 +864,9 @@ export function Reader({
   }
 
   function clearSearch(): void {
+    searchRequestRef.current += 1
+    setSearching(false)
+    setSearchError(null)
     setSearchQuery('')
     setSubmittedQuery('')
     setSearchResults([])
@@ -853,15 +885,23 @@ export function Reader({
       stepMatch(1)
       return
     }
+    const request = ++searchRequestRef.current
+    const isCurrent = (): boolean => request === searchRequestRef.current
     setSearching(true)
+    setSearchError(null)
     try {
       const results = await searchDocument(doc, trimmed)
+      if (!isCurrent()) return
       setSubmittedQuery(trimmed)
       setSearchResults(results)
       setSearchIndex(0)
       if (results.length > 0) focusSearchResult(results[0].pageNumber)
+    } catch (err: unknown) {
+      if (!isCurrent()) return
+      const detail = err instanceof Error ? `: ${err.message}` : ''
+      setSearchError(`Could not search this PDF${detail}. Try Search again.`)
     } finally {
-      setSearching(false)
+      if (isCurrent()) setSearching(false)
     }
   }
 
@@ -962,6 +1002,10 @@ export function Reader({
               setSearchQuery(value)
               // Editing (or clearing with the native ×) invalidates results.
               if (value.trim() !== submittedQuery) {
+                // Also retires a search still running for the old text.
+                searchRequestRef.current += 1
+                setSearching(false)
+                setSearchError(null)
                 setSubmittedQuery('')
                 setSearchResults([])
                 setSearchIndex(0)
@@ -981,6 +1025,7 @@ export function Reader({
           <button type="submit" disabled={!doc || searching}>
             Search
           </button>
+          {searching ? <span role="status">Searching…</span> : null}
           {searchIsCurrent && searchResults.length > 0 ? (
             <>
               <span aria-label="Search matches">
@@ -999,6 +1044,11 @@ export function Reader({
         </form>
       </div>
 
+      {searchError ? (
+        <p role="alert" className={styles.searchError}>
+          {searchError}
+        </p>
+      ) : null}
       {highlightSave ? (
         <div className={styles.highlightSave}>
           <p role={highlightSave.status === 'failed' ? 'alert' : 'status'}>
@@ -1056,7 +1106,7 @@ export function Reader({
             onMouseOver={handleCitationMouseOver}
             onMouseOut={handleCitationMouseOut}
           >
-            {doc
+            {doc && docSlug === slug
               ? pageSizes.map((size, index) => {
                   const n = index + 1
                   return (

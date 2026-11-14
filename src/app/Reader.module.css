@@ -346,3 +346,11 @@
 .highlightSave p {
   margin: 0;
 }
+
+.searchError {
+  margin: 0;
+  padding: 8px 12px;
+  color: var(--vellum-text, #eaeaea);
+  border-bottom: 1px solid var(--vellum-border, #2a2a2a);
+  flex-shrink: 0;
+}

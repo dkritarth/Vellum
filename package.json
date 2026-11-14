@@ -23,6 +23,7 @@
     "test:gate:trash": "node test/trash-live.mjs",
     "test:gate:usage": "node test/usage-live.mjs",
     "dist": "electron-vite build && electron-rebuild --force --only better-sqlite3 && electron-builder --linux --publish never",
+    "dist:mac": "electron-vite build && electron-rebuild --force --only better-sqlite3 && electron-builder --mac --publish never",
     "test:gate:reader": "node test/reader-gate.mjs",
     "test:gate:reader-scroll-zoom": "node test/reader-scroll-zoom-gate.mjs",
     "test:gate:app-ux": "node test/app-ux-live.mjs"

@@ -87,9 +87,10 @@ try {
     await rendered()
   }
   const stored = await window.evaluate(() => window.vellum.listPapers())
-  const a = stored.find((paper) => paper.title === path.resolve(papers[0]))
-  const b = stored.find((paper) => paper.title === path.resolve(papers[1]))
-  assert(a && b && a.slug !== b.slug, 'Both real papers must be independently ingested')
+  // Local PDFs are titled from their first page (#201), not their path:
+  // identify the two papers by ingest order instead.
+  const [a, b] = [...stored].sort((x, y) => x.addedAt.localeCompare(y.addedAt))
+  assert(stored.length === 2 && a && b && a.slug !== b.slug && a.title !== b.title, 'Both real papers must be independently ingested')
   const editor = window.getByRole('textbox', { name: 'Note', exact: true })
   await editor.fill('B original')
   await saved()

@@ -107,27 +107,35 @@ async function measure(label) {
 async function controls(label) {
   const toolbar = main().locator('[class*=toolbar_]')
   const page = window.locator('[aria-label="Page"]')
-  const textLayer = main().locator('[class*=textLayer_]')
-  const firstPageText = await textLayer.textContent()
-  await toolbar.getByRole('button', { name:'›', exact:true }).first().click()
+  // Continuous-scroll Reader (#203): one slot per page, each with its own
+  // text layer and canvas; page buttons are labelled "Previous/Next page".
+  const layerText = n => window.evaluate(n => document.querySelector(`[data-page-number="${n}"] [data-text-layer]`)?.textContent ?? '', n)
+  // An earlier pass may have left the reader on a search match; start at page 1.
+  while (!(await page.innerText()).trim().startsWith('1 of')) {
+    await toolbar.getByRole('button', { name:'Previous page', exact:true }).click()
+  }
+  await window.waitForFunction(() => (document.querySelector('[data-page-number="1"] [data-text-layer]')?.textContent ?? '').length > 100)
+  const firstPageText = await layerText(1)
+  assert(firstPageText.length > 100, `${label}: page 1 text layer rendered`)
+  await toolbar.getByRole('button', { name:'Next page', exact:true }).click()
   await window.waitForFunction(() => document.querySelector('[aria-label=Page]').textContent.trim().startsWith('2 of'))
   await window.waitForFunction(first => {
-    const text = document.querySelector('[class*=textLayer_]')?.textContent
+    const text = document.querySelector('[data-page-number="2"] [data-text-layer]')?.textContent
     return text?.length > 100 && text !== first
   }, firstPageText)
-  await toolbar.getByRole('button', { name:'‹', exact:true }).first().click()
+  await toolbar.getByRole('button', { name:'Previous page', exact:true }).click()
   await window.waitForFunction(() => document.querySelector('[aria-label=Page]').textContent.trim().startsWith('1 of'))
-  await window.waitForFunction(first => document.querySelector('[class*=textLayer_]')?.textContent === first, firstPageText)
+  assert.equal(await layerText(1), firstPageText)
   assert.match(await page.innerText(), /1 of/)
   const zoom = window.locator('[aria-label="Zoom"]')
   const initial = await zoom.innerText()
-  const canvasWidth = await main().locator('canvas').evaluate(e => e.width)
-  await toolbar.getByRole('button', { name:'+', exact:true }).click()
+  const canvasWidth = await main().locator('[data-page-number="1"] canvas').evaluate(e => e.width)
+  await toolbar.getByRole('button', { name:'Zoom in', exact:true }).click()
   assert.notEqual(await zoom.innerText(), initial)
-  await window.waitForFunction(width => document.querySelector('main canvas').width > width, canvasWidth)
-  await toolbar.getByRole('button', { name:'−', exact:true }).click()
+  await window.waitForFunction(width => document.querySelector('main [data-page-number="1"] canvas').width > width, canvasWidth)
+  await toolbar.getByRole('button', { name:'Zoom out', exact:true }).click()
   assert.equal(await zoom.innerText(), initial)
-  await window.waitForFunction(width => document.querySelector('main canvas').width === width, canvasWidth)
+  await window.waitForFunction(width => document.querySelector('main [data-page-number="1"] canvas').width === width, canvasWidth)
   await search().fill('learning')
   await search().press('Enter')
   await window.waitForFunction(() => /^[1-9]/.test(document.querySelector('[aria-label="Search matches"]')?.textContent || ''))

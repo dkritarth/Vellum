@@ -22,8 +22,8 @@ process.env.PATH = emptyBin
 
 // Independent PDF geometry, extracted from the real paper's text content.
 // Coordinates are PDF points; baseline Y is measured from the bottom.
-const title = { text: 'Attention Is All You Need', x: 211.488, baseline: 629.957, width: 188.40534, font: 17.2154 }
-const introduction = { text: 'Introduction', x: 125.9328, baseline: 710.037, width: 64.88087, font: 11.9552 }
+const title = { page: 1, text: 'Attention Is All You Need', x: 211.488, baseline: 629.957, width: 188.40534, font: 17.2154 }
+const introduction = { page: 2, text: 'Introduction', x: 125.9328, baseline: 710.037, width: 64.88087, font: 11.9552 }
 const near = (actual, expected, tolerance, label) => assert(Math.abs(actual - expected) <= tolerance,
   `${label}: expected ${expected} ± ${tolerance}, got ${actual}`)
 let active
@@ -45,18 +45,24 @@ async function close() {
 }
 
 async function checkAlignment(window, sample, scale, name) {
-  const span = window.locator('[class*="textLayer"] > span').filter({ hasText: sample.text }).first()
+  // Continuous-scroll Reader (#203): one slot per page with its own canvas
+  // and text layer. The canvas backing store may be DPR-scaled.
+  const slot = `[data-page-slot][data-page-number="${sample.page}"]`
+  const span = window.locator(`${slot} [data-text-layer] > span`).filter({ hasText: sample.text }).first()
   await span.waitFor()
-  // Canvas and text are asynchronous. Wait for newly rendered dimensions.
-  await window.waitForFunction(({ scale, text }) => {
-    const canvas = document.querySelector('[class*="pageLayer"] > canvas')
-    const layer = document.querySelector('[class*="textLayer"]')
-    return canvas?.width === Math.floor(612 * scale) && layer?.textContent.includes(text)
-  }, { scale, text: sample.text })
-  const info = await span.evaluate((element) => {
+  // Canvas and text are asynchronous. Wait for the re-rasterised canvas at this zoom.
+  await window.waitForFunction(({ slot, scale, text }) => {
+    const canvas = document.querySelector(`${slot} canvas`)
+    const layer = document.querySelector(`${slot} [data-text-layer]`)
+    if (!canvas || !layer?.textContent.includes(text)) return false
+    const ratio = canvas.width / canvas.getBoundingClientRect().width
+    return Math.abs(canvas.width / ratio - 612 * scale) < 1 && Math.abs(canvas.width - Math.floor(612 * scale * ratio)) <= 1
+  }, { slot, scale, text: sample.text })
+  const info = await span.evaluate((element, slot) => {
     const layer = element.parentElement
-    const canvas = layer.parentElement.querySelector('canvas')
+    const canvas = document.querySelector(`${slot} canvas`)
     const c = canvas.getBoundingClientRect()
+    const ratio = canvas.width / c.width
     const l = layer.getBoundingClientRect()
     const range = document.createRange()
     range.selectNodeContents(element)
@@ -73,8 +79,8 @@ async function checkAlignment(window, sample, scale, name) {
     // Raster ink within the selected word's box must fill its horizontal
     // extent. Hiding the duplicate alone cannot satisfy geometry checks.
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
-    for (let y = Math.max(0, Math.floor(r.top - c.top)); y < Math.min(canvas.height, Math.ceil(r.bottom - c.top)); y++) {
-      for (let x = Math.max(0, Math.floor(r.left - c.left)); x < Math.min(canvas.width, Math.ceil(r.right - c.left)); x++) {
+    for (let y = Math.max(0, Math.floor((r.top - c.top) * ratio)); y < Math.min(canvas.height, Math.ceil((r.bottom - c.top) * ratio)); y++) {
+      for (let x = Math.max(0, Math.floor((r.left - c.left) * ratio)); x < Math.min(canvas.width, Math.ceil((r.right - c.left) * ratio)); x++) {
         const i = (y * canvas.width + x) * 4
         if (pixels.data[i + 3] > 128 && Math.max(...pixels.data.slice(i, i + 3)) < 128) {
           minX = Math.min(minX, x); maxX = Math.max(maxX, x)
@@ -86,9 +92,9 @@ async function checkAlignment(window, sample, scale, name) {
       position: style.position, color: style.color, font: parseFloat(style.fontSize),
       layer: { x: l.x - c.x, y: l.y - c.y, width: l.width, height: l.height },
       range: { x: r.x - c.x, y: r.y - c.y, width: r.width, height: r.height },
-      ink: { minX, maxX, minY, maxY },
+      ink: { minX: minX / ratio, maxX: maxX / ratio, minY: minY / ratio, maxY: maxY / ratio },
     }
-  })
+  }, slot)
   measurements.push({ name, scale, ...info })
   fs.writeFileSync(path.join(evidence, 'measurements.json'), JSON.stringify(measurements, null, 2))
   await window.screenshot({ path: path.join(evidence, `${name}.png`) })
@@ -96,8 +102,8 @@ async function checkAlignment(window, sample, scale, name) {
   assert.equal(info.color, 'rgba(0, 0, 0, 0)', 'Canvas must be the only visible text')
   near(info.layer.x, 0, 0.1, 'Layer left')
   near(info.layer.y, 0, 0.1, 'Layer top')
-  near(info.layer.width, Math.floor(612 * scale), 0.1, 'Layer width')
-  near(info.layer.height, Math.floor(792 * scale), 0.1, 'Layer height')
+  near(info.layer.width, 612 * scale, 1, 'Layer width')
+  near(info.layer.height, 792 * scale, 1, 'Layer height')
   near(info.font, sample.font * scale, 0.1, 'PDF font size')
   near(info.range.x, sample.x * scale, 0.15, 'Selection left')
   // PDF advances and browser selection bounds differ slightly with fallback
@@ -142,14 +148,14 @@ try {
   await window.getByRole('button', { name: 'Add to chat', exact: true }).click()
   const ask = window.getByRole('textbox', { name: 'Ask a question', exact: true })
   await ask.waitFor()
-  await window.waitForFunction(() => document.querySelector('input[aria-label="Ask a question"]')?.value.includes('(p. 1)'))
+  await window.waitForFunction(() => document.querySelector('textarea[aria-label="Ask a question"]')?.value.includes('(p. 1)'))
   assert((await ask.inputValue()).includes(`> "${title.text}" (p. 1)`))
   assert(await ask.evaluate(el => el === document.activeElement), 'Add to chat focuses composer')
   await window.screenshot({ path: path.join(evidence, 'add-to-chat.png') })
 
-  await window.locator('[class*="zoom"]').getByRole('button', { name: '+', exact: true }).click()
+  await window.getByRole('button', { name: 'Zoom in', exact: true }).click()
   await checkAlignment(window, title, 1.25, 'page1-125')
-  await window.locator('[class*="pageNav"]').getByRole('button', { name: '›', exact: true }).click()
+  await window.getByRole('button', { name: 'Next page', exact: true }).click()
   span = await checkAlignment(window, introduction, 1.25, 'page2-125')
   await selectWithPointer(window, span, introduction.text)
   await window.getByRole('button', { name: 'Explain', exact: true }).click()

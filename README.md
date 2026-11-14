@@ -14,14 +14,16 @@ paper-grounded analysis through the agent's own file tools.
 ## Status
 
 Early, partially working product. Phase-1 code has landed, but user journeys still
-need live Electron validation and repair. Claude ACP has live smoke evidence;
-Codex ACP is current priority and remains unverified until a signed-in run succeeds.
+need live Electron validation and repair. Claude ACP has live smoke evidence.
+Codex ACP passed a signed-in smoke run (issue #25, see
+`docs/verification/codex-acp-2026-08-12.md`); the full Codex Ask journey is still
+being validated.
 The previous CLI prototype is preserved on `archive/cli-prototype`.
 
 - **GitHub Issues** — authoritative phased backlog, dependency locks, verification
 - **PLAN.md** — product direction and locked decisions; not task backlog
 - **CLAUDE.md** — architecture map + commands + guardrails
-- **AGENTS.md** — agent conventions and how work flows from the wiki
+- **AGENTS.md** — agent conventions and how work flows from GitHub Issues
 - **GitHub wiki** — historical design/card archive; not task authority
 
 ## Quick start
@@ -31,8 +33,11 @@ npm install
 npm run dev
 ```
 
-Requires `claude-code-acp` / `codex-acp` on PATH and their CLIs signed in
-(see the wiki's ACP-Integration page).
+Requires `claude-agent-acp` (`npm i -g @agentclientprotocol/claude-agent-acp`;
+the deprecated `claude-code-acp` is a fallback) / `codex-acp` on PATH and their
+CLIs signed in
+(see the wiki's ACP-Integration page). For Gemini, install Google's Antigravity
+CLI (`agy`) and sign in once with `agy acp --login` (see `core/acp/README.md`).
 
 ## Why
 

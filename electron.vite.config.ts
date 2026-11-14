@@ -1,6 +1,7 @@
 import { resolve } from 'node:path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
+import { pdfAssets } from './electron/pdfAssets'
 
 // Single-package Electron layout:
 //   electron/  -> main + preload (Node side)
@@ -8,7 +9,9 @@ import react from '@vitejs/plugin-react'
 //   core/      -> backend logic imported by the main process
 export default defineConfig({
   main: {
+    define: { __VELLUM_MAIN_BUNDLE__: 'true' },
     plugins: [
+      pdfAssets(['standard_fonts']),
       externalizeDepsPlugin({
         exclude: ['@agentclientprotocol/sdk', 'unpdf', 'pdfjs-dist'],
       }),
@@ -37,7 +40,7 @@ export default defineConfig({
   },
   renderer: {
     root: 'src',
-    plugins: [react()],
+    plugins: [react(), pdfAssets(['standard_fonts', 'wasm'])],
     resolve: {
       alias: { '@renderer': resolve('src') },
     },

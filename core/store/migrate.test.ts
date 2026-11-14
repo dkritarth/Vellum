@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import Database from 'better-sqlite3'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -5,9 +9,14 @@ import { runMigrations, type Migration } from './migrate.js'
 
 describe('runMigrations', () => {
   let db: Database.Database
+  let tempDir: string | undefined
 
   afterEach(() => {
     db?.close()
+    if (tempDir) {
+      rmSync(tempDir, { recursive: true, force: true })
+      tempDir = undefined
+    }
   })
 
   it('applies the real MIGRATIONS list and creates every SCHEMA_V1 table', () => {
@@ -38,7 +47,7 @@ describe('runMigrations', () => {
     runMigrations(db)
 
     const version = db.pragma('user_version', { simple: true })
-    expect(version).toBe(8)
+    expect(version).toBe(9)
   })
 
   it('adds the author_orcids column to papers [P2-04]', () => {
@@ -77,7 +86,7 @@ describe('runMigrations', () => {
     runMigrations(db)
 
     const version = db.pragma('user_version', { simple: true })
-    expect(version).toBe(8)
+    expect(version).toBe(9)
 
     const row = db.prepare('SELECT * FROM papers WHERE slug = ?').get('a')
     expect(row).toBeTruthy()
@@ -167,5 +176,87 @@ describe('runMigrations', () => {
     // A second run with the same migration list must not attempt to
     // re-CREATE the table (which would throw without IF NOT EXISTS).
     expect(() => runMigrations(db, migrations)).not.toThrow()
+  })
+
+  it('preserves committed upgrades after failure and durably retries the corrected version once', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'vellum-migration-test-'))
+    const dbPath = join(tempDir, 'app.db')
+    db = new Database(dbPath)
+
+    const baseline: Migration = {
+      version: 1,
+      sql: `
+        CREATE TABLE entries (id INTEGER PRIMARY KEY, title TEXT NOT NULL);
+        INSERT INTO entries VALUES (1, 'Original seed');
+      `,
+    }
+    const earlierUpgrade: Migration = {
+      version: 2,
+      sql: "INSERT INTO entries VALUES (2, 'Earlier upgrade');",
+    }
+    const correctedUpgrade: Migration = {
+      version: 3,
+      sql: `
+        CREATE TABLE upgrade_notes (entry_id INTEGER PRIMARY KEY, note TEXT NOT NULL);
+        INSERT INTO upgrade_notes VALUES (1, 'Review seed');
+        UPDATE entries SET title = 'Updated by upgrade' WHERE id = 2;
+        INSERT INTO entries VALUES (3, 'New entry');
+      `,
+    }
+    const failedUpgrade: Migration = {
+      version: 3,
+      sql: `${correctedUpgrade.sql}
+        INSERT INTO entries VALUES (1, 'Duplicate seed');
+      `,
+    }
+    const laterUpgrade: Migration = {
+      version: 4,
+      sql: 'CREATE TABLE later_upgrade (id INTEGER PRIMARY KEY);',
+    }
+
+    runMigrations(db, [baseline])
+    expect(() => runMigrations(db, [baseline, earlierUpgrade, failedUpgrade, laterUpgrade]))
+      .toThrow(/UNIQUE constraint failed: entries.id/)
+
+    const expectCommittedState = () => {
+      expect(db.pragma('user_version', { simple: true })).toBe(2)
+      expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all())
+        .toEqual([{ name: 'entries' }])
+      expect(db.prepare('SELECT id, title FROM entries ORDER BY id').all()).toEqual([
+        { id: 1, title: 'Original seed' },
+        { id: 2, title: 'Earlier upgrade' },
+      ])
+    }
+
+    // Both the current connection and a fresh open must see only committed work.
+    expectCommittedState()
+    db.close()
+    db = new Database(dbPath)
+    expectCommittedState()
+
+    const correctedMigrations = [baseline, earlierUpgrade, correctedUpgrade, laterUpgrade]
+    runMigrations(db, correctedMigrations)
+    db.close()
+    db = new Database(dbPath)
+
+    const expectRecoveredState = () => {
+      expect(db.pragma('user_version', { simple: true })).toBe(4)
+      expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all())
+        .toEqual([{ name: 'entries' }, { name: 'later_upgrade' }, { name: 'upgrade_notes' }])
+      expect(db.prepare('SELECT id, title FROM entries ORDER BY id').all()).toEqual([
+        { id: 1, title: 'Original seed' },
+        { id: 2, title: 'Updated by upgrade' },
+        { id: 3, title: 'New entry' },
+      ])
+      expect(db.prepare('SELECT entry_id, note FROM upgrade_notes').all())
+        .toEqual([{ entry_id: 1, note: 'Review seed' }])
+    }
+
+    expectRecoveredState()
+    // Non-idempotent CREATE/INSERT statements must be skipped on another run.
+    runMigrations(db, correctedMigrations)
+    db.close()
+    db = new Database(dbPath)
+    expectRecoveredState()
   })
 })

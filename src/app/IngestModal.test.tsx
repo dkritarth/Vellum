@@ -1,13 +1,15 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { IngestModal } from './IngestModal'
 
 let ingestMock: ReturnType<typeof vi.fn>
+let getPathForFileMock: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
+  getPathForFileMock = vi.fn().mockReturnValue('/home/research/Papers/注意 Attention.pdf')
   ingestMock = vi.fn().mockResolvedValue({
     slug: 'arxiv-1706.03762',
     title: 'Attention Is All You Need',
@@ -23,7 +25,7 @@ beforeEach(() => {
 
   Object.defineProperty(window, 'vellum', {
     configurable: true,
-    value: { ingest: ingestMock },
+    value: { ingest: ingestMock, getPathForFile: getPathForFileMock },
   })
 })
 
@@ -61,6 +63,31 @@ describe('IngestModal', () => {
     expect(onClose).toHaveBeenCalledTimes(2)
   })
 
+  it('calls onClose when Escape is pressed', async () => {
+    const onClose = vi.fn()
+    const user = userEvent.setup()
+
+    render(<IngestModal isOpen={true} onClose={onClose} onSuccess={vi.fn()} />)
+    await user.keyboard('{Escape}')
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores Escape while an ingest is in progress', async () => {
+    ingestMock.mockReturnValue(new Promise(() => undefined))
+    const onClose = vi.fn()
+    const user = userEvent.setup()
+
+    render(<IngestModal isOpen={true} onClose={onClose} onSuccess={vi.fn()} />)
+    await user.type(screen.getByPlaceholderText(/1706\.03762/), '1706.03762')
+    await user.click(screen.getByRole('button', { name: /add paper/i }))
+    expect(await screen.findByText(/ingesting paper/i)).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('submits valid input, calls window.vellum.ingest, and triggers onSuccess', async () => {
     const onSuccess = vi.fn()
     const user = userEvent.setup()
@@ -95,5 +122,95 @@ describe('IngestModal', () => {
     await user.click(submitButton)
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Failed to fetch from arXiv')
+  })
+
+  it('starts clean when reopened after a failed attempt', async () => {
+    ingestMock.mockRejectedValue(new Error('boom'))
+    const user = userEvent.setup()
+    const { rerender } = render(<IngestModal isOpen={true} onClose={vi.fn()} onSuccess={vi.fn()} />)
+
+    await user.type(screen.getByPlaceholderText(/1706\.03762/), 'bad-id')
+    await user.click(screen.getByRole('button', { name: /add paper/i }))
+    await screen.findByRole('alert')
+
+    rerender(<IngestModal isOpen={false} onClose={vi.fn()} onSuccess={vi.fn()} />)
+    rerender(<IngestModal isOpen={true} onClose={vi.fn()} onSuccess={vi.fn()} />)
+
+    expect(screen.getByPlaceholderText(/1706\.03762/)).toHaveValue('')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('strips Electron IPC wrapper noise from ingest errors', async () => {
+    ingestMock.mockRejectedValue(
+      new Error("Error invoking remote method 'vellum:ingest': Error: classifyInput: local PDF not found: /x.pdf"),
+    )
+    const user = userEvent.setup()
+    render(<IngestModal isOpen={true} onClose={vi.fn()} onSuccess={vi.fn()} />)
+
+    await user.type(screen.getByPlaceholderText(/1706\.03762/), '/x.pdf')
+    await user.click(screen.getByRole('button', { name: /add paper/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/^Local PDF not found: \/x\.pdf$/)
+  })
+})
+
+describe('local PDF selection', () => {
+  it('submits the full disk path including spaces and Unicode', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<IngestModal isOpen onClose={vi.fn()} onSuccess={vi.fn()} />)
+    const file = new File(['pdf'], 'Attention.pdf', { type: 'application/pdf' })
+    await user.upload(container.querySelector('input[type="file"]')!, file)
+    expect(getPathForFileMock).toHaveBeenCalledWith(file)
+    expect(screen.getByLabelText('Paper identifier or URL')).toHaveValue('/home/research/Papers/注意 Attention.pdf')
+    await user.click(screen.getByRole('button', { name: 'Add Paper' }))
+    expect(ingestMock).toHaveBeenCalledWith('/home/research/Papers/注意 Attention.pdf')
+  })
+})
+
+describe('unavailable PDF paths', () => {
+  it.each(['empty', 'throws', 'missing method', 'missing bridge'])('clears stale input, blocks submission and permits retry when resolver is %s', async (failure) => {
+    const user = userEvent.setup()
+    const { container } = render(<IngestModal isOpen onClose={vi.fn()} onSuccess={vi.fn()} />)
+    const input = screen.getByLabelText('Paper identifier or URL')
+    await user.type(input, '/previous/paper.pdf')
+    if (failure === 'empty') getPathForFileMock.mockReturnValueOnce('')
+    if (failure === 'throws') getPathForFileMock.mockImplementationOnce(() => { throw new Error('native failure') })
+    if (failure === 'missing method') Object.defineProperty(window, 'vellum', { configurable: true, value: { ingest: ingestMock } })
+    if (failure === 'missing bridge') Object.defineProperty(window, 'vellum', { configurable: true, value: undefined })
+    const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]')!
+    const file = new File(['pdf'], 'Attention.pdf', { type: 'application/pdf' })
+    await user.upload(fileInput, file)
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not access.*choose.*again.*enter.*path/i)
+    expect(input).toHaveValue('')
+    expect(screen.getByRole('button', { name: 'Add Paper' })).toBeDisabled()
+    expect(ingestMock).not.toHaveBeenCalled()
+    expect(fileInput.value).toBe('')
+    Object.defineProperty(window, 'vellum', { configurable: true, value: { ingest: ingestMock, getPathForFile: getPathForFileMock } })
+    await user.upload(fileInput, file)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Add Paper' }))
+    expect(ingestMock).toHaveBeenCalledWith('/home/research/Papers/注意 Attention.pdf')
+  })
+
+  it('preserves manual input when file selection is cancelled', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<IngestModal isOpen onClose={vi.fn()} onSuccess={vi.fn()} />)
+    await user.type(screen.getByLabelText('Paper identifier or URL'), 'https://example.org/paper.pdf')
+    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [] } })
+    expect(getPathForFileMock).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Add Paper' }))
+    expect(ingestMock).toHaveBeenCalledWith('https://example.org/paper.pdf')
+  })
+})
+
+
+describe('manual import', () => {
+  it.each(['10.1145/3318464.3389700', '/home/research/注意 paper.pdf'])('preserves typed input %s without resolving a File', async (target) => {
+    const user = userEvent.setup()
+    render(<IngestModal isOpen onClose={vi.fn()} onSuccess={vi.fn()} />)
+    await user.type(screen.getByLabelText('Paper identifier or URL'), target)
+    await user.click(screen.getByRole('button', { name: 'Add Paper' }))
+    expect(ingestMock).toHaveBeenCalledWith(target)
+    expect(getPathForFileMock).not.toHaveBeenCalled()
   })
 })

@@ -1,0 +1,52 @@
+Base c579a92a914fa22f4d9563b4c85f1c333ae6b173
+
+Initial regression on base before production changes:
+stored [ 'Research evidence' ] list calls 2 panel Research Paper+My Workspace⌄CreateHomeLibrarySearchFilesChatsCollections+📚All PapersNo collections yet. Click + to add one.TrashUsage✎ HighlightOutline‹1 of 1›−100%+SearchResearch evidenceAskNotesDetailsAnnotationsNo highlights yet — turn on Highlight mode and select text to add one.Vellumbridge: pong
+     → Unable to find an accessible element with the role "button" and name "Delete highlight: Research evidence"
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "Delete highlight: Research evidence"
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+
+Original slug-only guard negative control:
+   × creation refresh ordering > ignores obsolete same-paper list success after a newer refresh 26ms
+   × creation refresh ordering > ignores obsolete same-paper list error after a newer refresh 14ms
+   × creation refresh ordering > does not finish current loading when an obsolete request settles 5ms
+   × creation refresh ordering > preserves row focus during refresh and ignores reads from an earlier visit to the same paper 16ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed (1)
+      Tests  4 failed | 8 passed (12)
+
+focused-final.log
+ Test Files  4 passed (4)
+      Tests  64 passed (64)
+   Duration  1.99s (transform 625ms, setup 0ms, collect 1.62s, tests 2.17s, environment 1.66s, prepare 332ms)
+
+full-final.log
+ Test Files  42 passed (42)
+      Tests  395 passed (395)
+   Duration  5.41s (transform 2.17s, setup 0ms, collect 10.18s, tests 18.39s, environment 14.23s, prepare 4.09s)
+
+typecheck-final.log
+
+> vellum@0.1.0 typecheck
+> tsc --noEmit -p tsconfig.json
+
+
+
+live-final.log
+PASS Native real-paper selection and visible yellow action refresh open list with one correct quote/page/color row
+PASS Visible annotation jump keeps row focus and Reader page 1
+PASS Creation while Annotations closed loads on reopen; both saved rows remain
+PASS Controlled failed create adds no row or saved record
+PASS Controlled late A create leaves B list unchanged; return to A loads all three rows
+PASS Process restart retains A/B highlights, both notes and original PDF bytes
+Evidence: /tmp/vellum175-live-final; isolated data: /data/dandapat/.tmp/vellum175-8nrJHG/data
+
+
+dev-smoke.log
+PASS npm run dev actual Electron native selection keeps Annotations open and creates immediate correct row. Isolated root /tmp/vellum175-dev-VGvXFz
+
+Build: all three targets built successfully. git diff --check: clean.
+Native Node binding restored exactly:
+45cb92a176fb758533db6d9a343acdfc73e4de27ac4c20a0cb2a6fb5be3e84f2  node_modules/better-sqlite3/build/Release/better_sqlite3.node

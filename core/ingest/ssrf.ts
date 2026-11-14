@@ -75,10 +75,16 @@ function isPrivateIpv6Words(words: number[]): boolean {
   // Unspecified ::
   if (words.every((w) => w === 0)) return true
 
-  // IPv4-mapped (::ffff:0:0/96) or IPv4-compatible (::0:0/96)
+  // Forms whose last 32 bits are an IPv4 destination: IPv4-mapped
+  // (::ffff:0:0/96), IPv4-compatible (::/96), IPv4-translated / SIIT
+  // (::ffff:0:0:0/96, RFC 2765) and the NAT64 well-known prefix
+  // (64:ff9b::/96, RFC 6052). A translator on the local network turns these
+  // into IPv4 connections, so the embedded address gets the IPv4 check.
   const isIpv4Mapped = words.slice(0, 5).every((w) => w === 0) && words[5] === 0xffff
   const isIpv4Compat = words.slice(0, 6).every((w) => w === 0)
-  if (isIpv4Mapped || isIpv4Compat) {
+  const isIpv4Translated = words.slice(0, 4).every((w) => w === 0) && words[4] === 0xffff && words[5] === 0
+  const isNat64WellKnown = words[0] === 0x64 && words[1] === 0xff9b && words.slice(2, 6).every((w) => w === 0)
+  if (isIpv4Mapped || isIpv4Compat || isIpv4Translated || isNat64WellKnown) {
     const a = (words[6] >> 8) & 0xff
     const b = words[6] & 0xff
     const c = (words[7] >> 8) & 0xff
@@ -86,6 +92,11 @@ function isPrivateIpv6Words(words: number[]): boolean {
     return isPrivateIpv4Octets(a, b, c, d)
   }
 
+  // NAT64 local-use prefix 64:ff9b:1::/48 (RFC 8215). The IPv4 position
+  // depends on the operator's prefix length, so block the whole range.
+  if (words[0] === 0x64 && words[1] === 0xff9b && words[2] === 1) return true
+  // Teredo 2001::/32 (RFC 4380): tunnels to an embedded IPv4 server/client.
+  if (words[0] === 0x2001 && words[1] === 0) return true
   // Unique local fc00::/7 (fc00:: - fdff::)
   if ((words[0] & 0xfe00) === 0xfc00) return true
   // Link-local fe80::/10 (fe80:: - febf::)
@@ -140,7 +151,9 @@ export async function assertSafeUrl(urlStr: string, lookupFn?: DnsLookupFn): Pro
     )
   }
 
-  const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '')
+  // Strip a trailing root dot ("localhost." is the same name as "localhost")
+  // so the suffix checks below cannot be sidestepped with a fully-qualified form.
+  const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '')
   if (!hostname) {
     throw new Error(`Invalid URL: missing hostname in ${urlStr}`)
   }

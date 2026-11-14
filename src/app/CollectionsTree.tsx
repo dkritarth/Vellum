@@ -1,40 +1,85 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CollectionTreeItem } from '../../electron/preload'
 import styles from './CollectionsTree.module.css'
+import { PAPER_DRAG_TYPE } from './Library'
 
 export interface CollectionsTreeProps {
   selectedCollectionId: number | null
   onSelectCollection: (id: number | null, name: string | null) => void
+  /** A Library card was dropped on a collection and assigned to it. */
+  onPaperAssigned?: (collectionId: number) => void
+  /** A collection was created, renamed or deleted. */
+  onCollectionsChanged?: () => void
+}
+
+/** Enter/Space on the row itself (not a nested button or input) selects it. */
+function selectOnKey(event: React.KeyboardEvent, select: () => void): void {
+  if (event.target !== event.currentTarget) return
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault()
+    select()
+  }
+}
+
+function carriesPaper(event: React.DragEvent): boolean {
+  return Array.from(event.dataTransfer?.types ?? []).includes(PAPER_DRAG_TYPE)
 }
 
 export function CollectionsTree({
   selectedCollectionId,
   onSelectCollection,
+  onPaperAssigned,
+  onCollectionsChanged,
 }: CollectionsTreeProps): JSX.Element {
+  const [dropTargetId, setDropTargetId] = useState<number | null>(null)
   const [tree, setTree] = useState<CollectionTreeItem[]>([])
   const [loading, setLoading] = useState(true)
   const [creatingParentId, setCreatingParentId] = useState<number | null | 'root'>(null)
   const [newCollectionName, setNewCollectionName] = useState('')
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editingName, setEditingName] = useState('')
+  const [actionError, setActionError] = useState<string | null>(null)
+  // Polled every second: setting the same string again is a React no-op, so a
+  // persistent failure renders one stable message rather than a new one per tick.
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  // Initial load, polls, and mutation reloads share one publication owner.
+  const mounted = useRef(false)
+  const refreshSequence = useRef(0)
+  const currentSelection = useRef({ selectedCollectionId, onSelectCollection })
+
+  useEffect(() => {
+    currentSelection.current = { selectedCollectionId, onSelectCollection }
+  }, [selectedCollectionId, onSelectCollection])
 
   async function refreshTree(): Promise<void> {
+    if (!mounted.current) return
+    const sequence = ++refreshSequence.current
+    const isCurrent = () => mounted.current && sequence === refreshSequence.current
     try {
       if (window.vellum?.collectionsTree) {
         const data = await window.vellum.collectionsTree()
+        if (!isCurrent()) return
         setTree(data)
+        setLoadError(null)
       }
-    } catch {
-      // Fallback or quiet on error
+    } catch (err) {
+      if (!isCurrent()) return
+      setLoadError(`Could not load collections: ${errorMessage(err)}`)
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
   }
 
   useEffect(() => {
+    mounted.current = true
     void refreshTree()
     const interval = setInterval(refreshTree, 1000)
-    return () => clearInterval(interval)
+    return () => {
+      mounted.current = false
+      ++refreshSequence.current
+      clearInterval(interval)
+    }
   }, [])
 
   async function handleCreateSubmit(): Promise<void> {
@@ -44,12 +89,15 @@ export function CollectionsTree({
     const parentId = creatingParentId === 'root' ? null : creatingParentId
     try {
       const created = await window.vellum.collectionsCreate({ name, parentId })
+      setActionError(null)
       setNewCollectionName('')
       setCreatingParentId(null)
       await refreshTree()
+      onCollectionsChanged?.()
       onSelectCollection(created.id, created.name)
     } catch (err) {
       console.error('Failed to create collection', err)
+      setActionError(`Could not create collection "${name}": ${errorMessage(err)}`)
     }
   }
 
@@ -59,14 +107,17 @@ export function CollectionsTree({
 
     try {
       await window.vellum.collectionsRename({ id, name })
+      setActionError(null)
       setEditingId(null)
       setEditingName('')
       await refreshTree()
+      onCollectionsChanged?.()
       if (selectedCollectionId === id) {
         onSelectCollection(id, name)
       }
     } catch (err) {
       console.error('Failed to rename collection', err)
+      setActionError(`Could not rename collection to "${name}": ${errorMessage(err)}`)
     }
   }
 
@@ -75,14 +126,46 @@ export function CollectionsTree({
       return
     }
 
+    // Retain the subtree before deletion/polling removes its visible rows.
+    const deletedIds = new Set([id])
+    function collectSubtree(nodes: CollectionTreeItem[], deleting = false): void {
+      for (const node of nodes) {
+        const inSubtree = deleting || node.id === id
+        if (inSubtree) deletedIds.add(node.id)
+        collectSubtree(node.children, inSubtree)
+      }
+    }
+    collectSubtree(tree)
+
     try {
       await window.vellum.collectionsDelete(id)
-      if (selectedCollectionId === id) {
-        onSelectCollection(null, null)
+      setActionError(null)
+      const selection = currentSelection.current
+      if (selection.selectedCollectionId !== null && deletedIds.has(selection.selectedCollectionId)) {
+        selection.onSelectCollection(null, null)
       }
       await refreshTree()
+      onCollectionsChanged?.()
     } catch (err) {
       console.error('Failed to delete collection', err)
+      setActionError(`Could not delete collection "${name}": ${errorMessage(err)}`)
+    }
+  }
+
+  async function handleDrop(event: React.DragEvent, collectionId: number): Promise<void> {
+    setDropTargetId(null)
+    if (!carriesPaper(event)) return
+    event.preventDefault()
+    const paperSlug = event.dataTransfer.getData(PAPER_DRAG_TYPE)
+    if (!paperSlug) return
+    try {
+      await window.vellum.collectionsAssign({ paperSlug, collectionId })
+      setActionError(null)
+      await refreshTree()
+      onPaperAssigned?.(collectionId)
+    } catch (err) {
+      console.error('Failed to add paper to collection', err)
+      setActionError(`Could not add paper to collection: ${errorMessage(err)}`)
     }
   }
 
@@ -123,9 +206,23 @@ export function CollectionsTree({
             </div>
           ) : (
             <div
-              className={`${styles.treeItem} ${isSelected ? styles.treeItemActive : ''}`}
+              className={`${styles.treeItem} ${isSelected ? styles.treeItemActive : ''} ${
+                dropTargetId === node.id ? styles.dropTarget : ''
+              }`}
               style={{ paddingLeft: `${depth * 14 + 6}px` }}
               onClick={() => onSelectCollection(node.id, node.name)}
+              onKeyDown={(event) => selectOnKey(event, () => onSelectCollection(node.id, node.name))}
+              tabIndex={0}
+              onDragOver={(event) => {
+                if (!carriesPaper(event)) return
+                event.preventDefault()
+                event.dataTransfer.dropEffect = 'copy'
+                if (dropTargetId !== node.id) setDropTargetId(node.id)
+              }}
+              onDragLeave={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTargetId(null)
+              }}
+              onDrop={(event) => void handleDrop(event, node.id)}
               role="treeitem"
               aria-selected={isSelected}
             >
@@ -232,9 +329,25 @@ export function CollectionsTree({
         </button>
       </div>
 
+      {actionError && (
+        <div className={styles.actionError} role="alert">
+          <span>{actionError}</span>
+          <button
+            type="button"
+            className={styles.dismissButton}
+            aria-label="Dismiss collection error"
+            onClick={() => setActionError(null)}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <div
         className={`${styles.allPapersItem} ${selectedCollectionId === null ? styles.allPapersActive : ''}`}
         onClick={() => onSelectCollection(null, null)}
+        onKeyDown={(event) => selectOnKey(event, () => onSelectCollection(null, null))}
+        tabIndex={0}
         role="treeitem"
         aria-selected={selectedCollectionId === null}
       >
@@ -275,13 +388,29 @@ export function CollectionsTree({
         </div>
       )}
 
+      {loadError && (
+        <div className={styles.actionError} role="alert">
+          <span>{loadError}</span>
+        </div>
+      )}
+
       {loading ? (
         <div className={styles.emptyTree}>Loading collections...</div>
       ) : tree.length === 0 && creatingParentId !== 'root' ? (
-        <div className={styles.emptyTree}>No collections yet. Click + to add one.</div>
+        // A failed load is not an empty library; the load error above explains it.
+        loadError ? null : (
+          <div className={styles.emptyTree}>No collections yet. Click + to add one.</div>
+        )
       ) : (
         <div className={styles.tree}>{renderTreeNodes(tree)}</div>
       )}
     </div>
   )
+}
+
+// Electron wraps main-process throws as "Error invoking remote method '<channel>': Error: <msg>";
+// show only <msg> to the user.
+function errorMessage(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err)
+  return message.replace(/^Error invoking remote method '[^']*': (?:Error: )?/, '')
 }

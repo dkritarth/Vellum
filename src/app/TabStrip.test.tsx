@@ -39,4 +39,71 @@ describe('TabStrip', () => {
 
     expect(onSelectTab).toHaveBeenCalledWith('a')
   })
+
+  it('closes a tab from its close button or a middle-click without selecting it', async () => {
+    const user = userEvent.setup()
+    const onSelectTab = vi.fn()
+    const onCloseTab = vi.fn()
+    render(
+      <TabStrip
+        tabs={[
+          { id: 'a', title: 'Paper A' },
+          { id: 'b', title: 'Paper B' },
+        ]}
+        activeTabId="a"
+        onSelectTab={onSelectTab}
+        onCloseTab={onCloseTab}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Close Paper B' }))
+    expect(onCloseTab).toHaveBeenCalledWith('b')
+
+    await user.pointer({ keys: '[MouseMiddle]', target: screen.getByRole('tab', { name: 'Paper A' }) })
+    expect(onCloseTab).toHaveBeenCalledWith('a')
+    expect(onSelectTab).not.toHaveBeenCalled()
+  })
+
+  it('shows the full title as a tooltip and an enabled + button that calls onNewTab', async () => {
+    const user = userEvent.setup()
+    const onNewTab = vi.fn()
+    render(<TabStrip tabs={[{ id: 'a', title: 'A long paper title' }]} activeTabId="a" onNewTab={onNewTab} />)
+
+    expect(screen.getByRole('tab', { name: 'A long paper title' })).toHaveAttribute('title', 'A long paper title')
+    const plus = screen.getByRole('button', { name: /open another paper/i })
+    expect(plus).toBeEnabled()
+    await user.click(plus)
+    expect(onNewTab).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('TabStrip closing (#202)', () => {
+  it('closes a tab via its × button and via middle-click', async () => {
+    const user = userEvent.setup()
+    const onCloseTab = vi.fn()
+    const onSelectTab = vi.fn()
+    render(
+      <TabStrip
+        tabs={[
+          { id: 'a', title: 'Paper A' },
+          { id: 'b', title: 'Paper B' },
+        ]}
+        activeTabId="a"
+        onSelectTab={onSelectTab}
+        onCloseTab={onCloseTab}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Close Paper B' }))
+    expect(onCloseTab).toHaveBeenCalledWith('b')
+    expect(onSelectTab).not.toHaveBeenCalled()
+
+    await user.pointer({ keys: '[MouseMiddle]', target: screen.getByRole('tab', { name: 'Paper A' }) })
+    expect(onCloseTab).toHaveBeenCalledWith('a')
+  })
+
+  it('shows no close buttons without onCloseTab', () => {
+    render(<TabStrip tabs={[{ id: 'a', title: 'Paper A' }]} activeTabId="a" />)
+    expect(screen.queryByRole('button', { name: 'Close Paper A' })).toBeNull()
+  })
 })

@@ -1,0 +1,197 @@
+
+ RUN  v2.1.9 /home/dandapat/.t3/worktrees/Vellum/t3-b3dee486
+
+stderr | src/app/CollectionsTree.test.tsx > CollectionsTree [L2-01] > shows a visible error and keeps the input when creating fails
+Failed to create collection Error: parent not found
+    at /home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/src/app/CollectionsTree.test.tsx:123:65
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:146:14
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:533:11
+    at runWithTimeout (file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:39:7)
+    at runTest (file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:1056:17)
+    at runSuite (file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:1205:15)
+    at runSuite (file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:1205:15)
+    at runFiles (file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:1262:5)
+    at startTests (file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:1271:3)
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11
+
+stderr | src/app/CollectionsTree.test.tsx > CollectionsTree [L2-01] > shows a visible error when renaming fails
+Failed to rename collection Error: Collection 1 not found
+    at /home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/src/app/CollectionsTree.test.tsx:140:65
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:146:14
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:533:11
+    at runWithTimeout (file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:39:7)
+    at runTest (file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:1056:17)
+    at runSuite (file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:1205:15)
+    at runSuite (file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:1205:15)
+    at runFiles (file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:1262:5)
+    at startTests (file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:1271:3)
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11
+
+stderr | src/app/CollectionsTree.test.tsx > CollectionsTree [L2-01] > shows a visible error and keeps selection when deleting fails, then clears it on success
+Failed to delete collection Error: disk I/O error
+    at /home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/src/app/CollectionsTree.test.tsx:181:30
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:146:14
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:533:11
+    at runWithTimeout (file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:39:7)
+    at runTest (file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:1056:17)
+    at runSuite (file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:1205:15)
+    at runSuite (file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:1205:15)
+    at runFiles (file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:1262:5)
+    at startTests (file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/@vitest/runner/dist/index.js:1271:3)
+    at file:///home/dandapat/.t3/worktrees/Vellum/t3-b3dee486/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11
+
+ ❯ src/app/CollectionsTree.test.tsx (11 tests | 2 failed) 2488ms
+   ✓ CollectionsTree [L2-01] > shows one persistent load error while polling fails and clears it on the next successful load 2012ms
+   × CollectionsTree refresh ownership > keeps created collection and selection after obsolete initial success 20ms
+     → Unable to find an element with the text: New research. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33maria-label[39m=[32m"Collections"[39m
+      [33mclass[39m=[32m"_container_bec57c"[39m
+      [33mrole[39m=[32m"tree"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"_header_bec57c"[39m
+      [36m>[39m
+        [36m<span>[39m
+          [0mCollections[0m
+        [36m</span>[39m
+        [36m<button[39m
+          [33maria-label[39m=[32m"New Collection"[39m
+          [33mclass[39m=[32m"_addButton_bec57c"[39m
+          [33mtitle[39m=[32m"New Collection"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0m+[0m
+        [36m</button>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33maria-selected[39m=[32m"true"[39m
+        [33mclass[39m=[32m"_allPapersItem_bec57c _allPapersActive_bec57c"[39m
+        [33mrole[39m=[32m"treeitem"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"_itemLabel_bec57c"[39m
+        [36m>[39m
+          [36m<span>[39m
+            [0m📚[0m
+          [36m</span>[39m
+          [36m<span>[39m
+            [0mAll Papers[0m
+          [36m</span>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"_emptyTree_bec57c"[39m
+      [36m>[39m
+        [0mNo collections yet. Click + to add one.[0m
+      [36m</div>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+   × CollectionsTree refresh ownership > keeps created collection and selection after obsolete initial error 21ms
+     → expect(element).not.toBeInTheDocument()
+
+expected document not to contain element, found <div
+  class="_actionError_bec57c"
+  role="alert"
+>
+  <span>
+    Could not load collections: Obsolete failure
+  </span>
+</div> instead
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/app/CollectionsTree.test.tsx > CollectionsTree refresh ownership > keeps created collection and selection after obsolete initial success
+TestingLibraryElementError: Unable to find an element with the text: New research. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33maria-label[39m=[32m"Collections"[39m
+      [33mclass[39m=[32m"_container_bec57c"[39m
+      [33mrole[39m=[32m"tree"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"_header_bec57c"[39m
+      [36m>[39m
+        [36m<span>[39m
+          [0mCollections[0m
+        [36m</span>[39m
+        [36m<button[39m
+          [33maria-label[39m=[32m"New Collection"[39m
+          [33mclass[39m=[32m"_addButton_bec57c"[39m
+          [33mtitle[39m=[32m"New Collection"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0m+[0m
+        [36m</button>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33maria-selected[39m=[32m"true"[39m
+        [33mclass[39m=[32m"_allPapersItem_bec57c _allPapersActive_bec57c"[39m
+        [33mrole[39m=[32m"treeitem"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"_itemLabel_bec57c"[39m
+        [36m>[39m
+          [36m<span>[39m
+            [0m📚[0m
+          [36m</span>[39m
+          [36m<span>[39m
+            [0mAll Papers[0m
+          [36m</span>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"_emptyTree_bec57c"[39m
+      [36m>[39m
+        [0mNo collections yet. Click + to add one.[0m
+      [36m</div>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/app/CollectionsTree.test.tsx:233:21
+    231|         else old.reject(new Error('Obsolete failure'))
+    232|       })
+    233|       expect(screen.getByText(created.name)).toBeVisible()
+       |                     ^
+    234|       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    235|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/app/CollectionsTree.test.tsx > CollectionsTree refresh ownership > keeps created collection and selection after obsolete initial error
+Error: expect(element).not.toBeInTheDocument()
+
+expected document not to contain element, found <div
+  class="_actionError_bec57c"
+  role="alert"
+>
+  <span>
+    Could not load collections: Obsolete failure
+  </span>
+</div> instead
+ ❯ src/app/CollectionsTree.test.tsx:234:47
+    232|       })
+    233|       expect(screen.getByText(created.name)).toBeVisible()
+    234|       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+       |                                               ^
+    235|     })
+    236|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 9 passed (11)
+   Start at  10:15:07
+   Duration  3.45s (transform 126ms, setup 0ms, collect 236ms, tests 2.49s, environment 376ms, prepare 85ms)

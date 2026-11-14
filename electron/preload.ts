@@ -1,6 +1,6 @@
 import type { SuggestedQuestionRecord, QuestionCategory } from '../core/questions/repo.js'
 import type { ChatSessionSummary, ListChatSessionsOptions } from '../core/chat/repo.js'
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import type { AskOpenResult, AskStartParams, AskStreamEvent } from '../core/chat/manager.js'
 import type { IngestResult } from '../core/ingest/index.js'
@@ -20,6 +20,8 @@ export interface AskUpdatePayload {
 // Renderer never touches Node/Electron directly — only this allowlisted API.
 // Extend `vellum` as IPC channels are added (ingest, library, chat/ACP, store).
 const api = {
+  // Resolve locally: DOM Files must never cross main-process IPC. Native API validates File input.
+  getPathForFile: (file: File): string => webUtils.getPathForFile(file),
   ping: (): Promise<string> => ipcRenderer.invoke('vellum:ping'),
   // [P1-09] Reader needs raw PDF bytes for a paper. Main process reads
   // data/papers/<slug>/paper.pdf and hands back an ArrayBuffer (or null if

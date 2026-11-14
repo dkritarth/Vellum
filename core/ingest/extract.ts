@@ -55,9 +55,9 @@ export interface ExtractedMetadata {
 export interface ExtractResult {
   sections: ExtractedSection[]
   metadata: ExtractedMetadata
-  /** True whenever the agent's output was missing, unparseable, or had
-   * fields dropped for the wrong shape — sections/metadata may be partial or
-   * empty. Not an error: [P1-05] explicitly requires degrading, not throwing. */
+  /** True whenever the agent's turn was interrupted, output was missing or
+   * unparseable, or fields were dropped for the wrong shape. Sections and
+   * metadata may be partial or empty. Not an error: [P1-05] explicitly requires degrading, not throwing. */
   degraded: boolean
 }
 
@@ -107,21 +107,32 @@ export async function extractPaper(mdPath: string, options: ExtractOptions = {})
 
   try {
     let raw = ''
+    let completed = false
 
     try {
       for await (const update of session.prompt({ text: buildPrompt(mdPath), contextFiles: [mdPath] })) {
         if (update.kind === 'text') {
           raw += textFromUpdate(update)
-        } else if (update.kind === 'error' || update.kind === 'done') {
+        } else if (update.kind === 'error') {
+          break
+        } else if (update.kind === 'done') {
+          // Legacy clients emit done without a reason. Honor that contract,
+          // but only end_turn is successful when a reason is exposed.
+          const stopReason = typeof update.data === 'object' && update.data !== null
+            ? (update.data as Record<string, unknown>).stopReason
+            : undefined
+          completed = stopReason === undefined || stopReason === 'end_turn'
           break
         }
       }
     } catch {
+      completed = false
       // Stream itself threw (adapter died mid-turn, transport error, ...).
       // Fall through to parsing whatever text was collected before the throw.
     }
 
-    return parseAgentOutput(raw)
+    const result = parseAgentOutput(raw)
+    return { ...result, degraded: result.degraded || !completed }
   } finally {
     await session.dispose().catch(() => undefined)
   }

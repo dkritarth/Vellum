@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { AcpBackend, AcpClient, AcpPromptRequest, AcpSession, AcpUpdate } from '../acp/client.js'
 import { upsertPaper } from '../library/repo.js'
 import { openDb } from '../store/db.js'
-import { ChatManager } from './manager.js'
+import { ChatManager, type AskStreamEvent } from './manager.js'
 import { getChatMessages } from './repo.js'
 import { listUsageRecords, getUsageSummary } from '../usage/repo.js'
 
@@ -68,6 +68,80 @@ describe('ChatManager', () => {
     db.close()
   })
 
+  it('rejects a concurrent prompt before creating an ACP session or persisting its question', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const client = new FakeClient([], async () => { await gate; return new FakeSession([doneUpdate]) })
+    const manager = new ChatManager(client)
+    const { session } = manager.openChat({ db, paperSlug: slug })
+    const params = { db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'first' }
+    const first = manager.runTurn(params, () => {})
+    try {
+      expect(() => manager.runTurn({ ...params, text: 'overlap' }, () => {})).toThrow(/already.*active/i)
+      expect(manager.openChat({ db, paperSlug: slug }).messages.map((m) => m.content)).toEqual(['first'])
+      expect(client.newSessionCalls).toBe(1)
+    } finally { release(); await first }
+  })
+
+  it('snapshots streaming text, leaves other papers usable, and releases ownership on error', async () => {
+    let release!: () => void
+    let started!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const streaming = new Promise<void>((resolve) => { started = resolve })
+    const client: AcpClient = { newSession: async () => ({
+      async *prompt() {
+        yield textUpdate('Partial answer')
+        started()
+        await gate
+        yield { kind: 'error', data: { message: 'Disconnected' } }
+      },
+      async dispose() {},
+    }) }
+    const manager = new ChatManager(client)
+    const { session } = manager.openChat({ db, paperSlug: slug })
+    const running = manager.runTurn({ db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'first', requestId: 'stream-1' }, () => {})
+    await streaming
+    const snapshot = manager.openChat({ db, paperSlug: slug }).activeTurn
+    try {
+      expect(snapshot).toMatchObject({ requestId: 'stream-1', text: 'Partial answer' })
+      upsertPaper(db, { slug: 'other-paper', title: 'Other paper', authors: [], addedAt: new Date().toISOString() })
+      const other = manager.openChat({ db, paperSlug: 'other-paper' })
+      expect(other.activeTurn).toBeNull()
+      const independent = manager.runTurn({ db, chatSessionId: other.session.id, paperSlug: 'other-paper', mdPath, text: 'other' }, () => {})
+      release()
+      await independent
+    } finally { release(); await running }
+    expect(manager.openChat({ db, paperSlug: slug }).activeTurn).toBeNull()
+    expect(snapshot?.text).toBe('Partial answer')
+    expect((await manager.newChat({ db, paperSlug: slug })).id).not.toBe(session.id)
+  })
+
+  it('tracks an active turn across reopen and rejects overlap before persistence or session creation', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const client = new FakeClient([], async () => {
+      await gate
+      return new FakeSession([textUpdate('answer'), doneUpdate])
+    })
+    const manager = new ChatManager(client)
+    const { session } = manager.openChat({ db, paperSlug: slug })
+    const params = { db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'first', requestId: 'active-1' }
+    const first = manager.runTurn(params, () => {})
+    try {
+      expect(manager.openChat({ db, paperSlug: slug }).activeTurn).toMatchObject({ requestId: 'active-1', chatSessionId: session.id, text: '' })
+      expect(() => manager.runTurn({ ...params, text: 'overlap' }, () => {})).toThrow(/already.*active/i)
+      await expect(manager.newChat({ db, paperSlug: slug })).rejects.toThrow(/already.*active/i)
+      expect(manager.openChat({ db, paperSlug: slug }).messages.map((m) => m.content)).toEqual(['first'])
+      expect(client.newSessionCalls).toBe(1)
+    } finally {
+      release()
+      await first
+    }
+    expect(manager.openChat({ db, paperSlug: slug }).activeTurn).toBeNull()
+    await manager.runTurn({ ...params, text: 'next' }, () => {})
+    expect(manager.openChat({ db, paperSlug: slug }).messages.map((m) => m.content)).toEqual(['first', 'answer', 'next', 'answer'])
+  })
+
   it('streams text chunks then persists the user + assistant messages', async () => {
     const client = new FakeClient([textUpdate('The core '), textUpdate('contribution is the Transformer.'), doneUpdate])
     const manager = new ChatManager(client)
@@ -113,6 +187,24 @@ describe('ChatManager', () => {
     expect(promptText).toContain('What is the core contribution?')
   })
 
+  it('the prompt text requires exact-location attribution and surfacing in-paper discrepancies (#102)', async () => {
+    const client = new FakeClient([doneUpdate])
+    const manager = new ChatManager(client)
+    const { session } = manager.openChat({ db, paperSlug: slug })
+
+    await manager.runTurn({ db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'What BLEU did it get?' }, () => {})
+
+    const promptText = (client.sessions[0]?.requests[0]?.text ?? '').toLowerCase()
+    // Each quote/number cited to where that exact text appears; abstract is its own location.
+    expect(promptText).toContain('where that exact text appears')
+    expect(promptText).toContain('abstract is its own location')
+    // Conflicting values in different places are all reported with locations.
+    expect(promptText).toContain('different values in different places')
+    expect(promptText).toContain('report each value with its location')
+    // Absent answers are admitted rather than filled from general knowledge.
+    expect(promptText).toContain('does not contain the answer, say so')
+  })
+
   it('recaps prior history into a freshly (re)spawned ACP session so a resumed chat has context', async () => {
     // First turn establishes history, then the session cache is dropped
     // (simulating an app restart) without touching the DB.
@@ -143,6 +235,124 @@ describe('ChatManager', () => {
     const secondRequest = client.sessions[0]?.requests[1]?.text ?? ''
     expect(secondRequest).not.toContain('q1')
     expect(secondRequest).toContain('q2')
+  })
+
+  it.each(['claude', 'codex'] as const)('isolates %s agent memory and recaps only the selected chat across A/B/A/B navigation', async (backend) => {
+    const client = new FakeClient([textUpdate('answer'), doneUpdate])
+    const manager = new ChatManager(client)
+    const a = manager.openChat({ db, paperSlug: slug, backend }).session
+    const turn = (chatSessionId: number, text: string) => manager.runTurn(
+      { db, paperSlug: slug, mdPath, chatSessionId, text, backend }, () => {},
+    )
+    await turn(a.id, 'A original')
+    const b = await manager.newChat({ db, paperSlug: slug, backend })
+    await turn(b.id, 'B original')
+    const reopenedA = manager.openChat({ db, paperSlug: slug, chatSessionId: a.id })
+    await turn(reopenedA.session.id, 'A followup')
+    const reopenedB = manager.openChat({ db, paperSlug: slug, chatSessionId: b.id })
+    await turn(reopenedB.session.id, 'B followup')
+
+    expect(client.sessions).toHaveLength(4)
+    expect(client.sessions.map((session) => session.disposed)).toEqual([true, true, true, false])
+    const aPrompt = client.sessions[2].requests[0].text
+    expect(aPrompt).toContain('User: A original')
+    expect(aPrompt).toContain('Assistant: answer')
+    expect(aPrompt).not.toContain('B original')
+    const bPrompt = client.sessions[3].requests[0].text
+    expect(bPrompt).toContain('User: B original')
+    expect(bPrompt).toContain('Assistant: answer')
+    expect(bPrompt).not.toContain('A original')
+    expect(bPrompt).not.toContain('A followup')
+    expect(manager.openChat({ db, paperSlug: slug, chatSessionId: a.id }).messages.map((m) => m.content))
+      .toEqual(['A original', 'answer', 'A followup', 'answer'])
+    expect(manager.openChat({ db, paperSlug: slug, chatSessionId: b.id }).messages.map((m) => m.content))
+      .toEqual(['B original', 'answer', 'B followup', 'answer'])
+
+    await turn(b.id, 'B again')
+    expect(client.sessions).toHaveLength(4)
+    expect(client.sessions[3].requests[1].text).not.toContain('Prior conversation')
+    await manager.disposeAll()
+    expect(client.sessions.every((session) => session.disposed)).toBe(true)
+  })
+
+  it('evicts the other chat before a failed spawn and retries with the selected history', async () => {
+    const sessions: FakeSession[] = []
+    let attempts = 0
+    const client = new FakeClient([], async () => {
+      attempts += 1
+      if (attempts === 3) {
+        throw new Error('switch spawn failed')
+      }
+      const session = new FakeSession([textUpdate('answer'), doneUpdate])
+      sessions.push(session)
+      return session
+    })
+    const manager = new ChatManager(client)
+    const a = manager.openChat({ db, paperSlug: slug }).session
+    const turn = (chatSessionId: number, text: string, onEvent = (_event: { kind: string }) => {}) => manager.runTurn(
+      { db, paperSlug: slug, mdPath, chatSessionId, text }, onEvent,
+    )
+    await turn(a.id, 'A original')
+    const b = await manager.newChat({ db, paperSlug: slug })
+    await turn(b.id, 'B original')
+    manager.openChat({ db, paperSlug: slug, chatSessionId: a.id })
+    const events: string[] = []
+    await turn(a.id, 'A failed', (event) => events.push(event.kind))
+    expect(events).toEqual(['error'])
+    expect(sessions[1].disposed).toBe(true)
+    expect(manager.openChat({ db, paperSlug: slug }).activeTurn).toBeNull()
+    await turn(a.id, 'A retry')
+    expect(attempts).toBe(4)
+    expect(sessions[1].requests).toHaveLength(1)
+    expect(sessions[2].requests[0].text).toContain('User: A original')
+    expect(sessions[2].requests[0].text).toContain('User: A failed')
+    expect(sessions[2].requests[0].text).not.toContain('B original')
+    await manager.disposeAll()
+  })
+
+  it('keeps backend conversations separate and newChat disposes both', async () => {
+    const client = new FakeClient([doneUpdate])
+    const manager = new ChatManager(client)
+    const { session } = manager.openChat({ db, paperSlug: slug })
+    for (const backend of ['claude', 'codex', 'claude'] as const) {
+      await manager.runTurn({ db, paperSlug: slug, mdPath, chatSessionId: session.id, text: backend, backend }, () => {})
+    }
+    expect(client.backends).toEqual(['claude', 'codex'])
+    expect(client.sessions.map((s) => s.requests.length)).toEqual([2, 1])
+    expect(client.sessions[1].requests[0].text).toContain('User: claude')
+    expect(client.sessions[0].requests[1].text).not.toContain('Prior conversation')
+    await manager.newChat({ db, paperSlug: slug })
+    expect(client.sessions.every((s) => s.disposed)).toBe(true)
+  })
+
+  it('holds the paper lock while switching disposes the previous conversation', async () => {
+    let release!: () => void
+    let disposing!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const started = new Promise<void>((resolve) => { disposing = resolve })
+    let attempts = 0
+    const client: AcpClient = { async newSession() {
+      attempts += 1
+      const session = new FakeSession([doneUpdate])
+      if (attempts === 2) session.dispose = async () => { disposing(); await gate; session.disposed = true }
+      return session
+    } }
+    const manager = new ChatManager(client)
+    const a = manager.openChat({ db, paperSlug: slug }).session
+    const turn = (chatSessionId: number) => manager.runTurn(
+      { db, paperSlug: slug, mdPath, chatSessionId, text: 'question' }, () => {},
+    )
+    await turn(a.id)
+    const b = await manager.newChat({ db, paperSlug: slug })
+    await turn(b.id)
+    const switching = turn(a.id)
+    await started
+    try {
+      expect(() => turn(b.id)).toThrow(/already.*active/i)
+      await expect(manager.newChat({ db, paperSlug: slug })).rejects.toThrow(/already.*active/i)
+      expect(attempts).toBe(2)
+      expect(manager.openChat({ db, paperSlug: slug, chatSessionId: b.id }).messages).toHaveLength(2)
+    } finally { release(); await switching; await manager.disposeAll() }
   })
 
   it('reloads prior history on openChat without starting a new ACP session', async () => {
@@ -205,6 +415,48 @@ describe('ChatManager', () => {
     // The user's turn is still persisted even though the reply failed.
     expect(getChatMessages(db, session.id)).toHaveLength(1)
   })
+
+  it.each(['cancelled', 'max_tokens', 'max_turn_requests'])(
+    'rejects %s after partial streaming and allows explicit retry with fresh context',
+    async (stopReason) => {
+      const updates: AcpUpdate[] = [textUpdate('Completed answer'), doneUpdate]
+      const client = new FakeClient(updates)
+      const manager = new ChatManager(client)
+      const { session } = manager.openChat({ db, paperSlug: slug })
+      const params = { db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'Original question' }
+      await manager.runTurn(params, () => {})
+      updates.splice(0, updates.length, textUpdate('The evidence is'), {
+        kind: 'done', data: { stopReason, usage: { inputTokens: 10, outputTokens: 3 } },
+      })
+      const events: AskStreamEvent[] = []
+      await manager.runTurn({ ...params, text: 'Interrupted question' }, (event) => events.push(event))
+
+      expect(events.map((event) => event.kind)).toEqual(['text', 'error'])
+      expect(events.at(-1)).toMatchObject({ kind: 'error', message: expect.stringContaining(stopReason) })
+      expect(client.sessions[0].disposed).toBe(true)
+      expect(client.newSessionCalls).toBe(1) // No automatic retry.
+      expect(manager.openChat({ db, paperSlug: slug })).toMatchObject({ activeTurn: null })
+      expect(manager.openChat({ db, paperSlug: slug }).messages.map((m) => m.content)).toEqual([
+        'Original question', 'Completed answer', 'Interrupted question',
+      ])
+
+      updates.splice(0, updates.length, textUpdate('Retry answer'), {
+        kind: 'done', data: { stopReason: 'end_turn', usage: { inputTokens: 20, outputTokens: 5, totalTokens: 25 } },
+      })
+      const retryEvents: AskStreamEvent[] = []
+      await manager.runTurn({ ...params, text: 'Please retry' }, (event) => retryEvents.push(event))
+      expect(client.newSessionCalls).toBe(2)
+      const retry = client.sessions[1].requests[0].text
+      expect(retry).toContain('User: Original question')
+      expect(retry).toContain('Assistant: Completed answer')
+      expect(retry).toContain('User: Interrupted question')
+      expect(retry).not.toContain('The evidence is')
+      expect(retryEvents.at(-1)).toMatchObject({ kind: 'done', message: { content: 'Retry answer' } })
+      expect(listUsageRecords(db, { sessionId: session.id })).toHaveLength(2)
+      expect(listUsageRecords(db, { sessionId: session.id })[0]).toMatchObject({ inputTokens: 20, outputTokens: 5, totalTokens: 25 })
+      await manager.disposeAll()
+    },
+  )
 
   it('surfaces a mid-stream error update without persisting a partial assistant message', async () => {
     const client = new FakeClient([textUpdate('partial '), { kind: 'error', data: { message: 'turn timed out' } }])

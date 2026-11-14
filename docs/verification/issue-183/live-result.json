@@ -1,0 +1,154 @@
+{
+  "passed": true,
+  "dir": "/tmp/vellum183-live-CwHfUr",
+  "records": [
+    "Native real-paper drag/Add to chat focuses multiline draft; native edit/Shift+Enter/Enter preserves exact request once.",
+    "Send trims outer boundaries, preserves paragraphs. Keyboard focus, busy/empty/error/recovery checked. Restart returns exact persisted user text."
+  ],
+  "quote": "The dominant sequence transduction models are based on complex recurrent or\nconvolutional neural networks that include an encoder and a decoder. The best\nperforming models also connect the encoder and decoder through an attention",
+  "starts": [
+    {
+      "chatSessionId": 1,
+      "slug": "attention",
+      "text": "Compare this claim\n\n> \"The dominant sequence transduction models are based on complex recurrent or\nconvolutional neural networks that include an encoder and a decoder. The best\nperforming models also connect the encoder and decoder through an attention\" (p. 1)\n\nFirst question\n\nSecond question"
+    },
+    {
+      "chatSessionId": 1,
+      "slug": "attention",
+      "text": "Button paragraph\nButton continuation"
+    },
+    {
+      "chatSessionId": 1,
+      "slug": "attention",
+      "text": "Failure paragraph\n\nKeep boundaries"
+    },
+    {
+      "chatSessionId": 1,
+      "slug": "attention",
+      "text": "Recovery\nparagraph"
+    }
+  ],
+  "restored": [
+    {
+      "id": 1,
+      "sessionId": 1,
+      "role": "user",
+      "content": "Compare this claim\n\n> \"The dominant sequence transduction models are based on complex recurrent or\nconvolutional neural networks that include an encoder and a decoder. The best\nperforming models also connect the encoder and decoder through an attention\" (p. 1)\n\nFirst question\n\nSecond question",
+      "createdAt": "2026-11-06T20:46:53.788Z"
+    },
+    {
+      "id": 2,
+      "sessionId": 1,
+      "role": "assistant",
+      "content": "Deterministic multiline reply",
+      "createdAt": "2026-11-06T20:46:53.957Z"
+    },
+    {
+      "id": 3,
+      "sessionId": 1,
+      "role": "user",
+      "content": "Button paragraph\nButton continuation",
+      "createdAt": "2026-11-06T20:46:54.354Z"
+    },
+    {
+      "id": 4,
+      "sessionId": 1,
+      "role": "assistant",
+      "content": "Deterministic multiline reply",
+      "createdAt": "2026-11-06T20:46:54.382Z"
+    },
+    {
+      "id": 5,
+      "sessionId": 1,
+      "role": "user",
+      "content": "Failure paragraph\n\nKeep boundaries",
+      "createdAt": "2026-11-06T20:46:54.472Z"
+    },
+    {
+      "id": 6,
+      "sessionId": 1,
+      "role": "user",
+      "content": "Recovery\nparagraph",
+      "createdAt": "2026-11-06T20:46:54.653Z"
+    },
+    {
+      "id": 7,
+      "sessionId": 1,
+      "role": "assistant",
+      "content": "Deterministic multiline reply",
+      "createdAt": "2026-11-06T20:46:54.683Z"
+    }
+  ],
+  "geometry": [
+    {
+      "width": 1440,
+      "input": {
+        "x": 1128,
+        "y": 796.5,
+        "right": 1369.625,
+        "bottom": 869,
+        "width": 241.625,
+        "height": 72.5
+      },
+      "send": {
+        "x": 1375.625,
+        "y": 818.25,
+        "right": 1432,
+        "bottom": 847.25,
+        "width": 56.375,
+        "height": 29
+      },
+      "row": {
+        "x": 1120,
+        "y": 787.5,
+        "right": 1440,
+        "bottom": 877,
+        "width": 320,
+        "height": 89.5
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "overflow": false,
+      "tag": "TEXTAREA",
+      "label": "Ask a question"
+    },
+    {
+      "width": 1000,
+      "input": {
+        "x": 688,
+        "y": 796.5,
+        "right": 929.625,
+        "bottom": 869,
+        "width": 241.625,
+        "height": 72.5
+      },
+      "send": {
+        "x": 935.625,
+        "y": 818.25,
+        "right": 992,
+        "bottom": 847.25,
+        "width": 56.375,
+        "height": 29
+      },
+      "row": {
+        "x": 680,
+        "y": 787.5,
+        "right": 1000,
+        "bottom": 877,
+        "width": 320,
+        "height": 89.5
+      },
+      "viewport": {
+        "width": 1000,
+        "height": 900
+      },
+      "overflow": false,
+      "tag": "TEXTAREA",
+      "label": "Ask a question"
+    }
+  ],
+  "errors": [],
+  "pdfBytes": 2215244
+}

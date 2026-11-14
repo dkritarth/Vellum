@@ -1,0 +1,12 @@
+PASS Empty state, create autofocus and Escape cancel
+PASS Obsolete initial success leaves newer pending poll loading; latest failure displays and next poll recovers
+PASS old-initial-success preserves visible created selection
+PASS old-initial-error preserves visible created selection
+PASS Rename through focused input and Enter survives obsolete successful poll
+PASS Newer poll supersedes held mutation-refresh rejection
+PASS Current failure persists through stale success; successful poll recovers
+PASS Unmounted poll rejection cannot publish into remounted tree
+PASS Real-paper membership filters library and existing direct count becomes 1; note/history/file hashes preserved
+PASS Restart preserves collection, membership, real paper, note, history, exact file hashes
+PASS Delete confirmation removes collection despite obsolete poll; paper/note/history/files survive
+Isolated state retained: /data/dandapat/.tmp/vellum167-OABUfx

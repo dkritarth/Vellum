@@ -1,0 +1,45 @@
+
+> vellum@0.1.0 test
+> vitest run src/app/Reader.test.tsx -t invalidates a pending search
+
+
+ RUN  v2.1.9 /home/dandapat/.t3/worktrees/Vellum/t3-2897987b
+
+ ❯ src/app/Reader.test.tsx (62 tests | 1 failed | 61 skipped) 161ms
+   × Reader search ownership > invalidates a pending search when input is cleared without jumping pages 160ms
+     → expect(element).not.toBeInTheDocument()
+
+expected document not to contain element, found <span
+  aria-label="Search matches"
+>
+  1
+   /
+  1
+</span> instead
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/app/Reader.test.tsx > Reader search ownership > invalidates a pending search when input is cleared without jumping pages
+Error: expect(element).not.toBeInTheDocument()
+
+expected document not to contain element, found <span
+  aria-label="Search matches"
+>
+  1
+   /
+  1
+</span> instead
+ ❯ src/app/Reader.test.tsx:169:59
+    167|     fireEvent.change(screen.getByLabelText('Search in document'), { ta…
+    168|     await act(async () => { search.release(); search.pending.resolve({…
+    169|     expect(screen.queryByLabelText('Search matches')).not.toBeInTheDoc…
+       |                                                           ^
+    170|     expect(screen.queryByRole('button', { name: 'Next match' })).not.t…
+    171|     expect(screen.getByLabelText('Page')).toHaveTextContent('1 of 2')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 61 skipped (62)
+   Start at  09:33:52
+   Duration  1.43s (transform 267ms, setup 0ms, collect 452ms, tests 161ms, environment 409ms, prepare 98ms)

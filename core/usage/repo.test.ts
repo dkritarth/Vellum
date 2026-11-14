@@ -225,4 +225,55 @@ describe('core/usage/repo', () => {
     expect(s2List).toHaveLength(1)
     expect(s2List[0].backend).toBe('codex')
   })
+  it('returns the row just written when a turn has no chat session', () => {
+    // NULL session_id never conflicts under UNIQUE(session_id, turn_index),
+    // so sessionless turns (and turns whose session was deleted, which the FK
+    // sets to NULL) each get their own row.
+    const first = recordTurnUsage(db, {
+      sessionId: null,
+      backend: 'claude',
+      turnIndex: 0,
+      inputTokens: 10,
+      hasMetrics: true,
+      recordedAt: '2026-09-12T16:00:00.000Z',
+    })
+    const second = recordTurnUsage(db, {
+      sessionId: null,
+      backend: 'codex',
+      turnIndex: 0,
+      inputTokens: 99,
+      hasMetrics: true,
+      recordedAt: '2026-09-12T16:05:00.000Z',
+    })
+
+    expect(second.id).not.toBe(first.id)
+    expect(second.backend).toBe('codex')
+    expect(second.inputTokens).toBe(99)
+    expect(second.recordedAt).toBe('2026-09-12T16:05:00.000Z')
+    expect(listUsageRecords(db)).toHaveLength(2)
+  })
+
+  it('returns the updated row when a session turn is re-recorded', () => {
+    const session = createChatSession(db, { paperSlug: 'test-paper', backend: 'claude' })
+    const first = recordTurnUsage(db, {
+      sessionId: session.id,
+      backend: 'claude',
+      turnIndex: 1,
+      inputTokens: 5,
+      hasMetrics: true,
+      recordedAt: '2026-09-12T16:00:00.000Z',
+    })
+    const retried = recordTurnUsage(db, {
+      sessionId: session.id,
+      backend: 'claude',
+      turnIndex: 1,
+      inputTokens: 7,
+      hasMetrics: true,
+      recordedAt: '2026-09-12T16:01:00.000Z',
+    })
+
+    expect(retried.id).toBe(first.id)
+    expect(retried.inputTokens).toBe(7)
+    expect(listUsageRecords(db, { sessionId: session.id })).toHaveLength(1)
+  })
 })

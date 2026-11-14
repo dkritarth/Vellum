@@ -1,0 +1,10 @@
+PASS Visible Notes placeholder, real-paper ingestion/rendering, true missing-note editor and normal autosave
+PASS Delayed rejected autosave preserves draft/focus and old storage; keyboard retry repeats failure then saves same draft; process restart retains recovered save
+PASS Repeated Clear failure restores exact unsaved draft; newer keyboard edit removes obsolete Clear intent and Retry saves latest text
+PASS Explicit Clear retry invokes production delete, reports Cleared and removes stored note across process restart
+PASS Late rejected save and Clear after visible paper switch cannot replace B text or show obsolete error; revisit reads persisted A
+PASS Initial read error still locks Note/Clear and has distinct keyboard Retry that reads original without saving
+PASS Normal loaded debounce and quick Notes unmount flush remain functional
+PASS Final restart retains final edit, unrelated note/history message and byte-identical ingested PDFs
+PASS Zero renderer errors, warnings or page errors across four launches
+Isolated run data: /data/dandapat/.tmp/vellum-165-vTp6N5

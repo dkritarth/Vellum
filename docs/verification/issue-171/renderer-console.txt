@@ -1,0 +1,1 @@
+[error] Failed to delete collection Error: Error invoking remote method 'vellum:collections-delete': Error: issue171 controlled disk I/O error

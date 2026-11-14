@@ -13,6 +13,9 @@
 // third-party harness.
 
 import { spawn, type ChildProcessByStdio } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { delimiter, join } from 'node:path'
 import { Readable, Writable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
 import {
@@ -43,17 +46,55 @@ type AdapterChildProcess = ChildProcessByStdio<Writable, Readable, null>
 /** First-party adapter subprocess per backend. Do not add others here without
  * a card — this is the whole point of the "no OAuth bridge" guardrail. */
 const ADAPTERS: Record<AcpBackend, { command: string }> = {
-  claude: { command: 'claude-code-acp' },
+  // `claude-agent-acp` is the current name of the first-party Claude adapter
+  // (@agentclientprotocol/claude-agent-acp). The old `claude-code-acp` package
+  // is deprecated and too old for current Claude models, but still works as a
+  // fallback when it is the only one installed.
+  claude: { command: 'claude-agent-acp' },
   codex: { command: 'codex-acp' },
+  // Google's own Antigravity CLI, run as an ACP server. It owns Google sign-in
+  // and token storage (macOS keychain); Vellum never touches its credentials.
+  antigravity: { command: 'agy' },
 }
 
-/** Optional compatibility override for Codex service/CLI rollout skew. The
- * adapter owns config parsing; JSON string encoding is valid TOML and keeps
- * the model value in one argv entry without invoking a shell. */
+/** Resolves the executable for a backend. Antigravity honours
+ * `VELLUM_AGY_PATH`, then `agy` on PATH, then `~/.local/bin/agy` — a GUI-launched
+ * Electron app on macOS does not inherit the shell PATH, and `~/.local/bin` is
+ * where a user-level CLI install usually lands. */
+export function resolveAdapterCommand(
+  backend: AcpBackend,
+  sourceEnv: NodeJS.ProcessEnv = process.env,
+  fileExists: (path: string) => boolean = existsSync,
+): string {
+  const { command } = ADAPTERS[backend]
+  if (backend === 'claude') {
+    return onPath(command, sourceEnv, fileExists) ? command : LEGACY_CLAUDE_COMMAND
+  }
+  if (backend !== 'antigravity') return command
+  const override = sourceEnv.VELLUM_AGY_PATH?.trim()
+  if (override) return override
+  if (onPath(command, sourceEnv, fileExists)) return command
+  const userLocal = join(sourceEnv.HOME ?? homedir(), '.local', 'bin', command)
+  return fileExists(userLocal) ? userLocal : command
+}
+
+const LEGACY_CLAUDE_COMMAND = 'claude-code-acp'
+
+function onPath(command: string, sourceEnv: NodeJS.ProcessEnv, fileExists: (path: string) => boolean): boolean {
+  return (sourceEnv.PATH ?? '').split(delimiter).some((dir) => dir !== '' && fileExists(join(dir, command)))
+}
+
+/** Legacy adapter compatibility. Current codex-acp reads CODEX_CONFIG instead;
+ * JSON string encoding keeps the legacy TOML value in one argv entry. */
 export function buildAdapterArgs(
   backend: AcpBackend,
   sourceEnv: NodeJS.ProcessEnv = process.env,
 ): string[] {
+  if (backend === 'antigravity') {
+    // Separate app-data dir from the interactive `agy` CLI's own history,
+    // matching Antigravity's documented ACP layout. Sign-in is shared.
+    return ['acp', '--app-data-dir', 'antigravity-acp']
+  }
   const model = sourceEnv.VELLUM_CODEX_MODEL?.trim()
   return backend === 'codex' && model ? ['-c', `model=${JSON.stringify(model)}`] : []
 }
@@ -74,19 +115,77 @@ export type SpawnAdapter = (backend: AcpBackend) => AdapterChildProcess
  * Electron process never sets it. Stripping both from the adapter's env
  * makes the client robust to running nested, with no behavior change for
  * the normal (non-nested) case. Everything else the adapter needs for auth
- * (PATH, HOME, the CLI's own creds/config env) passes through untouched.
- * Exported standalone so the stripping is unit-testable without a
- * subprocess. */
-export function buildAdapterEnv(sourceEnv: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+ * (PATH, HOME, the CLI's own creds/config env) passes through. For Codex only,
+ * a nonblank VELLUM_CODEX_MODEL replaces CODEX_CONFIG.model in the copied env.
+ * Every backend drops raw Anthropic/OpenAI API-key env vars; Antigravity also
+ * drops raw Google API-key/cloud credential env vars.
+ * Exported standalone for tests at the child-environment boundary. */
+export function buildAdapterEnv(
+  sourceEnv: NodeJS.ProcessEnv = process.env,
+  backend?: AcpBackend,
+): NodeJS.ProcessEnv {
   const { CLAUDECODE, CLAUDE_CODE_SSE_PORT, ...rest } = sourceEnv
+  const model = sourceEnv.VELLUM_CODEX_MODEL?.trim()
+  if (backend === 'codex' && model) {
+    let config: unknown = {}
+    if (sourceEnv.CODEX_CONFIG !== undefined) {
+      try {
+        config = JSON.parse(sourceEnv.CODEX_CONFIG)
+      } catch {
+        // Parser diagnostics may contain config secrets. Never attach the cause.
+        throw new Error('Cannot apply VELLUM_CODEX_MODEL: CODEX_CONFIG must be a JSON object')
+      }
+    }
+    if (config === null || typeof config !== 'object' || Array.isArray(config)) {
+      throw new Error('Cannot apply VELLUM_CODEX_MODEL: CODEX_CONFIG must be a JSON object')
+    }
+    rest.CODEX_CONFIG = JSON.stringify({ ...config, model })
+  }
+  // No raw API-key path for any backend: a key left in the user's shell must
+  // never take precedence over the signed-in subscription CLI.
+  for (const key of RAW_API_KEY_ENV) delete rest[key]
+  if (backend === 'antigravity') {
+    // Same rule as the other backends: auth comes from the signed-in CLI,
+    // never from a raw API key or cloud credential sitting in the env.
+    for (const key of ANTIGRAVITY_SCRUBBED_ENV) delete rest[key]
+  }
   return rest
 }
 
+const RAW_API_KEY_ENV = ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'OPENAI_API_KEY', 'CODEX_API_KEY']
+
+const ANTIGRAVITY_SCRUBBED_ENV = [
+  'GEMINI_API_KEY',
+  'GOOGLE_API_KEY',
+  'GOOGLE_APPLICATION_CREDENTIALS',
+  'GOOGLE_CLOUD_PROJECT',
+  'GOOGLE_CLOUD_LOCATION',
+  'GOOGLE_GENAI_USE_VERTEXAI',
+]
+
+/** Model override for Antigravity (e.g. `claude-sonnet-4-6`), applied with
+ * ACP `session/set_config_option` after `session/new`. Unset = agent default. */
+export function antigravityModelOverride(sourceEnv: NodeJS.ProcessEnv = process.env): string | undefined {
+  return sourceEnv.VELLUM_ANTIGRAVITY_MODEL?.trim() || undefined
+}
+
+/** ACP error code agents use for "authentication required". */
+const ACP_AUTH_REQUIRED = -32000
+
+/** Turns an auth-required failure into an actionable message for the user. */
+export function describeSessionError(backend: AcpBackend, err: unknown): Error | undefined {
+  const code = typeof err === 'object' && err !== null ? (err as { code?: unknown }).code : undefined
+  if (code !== ACP_AUTH_REQUIRED) return undefined
+  if (backend === 'antigravity') {
+    return new Error('Antigravity is not signed in. Run `agy acp --login` in a terminal, then try again.')
+  }
+  return new Error(`${ADAPTERS[backend].command} is not signed in. Sign in with its CLI, then try again.`)
+}
+
 const defaultSpawnAdapter: SpawnAdapter = (backend) => {
-  const { command } = ADAPTERS[backend]
-  return spawn(command, buildAdapterArgs(backend), {
+  return spawn(resolveAdapterCommand(backend), buildAdapterArgs(backend), {
     stdio: ['pipe', 'pipe', 'inherit'],
-    env: buildAdapterEnv(),
+    env: buildAdapterEnv(process.env, backend),
     detached: process.platform !== 'win32',
   }) as AdapterChildProcess
 }
@@ -160,10 +259,15 @@ async function terminateAdapter(child: AdapterChildProcess): Promise<void> {
  * Exported standalone so the mapping can be unit-tested without a subprocess. */
 export function mapSessionUpdate(update: SessionUpdate): AcpUpdate {
   switch (update.sessionUpdate) {
-    case 'user_message_chunk':
     case 'agent_message_chunk':
-    case 'agent_thought_chunk':
       return { kind: 'text', data: update.content }
+    // Only the agent's answer is 'text'. Some agents (agy) echo the user's
+    // prompt back as user_message_chunk and stream reasoning as
+    // agent_thought_chunk; treating those as text pasted the prompt and the
+    // model's private reasoning into the answer and into persisted chats.
+    case 'user_message_chunk':
+    case 'agent_thought_chunk':
+      return { kind: 'tool_result', data: update }
     case 'tool_call':
       return { kind: 'tool_call', data: update }
     case 'tool_call_update':
@@ -302,21 +406,42 @@ function timeoutAfter(ms: number, message: string): { promise: Promise<never>; c
 }
 
 class StdioAcpSession implements AcpSession {
-  // Set only while a prompt() call is in flight — one prompt at a time per
-  // session, mirroring the ACP protocol (a session has one active turn).
+  // Set only while a turn is in flight — one turn at a time per session,
+  // mirroring the ACP protocol (a session has one active turn).
   private queue: UpdateQueue | undefined
   private disposed = false
   private disposePromise: Promise<void> | undefined
   // Set only while a prompt() call is in flight; cleared by dispose() too so
   // an external dispose mid-turn doesn't leave a dangling timer.
   private turnTimeout: { cancel(): void; reset(): void } | undefined
+  // ACP allows one active turn per session, and `route()` can only feed one
+  // queue. Overlapping prompt() calls wait here until every earlier turn has
+  // settled (done / error / timeout / dispose) before sending their own.
+  private turnTail: Promise<void> = Promise.resolve()
+  private releaseWaiters: (() => void) | undefined
+  private readonly disposedSignal = new Promise<void>((resolve) => {
+    this.releaseWaiters = resolve
+  })
 
   constructor(
     private readonly connection: ClientSideConnection,
     private readonly sessionId: string,
     private readonly child: AdapterChildProcess,
     private readonly turnMs: number,
+    private readonly childFailureMessage: () => string | undefined,
   ) {}
+
+  /** Error text for a rejected `session/prompt`. A JSON-RPC error from a
+   * live adapter is reported as-is. When the transport closed because the
+   * adapter process died, the SDK only says "ACP connection closed"; wait
+   * (bounded) for the child's exit and prefer its exit-code/signal
+   * diagnostic, mirroring what `newSession` does for handshake failures. */
+  private async promptFailureMessage(err: unknown): Promise<string> {
+    const fallback = err instanceof Error ? err.message : String(err)
+    if (!this.connection.signal.aborted) return fallback
+    await waitForChildExit(this.child, PROCESS_EXIT_GRACE_MS)
+    return this.childFailureMessage() ?? fallback
+  }
 
   /** Routes a `session/update` notification to the in-flight prompt's queue,
    * if this is that session and a prompt is actually in flight. Called
@@ -334,6 +459,29 @@ class StdioAcpSession implements AcpSession {
       return
     }
 
+    // Reserve this turn's slot. The slot is released when the turn settles
+    // on the wire, not when the consumer stops iterating, so an abandoned
+    // iterator cannot let the next turn overlap one still running.
+    const previousTurn = this.turnTail
+    let releaseTurn!: () => void
+    this.turnTail = new Promise<void>((resolve) => {
+      releaseTurn = resolve
+    })
+    let started = false
+    try {
+      await Promise.race([previousTurn, this.disposedSignal])
+      if (this.disposed) {
+        yield { kind: 'error', data: { message: 'session disposed' } }
+        return
+      }
+      started = true
+      yield* this.runTurn(req, releaseTurn)
+    } finally {
+      if (!started) releaseTurn()
+    }
+  }
+
+  private async *runTurn(req: AcpPromptRequest, releaseTurn: () => void): AsyncGenerator<AcpUpdate> {
     const queue = new UpdateQueue()
     this.queue = queue
 
@@ -349,13 +497,16 @@ class StdioAcpSession implements AcpSession {
         timeout.cancel()
         queue.push({ kind: 'done', data: { stopReason: res.stopReason, ...(res.usage ? { usage: res.usage } : {}) } })
         queue.close()
+        releaseTurn()
       })
-      .catch((err: unknown) => {
+      .catch(async (err: unknown) => {
         if (settled) return
         settled = true
         timeout.cancel()
-        queue.push({ kind: 'error', data: { message: err instanceof Error ? err.message : String(err) } })
+        const message = await this.promptFailureMessage(err)
+        queue.push({ kind: 'error', data: { message } })
         queue.close()
+        releaseTurn()
       })
 
     // Turn timeout: if neither branch above settles first, force-fail the
@@ -367,6 +518,7 @@ class StdioAcpSession implements AcpSession {
       settled = true
       queue.push({ kind: 'error', data: { message: err.message } })
       queue.close()
+      releaseTurn()
       void this.dispose().catch(() => undefined)
     })
 
@@ -381,8 +533,13 @@ class StdioAcpSession implements AcpSession {
   async dispose(): Promise<void> {
     if (this.disposePromise) return this.disposePromise
     this.disposed = true
+    this.releaseWaiters?.()
     this.turnTimeout?.cancel()
     this.turnTimeout = undefined
+    // A consumer whose iterator just ends treats the turn as complete (the
+    // chat manager persists the partial text as the reply). Disposal
+    // interrupts the turn, so say so explicitly before closing.
+    this.queue?.push({ kind: 'error', data: { message: 'session disposed' } })
     this.queue?.close()
     this.queue = undefined
     this.disposePromise = terminateAdapter(this.child)
@@ -442,6 +599,7 @@ export class StdioAcpClient implements AcpClient {
       await Promise.race([
         connection.initialize({
           protocolVersion: PROTOCOL_VERSION,
+          clientInfo: { name: 'vellum', version: '0.1.0' },
           clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
         }),
         failure,
@@ -453,9 +611,21 @@ export class StdioAcpClient implements AcpClient {
         failure,
         handshake.promise,
       ])
+      const model = backend === 'antigravity' ? antigravityModelOverride() : undefined
+      if (model) {
+        await Promise.race([
+          connection.setSessionConfigOption({
+            sessionId: newSessionResult.sessionId,
+            configId: 'model',
+            value: model,
+          }),
+          failure,
+          handshake.promise,
+        ])
+      }
       handshake.cancel()
       const turnMs = this.timeouts.turnMs ?? DEFAULT_TURN_TIMEOUT_MS
-      session = new StdioAcpSession(connection, newSessionResult.sessionId, child, turnMs)
+      session = new StdioAcpSession(connection, newSessionResult.sessionId, child, turnMs, tracker.message)
       return session
     } catch (err) {
       handshake.cancel()
@@ -471,6 +641,8 @@ export class StdioAcpClient implements AcpClient {
       if (err instanceof Error && err.message.startsWith('ACP handshake timed out')) {
         throw err
       }
+      const authError = describeSessionError(backend, err)
+      if (authError) throw authError
       await failure.catch(() => undefined)
       const message = tracker.message()
       throw message ? new Error(message) : err

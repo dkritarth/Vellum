@@ -1,0 +1,33 @@
+// @vitest-environment jsdom
+import '@testing-library/jest-dom/vitest'
+import {act,cleanup,fireEvent,render,screen} from '@testing-library/react'
+import {afterEach,expect,it,vi} from 'vitest'
+import {NotesPanel} from './NotesPanel'
+afterEach(()=>{cleanup();vi.useRealTimers()})
+function setup() {
+ let stored='Saved research evidence'
+ const notesSave=vi.fn(async()=>{throw Error('SQLITE_FULL: database or disk is full')})
+ const notesDelete=vi.fn(async()=>{throw Error('SQLITE_IOERR: disk I/O error')})
+ Object.defineProperty(window,'vellum',{configurable:true,value:{notesGet:vi.fn(async()=>({paperSlug:'paper',body:stored,updatedAt:'now'})),notesSave,notesDelete}})
+ return {stored:()=>stored,notesSave,notesDelete}
+}
+it('reports failed autosave and offers retry while preserving unsaved draft',async()=>{
+ vi.useFakeTimers();const store=setup()
+ render(<NotesPanel slug="paper"/>);await act(async()=>{})
+ fireEvent.change(screen.getByRole('textbox',{name:'Note'}),{target:{value:'New unsaved evidence'}})
+ await act(async()=>{await vi.advanceTimersByTimeAsync(500)})
+ expect(store.notesSave).toHaveBeenCalledTimes(1)
+ expect(store.stored()).toBe('Saved research evidence')
+ expect(screen.getByRole('textbox',{name:'Note'})).toHaveValue('New unsaved evidence')
+ console.log('failed autosave visible UI',document.body.textContent)
+ expect(screen.getByRole('alert')).toHaveTextContent(/save/i)
+ expect(screen.getByRole('button',{name:/retry/i})).toBeVisible()
+})
+it('reports failed clear after restoring the note',async()=>{
+ const store=setup();render(<NotesPanel slug="paper"/>);await act(async()=>{})
+ fireEvent.click(screen.getByRole('button',{name:'Clear note'}));await act(async()=>{})
+ expect(store.notesDelete).toHaveBeenCalledTimes(1)
+ expect(screen.getByRole('textbox',{name:'Note'})).toHaveValue('Saved research evidence')
+ console.log('failed clear visible UI',document.body.textContent)
+ expect(screen.getByRole('alert')).toHaveTextContent(/clear|delete/i)
+})

@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ChatSessionSummary } from '../../core/chat/repo'
+import { BACKEND_LABELS, isChatBackend } from './ModelSelector'
 import styles from './ChatsList.module.css'
 
 interface ChatsListProps {
+  onSessionDeleted?: (id: number) => void
   selectedSessionId: number | null
   onSelectSession: (session: ChatSessionSummary) => void
 }
@@ -25,31 +27,49 @@ function formatRelativeTime(dateStr: string): string {
   }
 }
 
-export function ChatsList({ selectedSessionId, onSelectSession }: ChatsListProps): JSX.Element {
+export function ChatsList({ selectedSessionId, onSelectSession, onSessionDeleted }: ChatsListProps): JSX.Element {
   const [sessions, setSessions] = useState<ChatSessionSummary[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [focusedIndex, setFocusedIndex] = useState<number>(-1)
   const listRef = useRef<HTMLUListElement>(null)
 
-  const fetchSessions = useCallback(async () => {
-    try {
-      const data = await window.vellum.chatListSessions({ search })
-      setSessions(data)
-      setError(null)
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setLoading(false)
-    }
-  }, [search])
+  const refreshSessions = useRef<(() => Promise<void>) | null>(null)
 
   useEffect(() => {
+    let active = true
+    let latestRequest = 0
+    setLoading(true)
+    setError(null)
+    setSessions([])
+
+    const fetchSessions = async () => {
+      const request = ++latestRequest
+      const isCurrent = () => active && request === latestRequest
+      try {
+        const data = await window.vellum.chatListSessions({ search })
+        if (!isCurrent()) return
+        setSessions(data)
+        setError(null)
+      } catch (err: unknown) {
+        if (!isCurrent()) return
+        setError(err instanceof Error ? err.message : String(err))
+      } finally {
+        if (isCurrent()) setLoading(false)
+      }
+    }
+
+    refreshSessions.current = fetchSessions
     void fetchSessions()
     const interval = setInterval(fetchSessions, 2000)
-    return () => clearInterval(interval)
-  }, [fetchSessions])
+    return () => {
+      active = false
+      refreshSessions.current = null
+      clearInterval(interval)
+    }
+  }, [search])
 
   const handleDelete = async (e: React.MouseEvent, session: ChatSessionSummary) => {
     e.stopPropagation()
@@ -57,9 +77,14 @@ export function ChatsList({ selectedSessionId, onSelectSession }: ChatsListProps
     if (!confirmed) return
     try {
       await window.vellum.chatDeleteSession(session.id)
-      await fetchSessions()
+      setActionError(null)
+      onSessionDeleted?.(session.id)
+      await refreshSessions.current?.()
     } catch (err) {
       console.error('Failed to delete chat session:', err)
+      setActionError(
+        `Could not delete chat "${session.title}": ${errorMessage(err)}`,
+      )
     }
   }
 
@@ -97,6 +122,20 @@ export function ChatsList({ selectedSessionId, onSelectSession }: ChatsListProps
         />
       </div>
 
+      {actionError && (
+        <div className={styles.actionError} role="alert">
+          <span>{actionError}</span>
+          <button
+            type="button"
+            className={styles.dismissButton}
+            aria-label="Dismiss chat error"
+            onClick={() => setActionError(null)}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {error ? (
         <div className={styles.errorState} role="alert">
           Failed to load chats: {error}
@@ -117,7 +156,9 @@ export function ChatsList({ selectedSessionId, onSelectSession }: ChatsListProps
                 ? styles.badgeClaude
                 : session.backend === 'codex'
                   ? styles.badgeCodex
-                  : styles.badgeGeneric
+                  : session.backend === 'antigravity'
+                    ? styles.badgeAntigravity
+                    : styles.badgeGeneric
 
             return (
               <li
@@ -154,7 +195,7 @@ export function ChatsList({ selectedSessionId, onSelectSession }: ChatsListProps
                 </div>
 
                 <div className={styles.itemMeta}>
-                  <span className={`${styles.badge} ${backendClass}`}>{session.backend}</span>
+                  <span className={`${styles.badge} ${backendClass}`}>{isChatBackend(session.backend) ? BACKEND_LABELS[session.backend] : session.backend}</span>
                   <span className={styles.msgCount}>
                     {session.messageCount} {session.messageCount === 1 ? 'turn' : 'turns'}
                   </span>
@@ -169,4 +210,11 @@ export function ChatsList({ selectedSessionId, onSelectSession }: ChatsListProps
       )}
     </div>
   )
+}
+
+// Electron wraps main-process throws as "Error invoking remote method '<channel>': Error: <msg>";
+// show only <msg> to the user.
+function errorMessage(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err)
+  return message.replace(/^Error invoking remote method '[^']*': (?:Error: )?/, '')
 }

@@ -18,7 +18,7 @@ const LIBRARY_VIEWS = ['Files', 'Chats'] as const
 type LibraryView = (typeof LIBRARY_VIEWS)[number]
 
 const FOOTER_ITEMS = ['Trash', 'Usage'] as const
-type FooterItem = (typeof FOOTER_ITEMS)[number]
+export type FooterItem = (typeof FOOTER_ITEMS)[number]
 
 const FOOTER_NOTES: Record<FooterItem, string> = {
   Trash: 'Soft-delete + restore — wiki card [P2-08]',
@@ -32,12 +32,23 @@ interface SidebarProps {
   onNavChange?: (item: NavItem) => void
   selectedCollectionId?: number | null
   onSelectCollection?: (id: number | null, name: string | null) => void
+  onSessionDeleted?: (id: number) => void
   selectedSessionId?: number | null
   onSelectSession?: (session: ChatSessionSummary) => void
   /** [L2-04] Callback when Trash is selected */
   onSelectTrash?: () => void
   /** [L2-05] Callback when Usage is selected */
   onSelectUsage?: () => void
+  /** Highlighted primary nav item. When App passes it, the highlight follows
+   * the visible view (Create is a dialog, never a page). `null` = no primary
+   * item (e.g. Trash/Usage shown). Omitted = Sidebar tracks clicks itself. */
+  activeNavItem?: NavItem | null
+  /** Highlighted footer item for App-driven views (Trash/Usage). */
+  activeFooterItem?: FooterItem | null
+  /** A Library card was dropped onto a collection. */
+  onPaperAssigned?: (collectionId: number) => void
+  /** A sidebar collection was created, renamed or deleted. */
+  onCollectionsChanged?: () => void
 }
 
 export function Sidebar({
@@ -46,12 +57,20 @@ export function Sidebar({
   onSelectCollection,
   selectedSessionId = null,
   onSelectSession,
+  onSessionDeleted,
   onSelectTrash,
   onSelectUsage,
+  activeNavItem,
+  activeFooterItem,
+  onPaperAssigned,
+  onCollectionsChanged,
 }: SidebarProps = {}): JSX.Element {
-  const [active, setActive] = useState<NavItem>('Home')
+  const [localActive, setLocalActive] = useState<NavItem>('Home')
   const [libraryView, setLibraryView] = useState<LibraryView>('Files')
   const [footerView, setFooterView] = useState<FooterItem | null>(null)
+  // A footer "coming soon" stub replaces the nav highlight while open.
+  const active = footerView ? null : activeNavItem !== undefined ? activeNavItem : localActive
+  const activeFooter = footerView ?? activeFooterItem ?? null
 
   return (
     <nav className={styles.sidebar} aria-label="Primary">
@@ -65,7 +84,7 @@ export function Sidebar({
               className={item === active ? `${styles.navItem} ${styles.navItemActive}` : styles.navItem}
               aria-current={item === active ? 'page' : undefined}
               onClick={() => {
-                setActive(item)
+                if (item !== 'Create') setLocalActive(item)
                 setFooterView(null)
                 onNavChange?.(item)
               }}
@@ -105,9 +124,12 @@ export function Sidebar({
             onSelectCollection={(id, name) => {
               onSelectCollection?.(id, name)
             }}
+            onPaperAssigned={onPaperAssigned}
+            onCollectionsChanged={onCollectionsChanged}
           />
         ) : (
           <ChatsList
+            onSessionDeleted={onSessionDeleted}
             selectedSessionId={selectedSessionId}
             onSelectSession={(session) => {
               onSelectSession?.(session)
@@ -121,8 +143,8 @@ export function Sidebar({
           <button
             key={item}
             type="button"
-            className={item === footerView ? `${styles.footerItem} ${styles.footerItemActive}` : styles.footerItem}
-            aria-pressed={item === footerView}
+            className={item === activeFooter ? `${styles.footerItem} ${styles.footerItemActive}` : styles.footerItem}
+            aria-pressed={item === activeFooter}
             onClick={() => {
               if (item === 'Trash' && onSelectTrash) {
                 setFooterView(null)

@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "npm run build && node test/offline-gates.mjs",
     "smoke:acp": "tsx core/acp/smoke.ts",
     "test:gate:reading": "node test/reading-gate.mjs",
     "test:gate:collections": "node test/collections-live.mjs",

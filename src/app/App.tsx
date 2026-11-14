@@ -1,7 +1,7 @@
 import { TrashView } from './TrashView.js'
 import { UsageView } from './UsageView.js'
 import type { ChatSessionSummary } from '../../core/chat/repo'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { IngestModal } from './IngestModal'
 import { Library } from './Library'
 import { Reader } from './Reader'
@@ -115,6 +115,7 @@ export function App(): JSX.Element {
 `,
       autoSend: false,
       nonce: Date.now(),
+      slug: activeTabId ?? undefined,
     })
   }
 
@@ -126,8 +127,13 @@ export function App(): JSX.Element {
 > "${quote}"`,
       autoSend: true,
       nonce: Date.now(),
+      slug: activeTabId ?? undefined,
     })
   }
+
+  const handleInjectedPromptHandled = useCallback((nonce: number): void => {
+    setInjectedPrompt((current) => (current?.nonce === nonce ? null : current))
+  }, [])
 
   useEffect(() => {
     window.vellum?.ping().then(setPong).catch(() => setPong('no-bridge'))
@@ -284,6 +290,7 @@ export function App(): JSX.Element {
           onHighlightDeleted={handleHighlightsChanged}
           highlightsRevision={activeTabId ? highlightRevisions[activeTabId] ?? 0 : 0}
           injectedPrompt={injectedPrompt}
+          onInjectedPromptHandled={handleInjectedPromptHandled}
           targetSessionId={selectedChatSessionId}
           deletedSessionIds={deletedSessionIds}
         />

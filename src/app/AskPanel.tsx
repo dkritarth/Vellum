@@ -38,6 +38,8 @@ export interface InjectedPrompt {
   text: string
   autoSend?: boolean
   nonce: number
+  /** Paper the prompt was created for; another paper's Ask panel ignores it. */
+  slug?: string
 }
 
 interface AskPanelProps {
@@ -45,13 +47,21 @@ interface AskPanelProps {
   slug: string
   /** [R1-05] Contextual prompt injected from PDF text selection (Add to chat or Explain) */
   injectedPrompt?: InjectedPrompt | null
+  /** Called once a prompt is consumed, with its nonce. */
+  onInjectedPromptHandled?: (nonce: number) => void
   /** Successful deletions retained by App across Ask tab remounts. */
   deletedSessionIds?: readonly number[]
   /** [L2-02] Target chat session ID to restore from Chats library */
   targetSessionId?: number | null
 }
 
-export function AskPanel({ slug, injectedPrompt, targetSessionId, deletedSessionIds }: AskPanelProps): JSX.Element {
+export function AskPanel({
+  slug,
+  injectedPrompt,
+  onInjectedPromptHandled,
+  targetSessionId,
+  deletedSessionIds,
+}: AskPanelProps): JSX.Element {
   const [deletionRevision, setDeletionRevision] = useState(0)
   const [loadRevision, setLoadRevision] = useState(0)
   // Durable IDs are never reused. Keep tombstones across Ask tab remounts.
@@ -228,8 +238,11 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId, deletedSession
   // [R1-05] Process injected prompt from PDF text selection actions
   useEffect(() => {
     if (!injectedPrompt || sessionId === null) return
+    if (injectedPrompt.slug !== undefined && injectedPrompt.slug !== slug) return
     if (lastHandledNonce.current === injectedPrompt.nonce) return
     lastHandledNonce.current = injectedPrompt.nonce
+    // App clears the prompt so a remounted panel (tab switch) never replays it.
+    onInjectedPromptHandled?.(injectedPrompt.nonce)
 
     if (injectedPrompt.autoSend) {
       void sendTurn(injectedPrompt.text)
@@ -237,7 +250,7 @@ export function AskPanel({ slug, injectedPrompt, targetSessionId, deletedSession
       setInput((current) => (current ? `${current}\n\n${injectedPrompt.text}` : injectedPrompt.text))
       inputRef.current?.focus()
     }
-  }, [injectedPrompt, sessionId, sendTurn])
+  }, [injectedPrompt, sessionId, sendTurn, slug, onInjectedPromptHandled])
 
   const startNewChat = useCallback((nextBackend: ChatBackend = backend) => {
     const generation = ++contextGeneration.current

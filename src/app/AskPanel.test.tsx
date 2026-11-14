@@ -569,6 +569,34 @@ describe('AskPanel', () => {
       }),
     )
   })
+  it('reports a consumed prompt so App can clear it before a remount replays it', async () => {
+    const onHandled = vi.fn()
+    render(
+      <AskPanel
+        slug="p1"
+        injectedPrompt={{ text: 'Explain this', autoSend: true, nonce: 7, slug: 'p1' }}
+        onInjectedPromptHandled={onHandled}
+      />,
+    )
+    await waitFor(() => expect(askStart).toHaveBeenCalledTimes(1))
+    expect(onHandled).toHaveBeenCalledWith(7)
+  })
+
+  it("ignores a prompt created for another paper", async () => {
+    const onHandled = vi.fn()
+    render(
+      <AskPanel
+        slug="p2"
+        injectedPrompt={{ text: 'Explain this', autoSend: true, nonce: 8, slug: 'p1' }}
+        onInjectedPromptHandled={onHandled}
+      />,
+    )
+    await waitFor(() => expect(askOpen).toHaveBeenCalled())
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(askStart).not.toHaveBeenCalled()
+    expect(onHandled).not.toHaveBeenCalled()
+  })
+
   it('reopens exact chat session when targetSessionId is passed [L2-02]', async () => {
     askOpen.mockResolvedValue({
       session: { id: 42, paperSlug: 'p1', backend: 'claude', title: 'Prior Discussion', createdAt: 't' },

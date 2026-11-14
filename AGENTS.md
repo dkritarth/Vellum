@@ -120,7 +120,18 @@ Every behavior change must satisfy all applicable checks:
 npm test
 npm run typecheck
 npm run build
+xvfb-run -a npm run test:e2e   # macOS/Windows or a desktop session: npm run test:e2e
 ```
+
+`npm run test:e2e` builds the app and runs the deterministic core-journey gates in
+`test/offline-gates.mjs` against the real Electron app: boot and preload bridge,
+Library empty state, ingest of the fixture PDFs, Reader rendering and text layer,
+notes/collections/trash/usage, and persistence across restart. Each gate uses an
+isolated `VELLUM_DATA_DIR` and never touches `data/`. ACP adapters are stubbed, so
+it needs no sign-in, and CI runs it on every PR. A failure exits non-zero and prints
+paths to a screenshot and console log under `test-artifacts/`. Console errors and
+warnings fail a gate unless allowlisted with a reason in `assertNoConsoleErrors`.
+Signed-in behaviour is separate: `npm run smoke:acp -- codex` and live clicking.
 
 - New behavior has tests; bug fix has regression test.
 - Existing unrelated tests still pass.

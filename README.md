@@ -39,6 +39,14 @@ CLIs signed in
 (see the wiki's ACP-Integration page). For Gemini, install Google's Antigravity
 CLI (`agy`) and sign in once with `agy acp --login` (see `core/acp/README.md`).
 
+## Verify
+
+```bash
+npm test && npm run typecheck
+xvfb-run -a npm run test:e2e   # live Electron core-journey gates; drop xvfb-run on a desktop
+npm run smoke:acp -- codex     # signed-in adapter check (also: claude)
+```
+
 ## Why
 
 anara.com is great but wants its own subscription. Vellum reuses the plan you

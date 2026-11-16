@@ -30,6 +30,12 @@ export function createIsolatedDataDir(existing) {
 export async function launchIsolatedApp(options = {}) {
   const appPath = options.appPath || path.join(ROOT, 'out', 'main', 'index.cjs')
   const dataDir = createIsolatedDataDir(options.dataDir)
+  // Chromium profile (localStorage such as the panel layout) lives under
+  // XDG_CONFIG_HOME on Linux. Keep it beside the data dir so one gate cannot
+  // leak UI state (e.g. a collapsed sidebar) into later gates or the developer's
+  // real profile, while restarts that reuse dataDir still see persisted state.
+  const profileDir = path.join(dataDir, '.electron-profile')
+  fs.mkdirSync(profileDir, { recursive: true })
 
   const app = await electron.launch({
     args: ['--no-sandbox', appPath],
@@ -37,6 +43,8 @@ export async function launchIsolatedApp(options = {}) {
       ...process.env,
       ELECTRON_RUN_AS_NODE: '',
       VELLUM_DATA_DIR: dataDir,
+      XDG_CONFIG_HOME: path.join(profileDir, 'config'),
+      XDG_CACHE_HOME: path.join(profileDir, 'cache'),
     },
   })
 

@@ -85,7 +85,8 @@ async function measure(label) {
   await window.screenshot({ path:path.join(dir, `${label}.png`) })
   assert.equal(record.documentOverflow, false, label)
   assert(record.sidebar.width > 0 && record.ask.width > 0, `${label}: both sidebars visible`)
-  assert.equal(record.main.right, record.ask.x, `${label}: center ends at Ask`)
+  // #216 places a 1px resize divider between the paper view and the Ask panel.
+  assert(Math.abs(record.ask.x - record.main.right) <= 1, `${label}: center ends at Ask (${record.main.right} vs ${record.ask.x})`)
   assert(record.body.height > 500, `${label}: remaining paper viewport`)
   for (const c of record.controls) {
     assert(c.visible && c.width > 0 && c.height > 0, `${label}: hidden ${c.label}`)
@@ -133,9 +134,13 @@ async function controls(label) {
   await toolbar.getByRole('button', { name:'Zoom in', exact:true }).click()
   assert.notEqual(await zoom.innerText(), initial)
   await window.waitForFunction(width => document.querySelector('main [data-page-number="1"] canvas').width > width, canvasWidth)
+  const zoomed = await zoom.innerText()
+  const zoomedWidth = await main().locator('[data-page-number="1"] canvas').evaluate(e => e.width)
+  // The default is fit-to-width (#216), and the buttons snap to 25% presets,
+  // so Zoom out after Zoom in lands on the preset below rather than the fit value.
   await toolbar.getByRole('button', { name:'Zoom out', exact:true }).click()
-  assert.equal(await zoom.innerText(), initial)
-  await window.waitForFunction(width => document.querySelector('main [data-page-number="1"] canvas').width === width, canvasWidth)
+  assert(parseInt(await zoom.innerText()) < parseInt(zoomed), `${label}: zoom out lowers ${zoomed}`)
+  await window.waitForFunction(width => document.querySelector('main [data-page-number="1"] canvas').width < width, zoomedWidth)
   await search().fill('learning')
   await search().press('Enter')
   await window.waitForFunction(() => /^[1-9]/.test(document.querySelector('[aria-label="Search matches"]')?.textContent || ''))

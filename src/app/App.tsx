@@ -91,6 +91,10 @@ export function App(): JSX.Element {
     try {
       const paper = await window.vellum.getPaper(session.paperSlug)
       if (chatNavigation.current !== request) return
+      if (paper?.trashedAt) {
+        setChatBanner(`"${paper.title}" is in Trash. Restore it from Trash to open this conversation.`)
+        return
+      }
       if (paper) {
         setChatBanner(null)
         openPaper({ slug: paper.slug, title: paper.title })

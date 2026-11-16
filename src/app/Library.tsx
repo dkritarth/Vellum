@@ -103,20 +103,22 @@ export function Library({
   }
 
   async function handleAssign(paper: PaperRecord, collectionId: number): Promise<void> {
+    setActionError(null)
     try {
       await window.vellum.collectionsAssign({ paperSlug: paper.slug, collectionId })
       await loadPaperCollections(paper.slug)
     } catch (err) {
-      console.error('Failed to add paper to collection:', err)
+      setActionError(`Could not add "${paper.title}" to collection: ${errorMessage(err)}`)
     }
   }
 
   async function handleRemoveFromCollection(paper: PaperRecord, collectionId: number): Promise<void> {
+    setActionError(null)
     try {
       await window.vellum.collectionsRemove({ paperSlug: paper.slug, collectionId })
       setPapers((prev) => prev.filter((p) => p.slug !== paper.slug))
     } catch (err) {
-      console.error('Failed to remove paper from collection:', err)
+      setActionError(`Could not remove "${paper.title}" from collection: ${errorMessage(err)}`)
     }
   }
 
@@ -142,6 +144,7 @@ export function Library({
         if (window.vellum?.collectionsForPaper) {
           const tags: Record<string, CollectionRecord[]> = {}
           for (const paper of rows) {
+            if (cancelled) break
             try {
               tags[paper.slug] = await window.vellum.collectionsForPaper(paper.slug)
             } catch {

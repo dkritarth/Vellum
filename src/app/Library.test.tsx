@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Library } from './Library'
@@ -228,6 +228,58 @@ describe('Library', () => {
     // Control resets to its prompt, and the paper's own collection is no longer offered.
     expect(select).toHaveValue('')
     await waitFor(() => expect(screen.queryByRole('option', { name: 'Computer Science / AI' })).not.toBeInTheDocument())
+  })
+
+  it('shows assignment failures and clears the error after a successful retry', async () => {
+    const user = userEvent.setup()
+    listPapers.mockResolvedValue([makePaper()])
+    let assigned = false
+    Object.assign(window.vellum, {
+      collectionsList: vi.fn().mockResolvedValue([{ id: 1, name: 'Reading', parentId: null }]),
+      collectionsForPaper: vi.fn(async () => assigned ? [{ id: 1, name: 'Reading', parentId: null }] : []),
+      collectionsAssign: vi.fn().mockRejectedValueOnce(new Error("Error invoking remote method 'vellum:collections-assign': Error: database is locked"))
+        .mockImplementationOnce(async () => { assigned = true }),
+    })
+    render(<Library onOpenPaper={vi.fn()} />)
+    const select = await screen.findByRole('combobox', { name: 'Add to collection: Attention Is All You Need' })
+    await user.selectOptions(select, '1')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not add "Attention Is All You Need" to collection: database is locked')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('invoking remote method')
+    await user.selectOptions(select, '1')
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+    expect(await screen.findByText('Reading')).toBeInTheDocument()
+  })
+
+  it('keeps the card and explains removal failures, then allows a successful retry', async () => {
+    const user = userEvent.setup()
+    listPapers.mockResolvedValue([makePaper()])
+    Object.assign(window.vellum, {
+      collectionsRemove: vi.fn().mockRejectedValueOnce(new Error('database is locked')).mockResolvedValueOnce(undefined),
+    })
+    render(<Library onOpenPaper={vi.fn()} selectedCollectionId={1} selectedCollectionName="Reading" />)
+    const remove = await screen.findByRole('button', { name: 'Remove from collection: Attention Is All You Need' })
+    await user.click(remove)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not remove "Attention Is All You Need" from collection: database is locked')
+    expect(screen.getByText('Attention Is All You Need')).toBeInTheDocument()
+    await user.click(remove)
+    await waitFor(() => expect(screen.queryByText('Attention Is All You Need')).not.toBeInTheDocument())
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('stops requesting obsolete collection tags when a new search replaces the results', async () => {
+    const user = userEvent.setup()
+    let release: (value: []) => void = () => undefined
+    listPapers.mockResolvedValueOnce([makePaper(), makePaper({ slug: 'old-second', title: 'Old second' })])
+      .mockResolvedValue([])
+    const collectionsForPaper = vi.fn().mockImplementationOnce(() => new Promise((resolve) => { release = resolve }))
+      .mockResolvedValue([])
+    Object.assign(window.vellum, { collectionsForPaper })
+    render(<Library onOpenPaper={vi.fn()} />)
+    await waitFor(() => expect(collectionsForPaper).toHaveBeenCalledWith('arxiv-1706.03762'))
+    await user.type(screen.getByRole('searchbox', { name: 'Search papers by title' }), 'x')
+    await screen.findByText('No papers match your search.')
+    await act(async () => { release([]) })
+    expect(collectionsForPaper).not.toHaveBeenCalledWith('old-second')
   })
 
   it('makes cards draggable with the paper slug as drag data', async () => {

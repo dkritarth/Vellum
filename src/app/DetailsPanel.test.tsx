@@ -2,6 +2,7 @@
 import '@testing-library/jest-dom/vitest'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import userEvent from '@testing-library/user-event'
 import { DetailsPanel } from './DetailsPanel'
 
 beforeEach(() => Object.defineProperty(window, 'vellum', { configurable: true, value: { getPaper: vi.fn().mockResolvedValue({ title: 'Paper', authors: ['Author'], year: 2026, summary: 'Short summary.', sections: [{ title: 'Introduction' }], addedAt: 't' }) } }))
@@ -15,6 +16,43 @@ it('shows stored summary and metadata', async () => {
   expect(await screen.findByText('Short summary.')).toBeInTheDocument()
   expect(screen.getByText('Author')).toBeInTheDocument()
   expect(screen.getByText('Introduction')).toBeInTheDocument()
+})
+
+it('shows a recoverable error when metadata lookup fails instead of loading forever', async () => {
+  const getPaper = vi.fn().mockRejectedValueOnce(new Error('metadata unavailable'))
+    .mockResolvedValueOnce({ title: 'Recovered paper', authors: [], addedAt: 't' })
+  Object.defineProperty(window, 'vellum', { configurable: true, value: { getPaper } })
+  render(<DetailsPanel slug="p1" />)
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Could not load paper details.')
+  expect(screen.queryByText('Loading paper details…')).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
+  expect(await screen.findByText('Recovered paper')).toBeInTheDocument()
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+})
+
+it('offers retry when the paper is missing and shows loading while retry is pending', async () => {
+  const getPaper = vi.fn().mockResolvedValueOnce(null).mockImplementationOnce(() => new Promise(() => undefined))
+  Object.defineProperty(window, 'vellum', { configurable: true, value: { getPaper } })
+  render(<DetailsPanel slug="missing" />)
+  expect(await screen.findByRole('alert')).toHaveTextContent('Could not load paper details.')
+  await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
+  expect(screen.getByText('Loading paper details…')).toBeInTheDocument()
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
+})
+
+it('ignores a failed lookup for the previous paper after switching papers', async () => {
+  let rejectOld: (reason: Error) => void = () => undefined
+  const getPaper = vi.fn().mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectOld = reject }))
+    .mockResolvedValueOnce({ title: 'Current paper', authors: [], addedAt: 't' })
+  Object.defineProperty(window, 'vellum', { configurable: true, value: { getPaper } })
+  const { rerender } = render(<DetailsPanel slug="old" />)
+  rerender(<DetailsPanel slug="current" />)
+  expect(await screen.findByText('Current paper')).toBeInTheDocument()
+  await act(async () => { rejectOld(new Error('Old lookup failed')) })
+  expect(screen.getByText('Current paper')).toBeInTheDocument()
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
 })
 
 it('renders an ORCID badge for authors with an ORCID and plain text for those without', async () => {

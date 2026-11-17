@@ -137,6 +137,9 @@ try {
     await button('Add Paper').click()
     await window.getByRole('alert').filter({ hasText: 'Local PDF not found:' }).waitFor()
     await window.keyboard.press('Escape')
+    // Keyboard dispatch can resolve before React unmounts the old dialog.
+    // Wait for that transition before checking the newly opened input.
+    await window.getByRole('dialog').waitFor({ state: 'detached' })
     await nav().getByRole('button', { name: 'Create', exact: true }).click()
     assert.equal(await window.getByLabel('Paper identifier or URL').inputValue(), '')
     await button('Cancel').click()

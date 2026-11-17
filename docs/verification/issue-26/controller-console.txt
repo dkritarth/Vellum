@@ -1,0 +1,15 @@
+Issue #26 renderer-control output captured after the detached-worktree-only
+preload bypass. This is audit-controller console evidence, not application
+renderer console output.
+
+{
+  "didCreate": true,
+  "createChanged": false,
+  "didLibrary": true,
+  "active": "Library"
+}
+
+Body text immediately before and after the Create click retained:
+
+No paper open
+Open a paper from Library to start reading.

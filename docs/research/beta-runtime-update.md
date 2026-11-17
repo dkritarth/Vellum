@@ -4,6 +4,8 @@ The release audit found high-severity advisories in PDF.js and Zod, and known El
 
 The beta pins Electron 45.3.3 and PDF.js 6.2.108, updates transitive Zod to 4.6.7, and uses electron-builder 26.18.0. Electron recommends shipping a current framework version because Chromium and Node security fixes ship with it. Sources: [Electron security guidance](https://www.electronjs.org/docs/latest/tutorial/security), [breaking changes](https://www.electronjs.org/docs/latest/breaking-changes), [PDF.js advisory](https://github.com/advisories/GHSA-hq66-cqwq-w95j), [Zod advisory](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5).
 
+Electron 44 and later require macOS 13 Ventura or later. Package metadata, README, release notes, and download page state that requirement. This beta targets Apple Silicon only.
+
 ## Native storage compatibility
 
 Rebuilding better-sqlite3 12.11.1 for Electron 45 failed with removed V8 methods, including `GetPrototypeV2` and `HolderV2`. This was a compile-time incompatibility, not a database failure. No production library was opened or migrated during the investigation.

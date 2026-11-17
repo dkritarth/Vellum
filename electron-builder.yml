@@ -18,6 +18,7 @@ linux:
   maintainer: Kritarth Dandapat <dkritarth@gmail.com>
   category: Education
 mac:
+  minimumSystemVersion: '13.0.0'
   extraResources:
     - from: node_modules/better-sqlite3/prebuilds/darwin-arm64.node
       to: native/better_sqlite3.node

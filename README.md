@@ -6,7 +6,7 @@ A local-first desktop workspace for reading research papers, asking about diffic
 
 ## Beta download
 
-**v0.1.1-beta.1 · Apple Silicon Macs · MIT license**
+**v0.1.1-beta.1 · Apple Silicon Macs · macOS 13+ · MIT license**
 
 [Download the Mac beta](https://github.com/dkritarth/Vellum/releases/tag/v0.1.1-beta.1) · [Website](https://dkritarth.com/Vellum/) · [Release notes](docs/releases/v0.1.1-beta.1.md)
 

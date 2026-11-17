@@ -39,6 +39,8 @@ export async function launchIsolatedApp(options = {}) {
 
   const app = await electron.launch({
     args: ['--no-sandbox', appPath],
+    // Opt-in recording for reviewable live walkthroughs; normal gates stay lean.
+    recordVideo: options.recordVideo,
     env: {
       ...process.env,
       ELECTRON_RUN_AS_NODE: '',

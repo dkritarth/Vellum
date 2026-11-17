@@ -1,6 +1,6 @@
 name: macOS build
 
-# Builds Vellum.app for Apple Silicon and Intel on real macOS runners so the
+# Builds Vellum.app for Apple Silicon on a real macOS runner so the
 # better-sqlite3 binding is compiled for the matching platform and arch.
 # Runs on PRs that touch packaging, manually from the Actions tab, or push a `v*` tag to attach the DMGs to
 # a GitHub release.
@@ -30,8 +30,6 @@ jobs:
         include:
           - arch: arm64
             runner: macos-15
-          - arch: x64
-            runner: macos-15-intel
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     steps:

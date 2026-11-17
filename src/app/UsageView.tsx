@@ -151,7 +151,7 @@ export function UsageView({ onBackToLibrary }: UsageViewProps): JSX.Element {
                     </div>
                     <div className={styles.metricRow}>
                       <span className={styles.metricLabel}>Context Window</span>
-                      <span className={usage.contextUsedLatest !== null ? styles.metricValue : styles.metricUnavailable}>
+                      <span className={usage.contextUsedLatest !== null && usage.contextSizeLatest !== null ? styles.metricValue : styles.metricUnavailable}>
                         {usage.contextUsedLatest !== null && usage.contextSizeLatest !== null
                           ? `${usage.contextUsedLatest.toLocaleString()} / ${usage.contextSizeLatest.toLocaleString()}`
                           : 'Unavailable'}

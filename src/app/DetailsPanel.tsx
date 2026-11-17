@@ -16,18 +16,33 @@ interface PaperDetails {
 
 export function DetailsPanel({ slug }: { slug?: string }): JSX.Element {
   const [paper, setPaper] = useState<PaperDetails | null>(null)
+  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     setPaper(null)
+    setFailed(false)
     if (!slug) return
     // Drop responses for a paper the user has already switched away from.
     let current = true
     window.vellum
       .getPaper(slug)
-      .then((result) => { if (current) setPaper(result) })
-      .catch(() => { if (current) setPaper(null) })
+      .then((result) => {
+        if (!current) return
+        setPaper(result)
+        setFailed(result === null)
+      })
+      .catch(() => { if (current) setFailed(true) })
     return () => { current = false }
-  }, [slug])
+  }, [slug, attempt])
   if (!slug) return <p className={styles.placeholder}>No paper open — metadata will show here.</p>
+  if (failed) return (
+    <div className={styles.placeholder}>
+      <p role="alert">Could not load paper details.</p>
+      <button type="button" className={styles.retryButton} onClick={() => setAttempt((value) => value + 1)}>
+        Retry
+      </button>
+    </div>
+  )
   if (!paper) return <p className={styles.placeholder}>Loading paper details…</p>
   return <section className={styles.panel}>
     {paper.summary ? <><h2>Summary</h2><p>{paper.summary}</p></> : null}

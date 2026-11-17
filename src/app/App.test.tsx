@@ -378,6 +378,20 @@ describe('chat navigation ownership', () => {
     return { user, chat: (id: number) => screen.getByRole('option', { name: new RegExp(`Chat ${id}`) }) }
   }
 
+  it('requires restoring a trashed paper before opening its conversation', async () => {
+    const { user, chat } = await setup()
+    vi.mocked(window.vellum.getPaper).mockResolvedValueOnce({ ...papers[0], trashedAt: '2026-11-16T00:00:00Z' })
+    await user.click(chat(1))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Restore it from Trash to open this conversation.')
+    expect(screen.queryByRole('tab', { name: 'Paper A' })).not.toBeInTheDocument()
+    expect(window.vellum.askOpen).not.toHaveBeenCalled()
+    // A later lookup after restore returns the active record and can open it.
+    await user.click(chat(1))
+    expect(await screen.findByRole('tab', { name: 'Paper A' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(window.vellum.askOpen).toHaveBeenLastCalledWith({ slug: 'paper-a', sessionId: 1 })
+  })
+
   it('keeps latest chat and paper together when lookups finish in reverse order', async () => {
     const { user, chat } = await setup()
     const a = deferred(), b = deferred()

@@ -3,3 +3,12 @@
 .panel p { margin: 0 0 10px; white-space: pre-wrap; }
 .panel ul { margin: 0; padding-left: 18px; }
 .placeholder { padding: 24px 16px; margin: 0; font-size: 13px; color: var(--vellum-text-dim, #8a8a8a); text-align: center; }
+.retryButton {
+  padding: 6px 12px;
+  border: 1px solid var(--vellum-border, #333);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vellum-text, #eaeaea);
+  cursor: pointer;
+}
+.retryButton:focus-visible { outline: 2px solid var(--vellum-accent, #818cf8); outline-offset: 2px; }

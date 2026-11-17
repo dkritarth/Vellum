@@ -13,7 +13,7 @@ for (const adapter of ['codex-acp', 'claude-agent-acp', 'claude-code-acp', 'agy'
 }
 
 try {
-  for (const gate of ['harness-isolation-live.mjs', 'reader-gate.mjs', 'collections-live.mjs', 'trash-live.mjs', 'reading-gate.mjs', 'usage-live.mjs']) {
+  for (const gate of ['harness-isolation-live.mjs', 'details-recovery-live.mjs', 'workflow-recovery-live.mjs', 'reader-gate.mjs', 'collections-live.mjs', 'trash-live.mjs', 'reading-gate.mjs', 'usage-live.mjs']) {
     const result = spawnSync(process.execPath, [join(import.meta.dirname, gate)], {
       stdio: 'inherit',
       env: {

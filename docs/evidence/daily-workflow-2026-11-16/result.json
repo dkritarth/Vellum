@@ -1,0 +1,196 @@
+{
+  "passed": true,
+  "provenance": {
+    "head": "06f64dfc81ffc022d032fbd8475305d68992473f",
+    "dirty": false,
+    "build": {
+      "out/main/index.cjs": "801604e0e15463079017b4afa5006c34c706e6af8fb893cb8b2824da2fd59896",
+      "out/renderer/index.html": "19087037bc0ef92963583031e60bb3ebec1194b49f1569f77f2f218efbbdd1f4"
+    }
+  },
+  "papers": [
+    "Attention Is All You Need",
+    "Language Models are Few-Shot Learners"
+  ],
+  "videos": [
+    {
+      "file": "walkthrough-1.webm",
+      "bytes": 19112645,
+      "sha256": "22aaeab27a712420f447bd191e3e4458465a676ec89dbbcb6431bca31a70ded2"
+    },
+    {
+      "file": "walkthrough-2.webm",
+      "bytes": 1897729,
+      "sha256": "35ded05593aac4a3760b5a81d7e2214f1f90ca6f329c0cfe72f2ddc4e85d4c08"
+    }
+  ],
+  "chapters": [
+    {
+      "name": "Empty workspace and deferred features",
+      "segment": 1,
+      "seconds": 1,
+      "passed": true
+    },
+    {
+      "name": "Import error and clean retry dialog",
+      "segment": 1,
+      "seconds": 8,
+      "passed": true
+    },
+    {
+      "name": "Import real paper 1 through Add Paper",
+      "segment": 1,
+      "seconds": 12,
+      "passed": true
+    },
+    {
+      "name": "Import real paper 2 through Add Paper",
+      "segment": 1,
+      "seconds": 20,
+      "passed": true
+    },
+    {
+      "name": "Reader continuous scroll, navigation, and outline",
+      "segment": 1,
+      "seconds": 29,
+      "passed": true
+    },
+    {
+      "name": "Pinch zoom and reader keyboard shortcuts",
+      "segment": 1,
+      "seconds": 34,
+      "passed": true
+    },
+    {
+      "name": "Document search matches, navigation, and empty results",
+      "segment": 1,
+      "seconds": 39,
+      "passed": true
+    },
+    {
+      "name": "Citation hover and reference navigation",
+      "segment": 1,
+      "seconds": 46,
+      "passed": true
+    },
+    {
+      "name": "Model selection, mouse selection, and Add to chat",
+      "segment": 1,
+      "seconds": 51,
+      "passed": true
+    },
+    {
+      "name": "Selection Explain with signed-in Codex",
+      "segment": 1,
+      "seconds": 62,
+      "passed": true
+    },
+    {
+      "name": "Suggested questions refresh and send",
+      "segment": 1,
+      "seconds": 82,
+      "passed": true
+    },
+    {
+      "name": "Quick action: Breakdown",
+      "segment": 1,
+      "seconds": 95,
+      "passed": true
+    },
+    {
+      "name": "Quick action: Practice questions",
+      "segment": 1,
+      "seconds": 125,
+      "passed": true
+    },
+    {
+      "name": "Quick action: Study guide",
+      "segment": 1,
+      "seconds": 143,
+      "passed": true
+    },
+    {
+      "name": "Context-menu highlight and annotation navigation",
+      "segment": 1,
+      "seconds": 159,
+      "passed": true
+    },
+    {
+      "name": "Highlight tool, color selection, and deletion",
+      "segment": 1,
+      "seconds": 164,
+      "passed": true
+    },
+    {
+      "name": "Notes autosave and paper isolation",
+      "segment": 1,
+      "seconds": 171,
+      "passed": true
+    },
+    {
+      "name": "Stored paper details",
+      "segment": 1,
+      "seconds": 176,
+      "passed": true
+    },
+    {
+      "name": "Tab close, Library shortcut, and reopen",
+      "segment": 1,
+      "seconds": 178,
+      "passed": true
+    },
+    {
+      "name": "Panel resizing, collapse, restore, and keyboard focus",
+      "segment": 1,
+      "seconds": 181,
+      "passed": true
+    },
+    {
+      "name": "Library search, sort, and collection assignment",
+      "segment": 1,
+      "seconds": 186,
+      "passed": true
+    },
+    {
+      "name": "Trash, restore, and purge confirmation cancellation",
+      "segment": 1,
+      "seconds": 195,
+      "passed": true
+    },
+    {
+      "name": "Authentic usage telemetry and refresh",
+      "segment": 1,
+      "seconds": 202,
+      "passed": true
+    },
+    {
+      "name": "Chat library search and session reopening",
+      "segment": 1,
+      "seconds": 204,
+      "passed": true
+    },
+    {
+      "name": "Restart restores library, notes, annotations, and conversation",
+      "segment": 2,
+      "seconds": 1,
+      "passed": true
+    },
+    {
+      "name": "New chat and isolated conversation deletion",
+      "segment": 2,
+      "seconds": 6,
+      "passed": true
+    },
+    {
+      "name": "Clear note, delete collection, and permanently purge isolated paper",
+      "segment": 2,
+      "seconds": 11,
+      "passed": true
+    }
+  ],
+  "limitations": [
+    "Claude and Gemini backend answers are not certified by this Codex walkthrough.",
+    "Workspace switching and slash/context pickers are shown as deferred features."
+  ],
+  "rendererConsoleErrors": 0
+}

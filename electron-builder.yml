@@ -7,11 +7,10 @@ directories:
 files:
   - out/**/*
   - package.json
-extraResources:
-  # npm run dist / dist:mac force an Electron rebuild before this resource is copied.
-  - from: node_modules/better-sqlite3/build/Release/better_sqlite3.node
-    to: native/better_sqlite3.node
 linux:
+  extraResources:
+    - from: node_modules/better-sqlite3/prebuilds/linux-${arch}.node
+      to: native/better_sqlite3.node
   executableName: vellum
   target:
     - deb
@@ -19,14 +18,19 @@ linux:
   maintainer: Kritarth Dandapat <dkritarth@gmail.com>
   category: Education
 mac:
+  extraResources:
+    - from: node_modules/better-sqlite3/prebuilds/darwin-arm64.node
+      to: native/better_sqlite3.node
   artifactName: ${productName}-${version}-${arch}.${ext}
-  # Built on a macOS runner per architecture so the SQLite binding matches.
+  # Apple Silicon only. SQLite's N-API prebuild matches the target platform.
   # No Developer ID is configured: scripts/after-pack-adhoc-sign.cjs ad-hoc
   # signs the bundle, so the first launch needs right-click > Open (or
   # `xattr -cr /Applications/Vellum.app`).
   category: public.app-category.education
   target:
-    - dmg
-    - zip
+    - target: dmg
+      arch: [arm64]
+    - target: zip
+      arch: [arm64]
 dmg:
   artifactName: ${productName}-${version}-${arch}.${ext}

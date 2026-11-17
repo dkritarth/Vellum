@@ -38,7 +38,8 @@ export async function launchIsolatedApp(options = {}) {
   fs.mkdirSync(profileDir, { recursive: true })
 
   const app = await electron.launch({
-    args: ['--no-sandbox', appPath],
+    executablePath: options.executablePath,
+    args: options.executablePath ? ['--no-sandbox'] : ['--no-sandbox', appPath],
     // Opt-in recording for reviewable live walkthroughs; normal gates stay lean.
     recordVideo: options.recordVideo,
     env: {

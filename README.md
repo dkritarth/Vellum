@@ -2,67 +2,79 @@
 
 # Vellum
 
-Local-first AI paper workspace for reviewing, understanding, annotating, and
-analyzing research papers. Inspired by [anara.com](https://anara.com), Vellum runs
-on **your own** Claude or Codex plan
-via **ACP** (Agent Client Protocol). No extra AI subscription, no raw API key:
-it uses the Agent-SDK credit already bundled in your Claude plan, or your
-ChatGPT plan through Codex — swappable at runtime.
+A local-first desktop workspace for reading research papers, asking about difficult passages, and keeping notes and highlights with the paper. AI uses your existing signed-in Codex or Claude plan through ACP adapters. No separate Vellum account or raw API key.
 
-Ingest a paper (arXiv ID, DOI, PDF URL, or local file), read it in-app, select a
-difficult passage, send it to chat or ask for an explanation, and continue with
-paper-grounded analysis through the agent's own file tools.
+## Beta download
 
-## Status
+**v0.1.1-beta.1 · Apple Silicon Macs · macOS 13+ · MIT license**
 
-Early, partially working product. Phase-1 code has landed, but user journeys still
-need live Electron validation and repair. Claude ACP has live smoke evidence.
-Codex ACP passed a signed-in smoke run (issue #25, see
-`docs/verification/codex-acp-2026-08-12.md`); the full Codex Ask journey is still
-being validated.
-The previous CLI prototype is preserved on `archive/cli-prototype`.
+[Download the Mac beta](https://github.com/dkritarth/Vellum/releases/tag/v0.1.1-beta.1) · [Website](https://dkritarth.com/Vellum/) · [Release notes](docs/releases/v0.1.1-beta.1.md)
 
-- **GitHub Issues** — authoritative phased backlog, dependency locks, verification
-- **PLAN.md** — product direction and locked decisions; not task backlog
-- **CLAUDE.md** — architecture map + commands + guardrails
-- **AGENTS.md** — agent conventions and how work flows from GitHub Issues
-- **GitHub wiki** — historical design/card archive; not task authority
+Open the DMG and move Vellum to Applications. This beta is ad-hoc signed, not Apple-notarized. If macOS blocks it, review [Apple's first-launch guidance](https://support.apple.com/en-us/102445). There is no Intel Mac download for this beta.
+
+## Watch the workflow
+
+[![Vellum answering a question about a real paper](website/assets/screenshots/ask-codex.png)](https://dkritarth.com/Vellum/#walkthrough)
+
+- [Part 1: import, read, select, Ask/Explain, highlights, notes, collections, and usage](docs/evidence/daily-workflow-2026-11-16/walkthrough-1.webm)
+- [Part 2: restart persistence, conversation deletion, note clearing, and purge](docs/evidence/daily-workflow-2026-11-16/walkthrough-2.webm)
+- [Timestamped coverage and limitations](docs/verification/daily-workflow-2026-11-16.md)
+
+Both videos show the actual Electron app with real papers and signed-in Codex. All 27 chapters pass. Recordings were made on Linux; they do not certify physical Mac input behavior or every backend.
+
+## What you can do
+
+Import a local PDF, arXiv ID, DOI, or PDF URL. Read continuous pages, search, zoom, and follow resolvable references. Select text to add it to chat, ask for an explanation, or highlight it. Save notes, organize collections, and return to persisted conversations and annotations.
+
+Papers and saved research stay on your machine. AI prompts and paper context are sent to your selected provider when you use AI features.
 
 ## Quick start
 
+For AI, install the maintained Codex adapter and sign in through Codex:
+
 ```bash
-npm install
+npm install -g @openai/codex @agentclientprotocol/codex-acp
+codex login
+```
+
+The adapter executable `codex-acp` must be on PATH. Claude users can install `@agentclientprotocol/claude-agent-acp` and sign in through Claude Code. See [ACP setup and backend details](core/acp/README.md).
+
+To run Vellum from source:
+
+```bash
+npm ci
 npm run dev
 ```
 
-Requires `claude-agent-acp` (`npm i -g @agentclientprotocol/claude-agent-acp`;
-the deprecated `claude-code-acp` is a fallback) / `codex-acp` on PATH and their
-CLIs signed in
-(see the wiki's ACP-Integration page). For Gemini, install Google's Antigravity
-CLI (`agy`) and sign in once with `agy acp --login` (see `core/acp/README.md`).
+Use Node.js 24. The packaged Mac app finds adapters through your login shell's PATH.
 
-## macOS app
+## Current status
 
-The **macOS build** workflow (`.github/workflows/release-mac.yml`) packages
-`Vellum-<version>-arm64.dmg` (Apple Silicon) and `-x64.dmg` (Intel) on macOS
-runners. Run it from the Actions tab, or push a `v*` tag to attach the DMGs to a
-GitHub release. On a Mac you can also run `npm ci && npm run dist:mac`.
+Early beta. The core ingest/read/select/chat/save/restart workflow has automated and live Electron evidence. Signed-in Codex answers were checked against real paper content. Metadata and collection failures have visible recovery paths.
 
-The build is ad-hoc signed, not notarized. On first launch, right-click
-`Vellum.app` and choose **Open**, or run `xattr -cr /Applications/Vellum.app`.
-Install and sign in to at least one ACP adapter first; the app picks up your
-login shell's `PATH` to find it.
+Claude remains supported, but a recent live turn hit a provider rate limit. Gemini application answers are not certified. Workspace switching and slash/context pickers remain coming-soon features. Keep backups of important research files.
+
+GitHub Issues define work scope and order. [PLAN.md](PLAN.md) describes direction; [CLAUDE.md](CLAUDE.md) maps the architecture; [AGENTS.md](AGENTS.md) defines contributor checks. The wiki is historical reference. The earlier CLI prototype remains on `archive/cli-prototype`.
 
 ## Verify
 
 ```bash
-npm test && npm run typecheck
-xvfb-run -a npm run test:e2e   # live Electron core-journey gates; drop xvfb-run on a desktop
-npm run smoke:acp -- codex     # signed-in adapter check (also: claude)
+npm test
+npm run typecheck
+npm run build
+xvfb-run -a npm run test:e2e   # drop xvfb-run on a desktop
+npm run smoke:acp -- codex    # requires a signed-in adapter
 ```
 
-## Why
+Record a fresh signed-in walkthrough with two real PDFs:
 
-anara.com is great but wants its own subscription. Vellum reuses the plan you
-already pay for, keeps your papers local, and is swappable across AI backends
-via ACP. MIT-licensed.
+```bash
+npm run build
+xvfb-run -a -s '-screen 0 1440x900x24' npm run demo:record -- /path/attention.pdf /path/second-paper.pdf
+```
+
+## Beta releases
+
+The Mac workflow builds only arm64 on a GitHub-hosted Mac, then verifies the packaged native binding, ad-hoc signature, and a packaged app smoke test. A matching `v*` tag publishes the beta downloads and checksums as a GitHub prerelease. [Release checklist](docs/releases/README.md) describes occasional updates. There is no automatic app updater yet.
+
+Vellum is MIT-licensed. Inspired by the paper-reading workflow in [Anara](https://anara.com).

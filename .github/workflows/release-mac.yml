@@ -1,9 +1,5 @@
 name: macOS build
 
-# Builds Vellum.app for Apple Silicon on a real macOS runner so the
-# better-sqlite3 binding is compiled for the matching platform and arch.
-# Runs on PRs that touch packaging, manually from the Actions tab, or push a `v*` tag to attach the DMGs to
-# a GitHub release.
 on:
   workflow_dispatch:
   pull_request:
@@ -11,6 +7,9 @@ on:
     paths:
       - electron-builder.yml
       - scripts/after-pack-adhoc-sign.cjs
+      - scripts/release-metadata.mjs
+      - test/packaged-mac-smoke.mjs
+      - test/harness.mjs
       - package.json
       - package-lock.json
       - resources/**
@@ -19,18 +18,12 @@ on:
     tags: ['v*']
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   mac:
-    name: mac-${{ matrix.arch }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: arm64
-            runner: macos-15
-    runs-on: ${{ matrix.runner }}
+    name: mac-arm64
+    runs-on: macos-15
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -40,21 +33,33 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+      - name: Validate release identity
+        id: release
+        run: node scripts/release-metadata.mjs
       - run: npm ci
-      - name: Build and package
+      - name: Build and package Apple Silicon app
         env:
-          # No Developer ID certificate; afterPack ad-hoc signs instead.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: npm run dist:mac -- --${{ matrix.arch }}
-      - name: Check packaged SQLite binding architecture
+        run: npm run dist:mac -- --arm64
+      - name: Verify native binding and signature
         run: |
           app=$(find release -maxdepth 2 -name Vellum.app | head -1)
-          file "$app/Contents/Resources/native/better_sqlite3.node"
-          file "$app/Contents/Resources/native/better_sqlite3.node" | grep -q "${{ matrix.arch == 'x64' && 'x86_64' || 'arm64' }}"
+          test -n "$app"
+          file "$app/Contents/Resources/native/better_sqlite3.node" | grep -q arm64
           codesign --verify --deep --strict --verbose=2 "$app"
+      - name: Exercise the packaged app
+        run: |
+          app=$(find release -maxdepth 2 -name Vellum.app | head -1)
+          node test/packaged-mac-smoke.mjs "$app/Contents/MacOS/Vellum"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Vellum-mac-smoke-evidence
+          path: test-artifacts/
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:
-          name: Vellum-mac-${{ matrix.arch }}
+          name: Vellum-mac-arm64
           path: |
             release/*.dmg
             release/*.zip
@@ -65,15 +70,43 @@ jobs:
     needs: mac
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate release identity
+        id: metadata
+        run: node scripts/release-metadata.mjs
       - uses: actions/download-artifact@v4
         with:
-          path: dist
-          merge-multiple: true
-      - env:
+          name: Vellum-mac-arm64
+          path: release-assets
+      - name: Publish complete beta downloads
+        env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.metadata.outputs.tag }}
+          PRERELEASE: ${{ steps.metadata.outputs.prerelease }}
+          VERSION: ${{ steps.metadata.outputs.version }}
         run: |
-          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
-            || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "Vellum $GITHUB_REF_NAME" \
-                 --notes "macOS builds. Ad-hoc signed: on first launch right-click Vellum.app and choose Open."
-          gh release upload "$GITHUB_REF_NAME" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+          test -f "docs/releases/$RELEASE_TAG.md"
+          test -f "release-assets/Vellum-$VERSION-arm64.dmg"
+          test -f "release-assets/Vellum-$VERSION-arm64.zip"
+          (cd release-assets && sha256sum *.dmg *.zip > SHA256SUMS.txt)
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            if [ "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" != true ]; then
+              echo "Release already published; leaving its assets unchanged."
+              exit 0
+            fi
+          else
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --draft --prerelease="$PRERELEASE" --latest=false --title "Vellum $RELEASE_TAG" \
+              --notes-file "docs/releases/$RELEASE_TAG.md"
+          fi
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber --repo "$GITHUB_REPOSITORY"
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false \
+            --prerelease="$PRERELEASE" --latest=false

@@ -5,7 +5,13 @@ on:
     branches: [master]
     paths:
       - website/**
+      - scripts/build-website.mjs
+      - scripts/release-metadata.mjs
+      - package.json
       - .github/workflows/deploy-pages.yml
+  workflow_run:
+    workflows: ['macOS build']
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -19,19 +25,55 @@ concurrency:
 
 jobs:
   deploy:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-      - name: Upload website
-        uses: actions/upload-pages-artifact@v3
+      - uses: actions/checkout@v4
         with:
-          path: website
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Read website release identity
+        id: metadata
+        run: node scripts/release-metadata.mjs
+      - name: Wait for complete public downloads
+        id: downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.metadata.outputs.tag }}
+          VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          ready=false
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets,isDraft \
+            --jq 'select(.isDraft == false) | .assets[].name' > /tmp/vellum-assets.txt; then
+            if grep -Fxq "Vellum-$VERSION-arm64.dmg" /tmp/vellum-assets.txt \
+              && grep -Fxq "Vellum-$VERSION-arm64.zip" /tmp/vellum-assets.txt \
+              && grep -Fxq SHA256SUMS.txt /tmp/vellum-assets.txt; then
+              ready=true
+            fi
+          fi
+          echo "ready=$ready" >> "$GITHUB_OUTPUT"
+          if [ "$ready" != true ]; then
+            echo 'Beta downloads are not published yet; keeping the current website live.'
+          fi
+      - name: Build website with recordings
+        if: steps.downloads.outputs.ready == 'true'
+        run: node scripts/build-website.mjs
+      - uses: actions/configure-pages@v5
+        if: steps.downloads.outputs.ready == 'true'
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.downloads.outputs.ready == 'true'
+        with:
+          path: site-dist
       - name: Deploy
         id: deployment
+        if: steps.downloads.outputs.ready == 'true'
         uses: actions/deploy-pages@v4

@@ -118,3 +118,11 @@ h3 { font-size: 18px; font-weight: 500; }
   .actions { gap: 20px; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+.walkthrough { padding-top: 88px; }
+.walkthrough video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; background: #101415; border: 1px solid var(--line); border-radius: 6px; }
+.walkthrough video:focus-visible, .restart-video summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; }
+.restart-video { margin-top: 28px; padding: 20px; border: 1px solid var(--line); border-radius: 6px; }
+.restart-video summary { cursor: pointer; color: var(--accent); font-size: 14px; }
+.restart-video[open] summary { margin-bottom: 20px; }
+@media (max-width: 700px) { .walkthrough { padding-top: 56px; } nav { flex-wrap: wrap; } .restart-video { padding: 14px; } }

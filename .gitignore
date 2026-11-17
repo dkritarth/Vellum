@@ -5,6 +5,7 @@ node_modules/
 out/
 dist/
 build/
+site-dist/
 *.tsbuildinfo
 
 # runtime data (papers, sqlite db) — Vellum starts empty

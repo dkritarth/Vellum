@@ -275,6 +275,13 @@
   user-select: none;
 }
 
+/* While a drag selection is in progress (textLayerSelection.ts), the guard
+   covers the whole page beneath the spans, so starting beside a line does
+   not snap the selection to unrelated text later in the DOM. */
+.textLayer[data-selecting] :global(.endOfContent) {
+  top: 0;
+}
+
 .textLayer[data-highlight-mode='active'] {
   cursor: text;
 }

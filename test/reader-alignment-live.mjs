@@ -117,10 +117,12 @@ async function checkAlignment(window, sample, scale, name) {
   return span
 }
 
-async function selectWithPointer(window, span, text) {
+// startDx: where the drag begins relative to the span's left edge. Negative
+// values start in blank page space, as people usually do.
+async function selectWithPointer(window, span, text, startDx = 0.2) {
   await span.scrollIntoViewIfNeeded()
   const box = await span.boundingBox()
-  await window.mouse.move(box.x + 0.2, box.y + box.height / 2)
+  await window.mouse.move(box.x + startDx, box.y + box.height / 2)
   await window.mouse.down()
   await window.mouse.move(box.x + box.width - 0.2, box.y + box.height / 2, { steps: 30 })
   await window.mouse.up()
@@ -143,6 +145,11 @@ try {
   await window.getByLabel('Page', { exact: true }).filter({ hasText: '1 of 15' }).waitFor()
   await window.getByText('Loading…', { exact: true }).waitFor({ state: 'hidden' })
   let span = await checkAlignment(window, title, 1, 'page1-100')
+  // A drag that starts in blank space just left of the title must select the
+  // title, not jump to the author block below it, and must keep its first
+  // letter.
+  await selectWithPointer(window, span, title.text, -6)
+  await window.mouse.click(5, 5)
   await selectWithPointer(window, span, title.text)
   await window.screenshot({ path: path.join(evidence, 'selection-page1.png') })
   await window.getByRole('button', { name: 'Add to chat', exact: true }).click()

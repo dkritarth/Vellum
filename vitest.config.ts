@@ -15,6 +15,10 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    // Ingest, migration and restart tests do real PDF parsing and SQLite I/O.
+    // They take about 2 s on an idle machine but exceeded Vitest 5's 5 s
+    // default on the shared dev box under load, so allow more headroom.
+    testTimeout: 15_000,
     // Vitest 5 no longer excludes dist by default; keep build output out.
     // Match paths within this checkout, even when it lives inside a worktree.
     exclude: [...configDefaults.exclude, '**/dist/**', '**/.claude/worktrees/**'],

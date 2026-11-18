@@ -81,6 +81,38 @@ describe('ingest', () => {
     }
   })
 
+  it.each([
+    ['text/plain', '<html><body>Publisher landing page</body></html>'],
+    ['application/octet-stream', '<!doctype html><title>Sign in</title>'],
+    ['', 'Not a PDF at all'],
+  ])('rejects a non-PDF download served as %s before converting it', async (type, body) => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-notpdf-'))
+    const db = openDb({ path: ':memory:' })
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => url.includes('api.crossref.org/works/')
+      ? new Response(CROSSREF_ORCID_BODY, { status: 200, headers: { 'content-type': 'application/json' } })
+      : new Response(body, { status: 200, headers: type ? { 'content-type': type } : {} })))
+    try {
+      await expect(ingest('10.1234/not-a-pdf', { db, dataDir: tmpDir, client: new FakeClient([]) }))
+        .rejects.toThrow('did not return a PDF')
+      expect(listPapers(db)).toHaveLength(0)
+    } finally {
+      db.close()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('rejects a local file that is not a PDF with a clear message', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-notpdf-'))
+    const fake = join(tmpDir, 'notes.pdf')
+    writeFileSync(fake, 'plain text renamed to .pdf')
+    const db = openDb({ path: ':memory:' })
+    try {
+      await expect(ingest(fake, { db, dataDir: tmpDir, client: new FakeClient([]) })).rejects.toThrow('is not a PDF file')
+    } finally {
+      db.close()
+    }
+  })
+
   it('writes paper.pdf + paper.md, inserts the DB row, and returns an IngestResult', async () => {
     tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-'))
     const db = openDb({ path: ':memory:' })

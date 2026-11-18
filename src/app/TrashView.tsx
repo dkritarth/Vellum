@@ -1,6 +1,7 @@
 // [L2-04] TrashView: lists soft-deleted papers with restore and permanent purge actions.
 import { useState, useEffect } from 'react'
 import type { PaperRecord } from '../../core/library/repo.js'
+import { friendlyIpcError } from './ipcError'
 import styles from './TrashView.module.css'
 
 export interface TrashViewProps {
@@ -64,7 +65,7 @@ export function TrashView({ onBackToLibrary, onPaperRestored }: TrashViewProps):
       setTrashedPapers((prev) => prev.filter((p) => p.slug !== confirmPurgeTarget.slug))
       setConfirmPurgeTarget(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to permanently delete paper')
+      setError(friendlyIpcError(err, 'Failed to permanently delete paper'))
     } finally {
       setPurging(false)
     }

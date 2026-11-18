@@ -167,6 +167,16 @@ describe('main process startup and preload contract', () => {
     }
   })
 
+  it('routes chat delete and paper purge through the chat manager when idle', async () => {
+    electron.runHandlers = true
+    try {
+      await expect(electron.api['chatDeleteSession']!(999)).resolves.toBeUndefined()
+      await expect(electron.api['paperPurge']!('missing-paper')).resolves.toBe(false)
+    } finally {
+      electron.runHandlers = false
+    }
+  })
+
   it('preserves valid usage filters and collection operations through preload', async () => {
     electron.runHandlers = true
     try {

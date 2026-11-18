@@ -6,10 +6,10 @@ import type { Database } from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import type { AcpBackend, AcpClient, AcpPromptRequest, AcpSession, AcpUpdate } from '../acp/client.js'
-import { upsertPaper } from '../library/repo.js'
+import { getPaper, upsertPaper } from '../library/repo.js'
 import { openDb } from '../store/db.js'
 import { ChatManager, type AskStreamEvent } from './manager.js'
-import { getChatMessages } from './repo.js'
+import { createChatSession, getChatMessages, getChatSession } from './repo.js'
 import { listUsageRecords, getUsageSummary } from '../usage/repo.js'
 
 class FakeSession implements AcpSession {
@@ -140,6 +140,79 @@ describe('ChatManager', () => {
     expect(manager.openChat({ db, paperSlug: slug }).activeTurn).toBeNull()
     await manager.runTurn({ ...params, text: 'next' }, () => {})
     expect(manager.openChat({ db, paperSlug: slug }).messages.map((m) => m.content)).toEqual(['first', 'answer', 'next', 'answer'])
+  })
+
+  describe('deleting during an active turn (#237)', () => {
+    async function startBlockedTurn(chatSlug = slug) {
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => { release = resolve })
+      const client = new FakeClient([], async () => { await gate; return new FakeSession([textUpdate('answer'), doneUpdate]) })
+      const manager = new ChatManager(client)
+      const { session } = manager.openChat({ db, paperSlug: chatSlug })
+      const turn = manager.runTurn({ db, chatSessionId: session.id, paperSlug: chatSlug, mdPath, text: 'question' }, () => {})
+      return { manager, session, turn, release }
+    }
+
+    it('refuses to delete the chat that is answering, keeping the conversation intact', async () => {
+      const { manager, session, turn, release } = await startBlockedTurn()
+      try {
+        expect(() => manager.deleteChat(db, session.id)).toThrow(/answering.*wait/i)
+        expect(() => manager.deleteChat(db, session.id)).not.toThrow(/SQLITE|FOREIGN/i)
+        expect(getChatSession(db, session.id)).toBeDefined()
+      } finally {
+        release()
+        await turn
+      }
+      // The turn still completes and persists its reply, with no database error.
+      expect(getChatMessages(db, session.id).map((m) => m.content)).toEqual(['question', 'answer'])
+    })
+
+    it('deletes the chat once its turn has finished', async () => {
+      const { manager, session, turn, release } = await startBlockedTurn()
+      release()
+      await turn
+      manager.deleteChat(db, session.id)
+      expect(getChatSession(db, session.id)).toBeUndefined()
+    })
+
+    it('still deletes other chats of the same paper while one is answering', async () => {
+      const { manager, session, turn, release } = await startBlockedTurn()
+      const other = createChatSession(db, { paperSlug: slug, backend: 'codex' })
+      try {
+        manager.deleteChat(db, other.id)
+        expect(getChatSession(db, other.id)).toBeUndefined()
+        expect(getChatSession(db, session.id)).toBeDefined()
+      } finally {
+        release()
+        await turn
+      }
+    })
+
+    it('refuses to purge a paper that has an active turn, keeping paper and chat', async () => {
+      const { manager, session, turn, release } = await startBlockedTurn()
+      try {
+        expect(() => manager.purgePaper(db, slug)).toThrow(/answer.*in progress.*wait/i)
+        expect(getPaper(db, slug)).toBeDefined()
+        expect(getChatSession(db, session.id)).toBeDefined()
+      } finally {
+        release()
+        await turn
+      }
+      expect(getChatMessages(db, session.id).map((m) => m.content)).toEqual(['question', 'answer'])
+    })
+
+    it('purges a paper with no active turn, and purges an unrelated paper during another paper\'s turn', async () => {
+      upsertPaper(db, { slug: 'other-paper', title: 'Other', authors: [], addedAt: new Date().toISOString() })
+      const { manager, turn, release } = await startBlockedTurn()
+      try {
+        expect(manager.purgePaper(db, 'other-paper')).toBe(true)
+      } finally {
+        release()
+        await turn
+      }
+      expect(manager.purgePaper(db, slug)).toBe(true)
+      expect(getPaper(db, slug)).toBeUndefined()
+    })
   })
 
   it('streams text chunks then persists the user + assistant messages', async () => {

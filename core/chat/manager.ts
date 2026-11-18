@@ -25,7 +25,8 @@ import type { Database } from 'better-sqlite3'
 
 import type { AcpBackend, AcpClient, AcpSession, AcpUpdate } from '../acp/client.js'
 import type { ChatMessage, ChatSession } from './repo.js'
-import { addChatMessage, createChatSession, getChatMessages, getChatSession, getLatestChatSession } from './repo.js'
+import { addChatMessage, createChatSession, deleteChatSession, getChatMessages, getChatSession, getLatestChatSession } from './repo.js'
+import { purgePaper } from '../library/repo.js'
 import { recordTurnUsage } from '../usage/repo.js'
 
 const DEFAULT_BACKEND: AcpBackend = 'claude'
@@ -223,6 +224,32 @@ export class ChatManager {
       if (event.kind === 'done' || event.kind === 'error') release()
       onEvent({ ...event, sequence: ++activeTurn.sequence })
     }).finally(release)
+  }
+
+  /**
+   * Delete a conversation. Refused (not cancelled) while that conversation has
+   * an active turn: the turn would otherwise finish and insert its reply for a
+   * missing session, failing with a raw SQLITE_CONSTRAINT_FOREIGNKEY. Other
+   * chats of the same paper are unaffected.
+   */
+  deleteChat(db: Database, chatSessionId: number): void {
+    for (const turn of this.activeTurns.values()) {
+      if (turn.chatSessionId === chatSessionId) {
+        throw new Error('This chat is still answering. Wait for the answer to finish, then delete it.')
+      }
+    }
+    deleteChatSession(db, chatSessionId)
+  }
+
+  /**
+   * Permanently delete a paper. Refused while any chat of that paper has an
+   * active turn or is being reset, because purge cascades to its chats.
+   */
+  purgePaper(db: Database, paperSlug: string, libraryDir?: string): boolean {
+    if (this.activeTurns.has(paperSlug) || this.resettingPapers.has(paperSlug)) {
+      throw new Error('This paper has an answer in progress. Wait for it to finish, then delete it permanently.')
+    }
+    return purgePaper(db, paperSlug, libraryDir)
   }
 
   private requireIdle(paperSlug: string): void {

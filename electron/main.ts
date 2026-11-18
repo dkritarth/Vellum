@@ -5,7 +5,7 @@ import {
   saveSuggestedQuestions,
 } from '../core/questions/repo.js'
 import type { SuggestedQuestionRecord } from '../core/questions/repo.js'
-import { deleteChatSession, listChatSessions, updateChatSessionTitle } from '../core/chat/repo.js'
+import { listChatSessions, updateChatSessionTitle } from '../core/chat/repo.js'
 import type { ChatSessionSummary } from '../core/chat/repo.js'
 import { app, BrowserWindow, ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
@@ -23,7 +23,7 @@ import { ChatManager } from '../core/chat/manager.js'
 import { getChatSession } from '../core/chat/repo.js'
 import { ingest } from '../core/ingest/index.js'
 import type { IngestResult } from '../core/ingest/index.js'
-import { getPaper, listPapers, trashPaper, restorePaper, purgePaper } from '../core/library/repo.js'
+import { getPaper, listPapers, trashPaper, restorePaper } from '../core/library/repo.js'
 import { getUsageSummary, listUsageRecords, type ListUsageOptions } from '../core/usage/repo.js'
 import type { ListPapersOptions, PaperRecord, PaperSortColumn } from '../core/library/repo.js'
 import { deleteNote, getNote, upsertNote } from '../core/notes/repo.js'
@@ -206,7 +206,7 @@ ipcMain.handle('vellum:paper-restore', (_event, slug: unknown): PaperRecord | nu
 })
 
 ipcMain.handle('vellum:paper-purge', (_event, slug: unknown): boolean => {
-  return purgePaper(getDb(), requireSlug(slug, 'vellum:paper-purge'), resolveDataRoot())
+  return getChatManager().purgePaper(getDb(), requireSlug(slug, 'vellum:paper-purge'), resolveDataRoot())
 })
 
 // [L2-05] Usage & Telemetry operations ---------------------------------------
@@ -385,7 +385,7 @@ ipcMain.handle('vellum:chat-delete-session', (_event, id: unknown): void => {
   if (typeof id !== 'number' || !Number.isInteger(id)) {
     throw new Error('vellum:chat-delete-session: id must be an integer')
   }
-  deleteChatSession(getDb(), id)
+  getChatManager().deleteChat(getDb(), id)
 })
 
 ipcMain.handle('vellum:chat-rename-session', (_event, params: unknown): void => {

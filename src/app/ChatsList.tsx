@@ -81,7 +81,6 @@ export function ChatsList({ selectedSessionId, onSelectSession, onSessionDeleted
       onSessionDeleted?.(session.id)
       await refreshSessions.current?.()
     } catch (err) {
-      console.error('Failed to delete chat session:', err)
       setActionError(
         `Could not delete chat "${session.title}": ${errorMessage(err)}`,
       )

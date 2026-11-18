@@ -147,4 +147,19 @@ describe('TrashView [L2-04]', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('Database write failure')
     })
   })
+
+  it('shows the friendly refusal, without IPC wrapper text, when purge is refused during an answer', async () => {
+    paperPurge.mockRejectedValueOnce(new Error(
+      "Error invoking remote method 'vellum:paper-purge': Error: This paper has an answer in progress. Wait for it to finish, then delete it permanently.",
+    ))
+    render(<TrashView />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete Attention Is All You Need permanently' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm purge' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('This paper has an answer in progress. Wait for it to finish, then delete it permanently.')
+    expect(alert).not.toHaveTextContent(/Error invoking|SQLITE/)
+    expect(screen.getByText('Attention Is All You Need')).toBeInTheDocument()
+  })
 })

@@ -23,7 +23,7 @@ export function TrashView({ onBackToLibrary, onPaperRestored }: TrashViewProps):
       const papers = await window.vellum.listPapers({ trashed: true })
       setTrashedPapers(papers)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load trashed papers')
+      setError(friendlyIpcError(err, 'Failed to load trashed papers'))
     } finally {
       setLoading(false)
     }
@@ -52,7 +52,7 @@ export function TrashView({ onBackToLibrary, onPaperRestored }: TrashViewProps):
       setTrashedPapers((prev) => prev.filter((p) => p.slug !== paper.slug))
       onPaperRestored?.(paper.slug)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to restore paper')
+      setError(friendlyIpcError(err, 'Failed to restore paper'))
     }
   }
 

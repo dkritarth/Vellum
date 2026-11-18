@@ -19,5 +19,5 @@
       "@renderer/*": ["src/*"]
     }
   },
-  "include": ["electron", "src", "core", "vitest.config.ts", "electron.vite.config.ts"]
+  "include": ["electron", "src", "core", "scripts/check-package-contents.d.mts", "scripts/check-package-contents.test.ts", "vitest.config.ts", "electron.vite.config.ts"]
 }

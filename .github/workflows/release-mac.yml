@@ -48,6 +48,7 @@ jobs:
           test -n "$app"
           file "$app/Contents/Resources/native/better_sqlite3.node" | grep -q arm64
           codesign --verify --deep --strict --verbose=2 "$app"
+      # Gate scope is the unpacked Vellum.app only; the DMG and ZIP are not inspected.
       - name: Check package contents
         run: |
           app=$(find release -maxdepth 2 -name Vellum.app | head -1)

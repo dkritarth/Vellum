@@ -2,9 +2,14 @@
 //
 // Usage: node scripts/check-package-contents.mjs <path/to/Vellum.app> [--cross-package]
 //
-// Fails when the app carries other-platform native binaries, dependency build
-// sources, docs, videos, PDFs, or test data, or when a required runtime file
-// (arm64 SQLite resource, canvas binary, dependency licenses) is missing.
+// Walks all of Contents/ (Resources, Frameworks, MacOS, ...). Every file there
+// must not be a non-arm64 Mach-O binary (any extension, thin or fat) or live in
+// a .dSYM bundle. Contents/Resources (including the files inside app.asar) must
+// also be free of other-platform native binaries, dependency build sources,
+// docs, source maps, videos, PDFs, and test data, and must keep the required
+// runtime files (arm64 SQLite resource, canvas binary, dependency licenses).
+// The Electron Frameworks legitimately ship docs-like files and many binaries,
+// so the content rules apply to Contents/Resources only.
 // --cross-package is for `--dir` builds made on a non-Mac host, where npm
 // never installed the darwin canvas binary, so its presence cannot be required.
 import fs from 'node:fs'
@@ -13,6 +18,7 @@ import { fileURLToPath } from 'node:url'
 
 const NATIVE_EXT = /\.(node|dylib|so(\.\d+)*|dll|exe)$/i
 const BUILD_SOURCE_EXT = /\.(c|cc|cpp|cxx|h|hpp|gyp|gypi)$/i
+const SOURCE_MAP_EXT = /\.map$/i
 const VIDEO_EXT = /\.(mp4|m4v|mov|webm|mkv|avi)$/i
 const TEST_DIRS = new Set(['test', 'tests', '__tests__', 'fixtures', '__fixtures__', 'testdata', 'test-data', 'test-support', 'examples'])
 const LICENSE_NAME = /^(licen[sc]e|notice|copying)([.-].*)?$/i
@@ -25,7 +31,8 @@ const REQUIRED_LICENSES = [
   'node_modules/@napi-rs/canvas/LICENSE',
   'node_modules/pdfjs-dist/LICENSE',
 ]
-const MACHO_ARM64 = Buffer.from([0xcf, 0xfa, 0xed, 0xfe, 0x0c, 0x00, 0x00, 0x01])
+const CPU_ARM64 = 0x0100000c
+const CPU_X86_64 = 0x01000007
 
 /** Reads the file table of an asar archive without extracting it. */
 export function readAsarEntries(archive) {
@@ -51,22 +58,48 @@ export function readAsarEntries(archive) {
   }
 }
 
+/** Walks a directory without following symlinks. Paths are relative to `dir`. */
 function walkDisk(dir, base = '') {
   const out = []
   for (const dirent of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (dirent.isSymbolicLink()) continue
     if (dirent.isDirectory() && dirent.name.endsWith('.lproj')) continue
     const rel = base ? `${base}/${dirent.name}` : dirent.name
-    if (dirent.isDirectory()) out.push(...walkDisk(path.join(dir, dirent.name), rel))
-    else out.push({ path: rel, size: fs.statSync(path.join(dir, dirent.name)).size })
+    const full = path.join(dir, dirent.name)
+    if (dirent.isDirectory()) out.push(...walkDisk(full, rel))
+    else if (dirent.isFile()) out.push({ path: rel, size: fs.statSync(full).size })
   }
   return out
 }
 
-function isMachOArm64(file) {
-  const head = Buffer.alloc(8)
+/**
+ * CPU types of a Mach-O file (thin or fat), or null when the file is not Mach-O.
+ * Reads only the header. Java class files share the fat magic, so a fat header
+ * claiming more than 30 slices is treated as not Mach-O.
+ */
+function machOCpuTypes(file) {
   const fd = fs.openSync(file, 'r')
-  try { fs.readSync(fd, head, 0, 8, 0) } finally { fs.closeSync(fd) }
-  return head.equals(MACHO_ARM64)
+  try {
+    const head = Buffer.alloc(16)
+    const read = fs.readSync(fd, head, 0, 16, 0)
+    if (read < 8) return null
+    const magic = head.readUInt32BE(0)
+    if (magic === 0xcffaedfe || magic === 0xcefaedfe) return [head.readUInt32LE(4)] // thin, little-endian
+    if (magic === 0xfeedfacf || magic === 0xfeedface) return [head.readUInt32BE(4)] // thin, big-endian
+    const fatBE = magic === 0xcafebabe || magic === 0xcafebabf
+    const fatLE = magic === 0xbebafeca || magic === 0xbfbafeca
+    if (!fatBE && !fatLE) return null
+    const readU32 = (buf, offset) => (fatBE ? buf.readUInt32BE(offset) : buf.readUInt32LE(offset))
+    const count = readU32(head, 4)
+    if (count < 1 || count > 30) return null
+    const entrySize = magic === 0xcafebabf || magic === 0xbfbafeca ? 32 : 20
+    const table = Buffer.alloc(count * entrySize)
+    const got = fs.readSync(fd, table, 0, table.length, 8)
+    if (got < table.length) return null
+    return Array.from({ length: count }, (_, i) => readU32(table, i * entrySize))
+  } finally {
+    fs.closeSync(fd)
+  }
 }
 
 function contentViolations(appPath, where) {
@@ -83,6 +116,7 @@ function contentViolations(appPath, where) {
   if (!isLicense && (/\.(md|markdown|rst)$/i.test(name) || /^(readme|changelog|history|code_of_conduct)/i.test(name) || dirs.includes('docs'))) {
     reasons.push('documentation')
   }
+  if (SOURCE_MAP_EXT.test(name)) reasons.push('source map')
   if (VIDEO_EXT.test(name)) reasons.push('video')
   if (/\.pdf$/i.test(name)) reasons.push('PDF (paper/test data)')
   if (dirs.some((d) => TEST_DIRS.has(d.toLowerCase())) || /\.(test|spec)\.[cm]?[jt]sx?(\.map)?$/.test(name)) {
@@ -92,62 +126,98 @@ function contentViolations(appPath, where) {
 }
 
 export function checkPackageContents(appBundle, { crossPackage = false } = {}) {
-  const resources = path.join(appBundle, 'Contents', 'Resources')
+  const contents = path.join(appBundle, 'Contents')
   const violations = []
-  if (!fs.existsSync(resources)) return { violations: [`${resources}: not found`], bytes: 0 }
+  if (!fs.existsSync(path.join(contents, 'Resources'))) return { violations: [`${path.join(contents, 'Resources')}: not found`], bytes: 0, resourceBytes: 0 }
 
-  const entries = [] // { app: path inside the app payload, where: label, packed, disk? }
-  const diskFiles = walkDisk(resources)
+  // Payload entries under Contents/Resources. app: path inside the app payload
+  // (asar contents and app.asar.unpacked share one namespace); where: report label.
+  const payload = []
   let bytes = 0
-  for (const file of diskFiles) {
+  let resourceBytes = 0
+  for (const file of walkDisk(contents)) {
     bytes += file.size
-    if (file.path === 'app.asar') {
-      for (const entry of readAsarEntries(path.join(resources, 'app.asar'))) {
+    const onDisk = path.join(contents, file.path)
+
+    if (file.path.split('/').some((part) => /\.dSYM$/i.test(part))) {
+      violations.push(`${file.path}: debug symbols (.dSYM)`)
+      continue
+    }
+
+    const cpus = machOCpuTypes(onDisk)
+    const isResource = file.path.startsWith('Resources/')
+    const resourcePath = isResource ? file.path.slice('Resources/'.length) : ''
+    const allowedNative = isResource && ALLOWED_NATIVE.some((re) => re.test(unpackedName(resourcePath)))
+    if (allowedNative) {
+      if (!cpus || cpus.length !== 1 || cpus[0] !== CPU_ARM64) violations.push(`${file.path}: not a Mach-O arm64 binary`)
+    } else if (cpus) {
+      if (cpus.includes(CPU_X86_64)) violations.push(`${file.path}: Mach-O binary contains x86_64 slice`)
+      else if (!cpus.includes(CPU_ARM64)) violations.push(`${file.path}: Mach-O binary without arm64 slice`)
+    }
+
+    if (!isResource) continue
+    resourceBytes += file.size
+    if (resourcePath === 'app.asar') {
+      for (const entry of readAsarEntries(onDisk)) {
         if (entry.unpacked) continue // listed on disk under app.asar.unpacked
-        entries.push({ app: entry.path, where: `app.asar/${entry.path}`, packed: true })
+        payload.push({ app: entry.path, where: `Resources/app.asar/${entry.path}`, packed: true })
       }
-    } else if (file.path.startsWith('app.asar.unpacked/')) {
-      entries.push({ app: file.path.slice('app.asar.unpacked/'.length), where: file.path, disk: file.path })
     } else {
-      entries.push({ app: file.path, where: file.path, disk: file.path })
+      payload.push({ app: unpackedName(resourcePath), where: file.path, allowedNative })
     }
   }
 
-  for (const entry of entries) {
+  for (const entry of payload) {
     const name = entry.app.split('/').pop()
     if (NATIVE_EXT.test(name)) {
       if (entry.packed) violations.push(`${entry.where}: native binary packed inside app.asar`)
-      else if (!ALLOWED_NATIVE.some((re) => re.test(entry.app))) violations.push(`${entry.where}: unexpected native binary`)
-      else if (!isMachOArm64(path.join(resources, entry.disk))) violations.push(`${entry.where}: not a Mach-O arm64 binary`)
+      else if (!entry.allowedNative) violations.push(`${entry.where}: unexpected native binary`)
     }
     violations.push(...contentViolations(entry.app, entry.where))
   }
 
-  const present = new Set(entries.map((e) => e.app))
-  const unpackedNative = entries.find((e) => e.app === 'native/better_sqlite3.node')
-  if (!unpackedNative) violations.push('native/better_sqlite3.node: required arm64 SQLite resource is missing')
+  const present = new Set(payload.map((e) => e.app))
+  if (!payload.some((e) => e.app === 'native/better_sqlite3.node')) violations.push('native/better_sqlite3.node: required arm64 SQLite resource is missing')
   for (const license of REQUIRED_LICENSES) {
     if (!present.has(license)) violations.push(`${license}: required license file is missing`)
   }
-  if (!crossPackage && !entries.some((e) => ALLOWED_NATIVE[1].test(e.app))) {
+  if (!crossPackage && !payload.some((e) => ALLOWED_NATIVE[1].test(e.app))) {
     violations.push('node_modules/@napi-rs/canvas-darwin-arm64: required canvas binary is missing')
   }
-  return { violations, bytes }
+  return { violations, bytes, resourceBytes }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const args = process.argv.slice(2)
-  const target = args.find((a) => !a.startsWith('--'))
+/** Maps a Resources-relative disk path to its path inside the app payload. */
+function unpackedName(resourcePath) {
+  return resourcePath.startsWith('app.asar.unpacked/') ? resourcePath.slice('app.asar.unpacked/'.length) : resourcePath
+}
+
+export function main(argv) {
+  const target = argv.find((a) => !a.startsWith('--'))
   if (!target) {
     console.error('Usage: node scripts/check-package-contents.mjs <path/to/Vellum.app> [--cross-package]')
-    process.exit(2)
+    return 2
   }
-  const { violations, bytes } = checkPackageContents(path.resolve(target), { crossPackage: args.includes('--cross-package') })
-  console.log(`Contents/Resources on disk: ${bytes} bytes`)
+  const { violations, bytes, resourceBytes } = checkPackageContents(path.resolve(target), { crossPackage: argv.includes('--cross-package') })
+  console.log(`Contents on disk: ${bytes} bytes (Resources: ${resourceBytes} bytes)`)
   if (violations.length) {
     console.error(`FAIL: ${violations.length} package content violation(s):`)
     for (const v of violations) console.error(`  - ${v}`)
-    process.exit(1)
+    return 1
   }
   console.log('PASS: package contents match the arm64 allowlist')
+  return 0
 }
+
+// Compare real paths: a symlinked invocation (npx, package-manager shims) must
+// still run the gate, otherwise it would exit 0 without checking anything.
+function isMainModule() {
+  if (!process.argv[1]) return false
+  try {
+    return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url))
+  } catch {
+    return false
+  }
+}
+
+if (isMainModule()) process.exitCode = main(process.argv.slice(2))

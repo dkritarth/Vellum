@@ -1,11 +1,13 @@
 // Minimal markdown renderer for assistant answers. Agents reply in markdown
-// (bold, lists, headings, code, inline LaTeX); showing it raw left `**28.4**`
-// and `\(h = 8\)` in the Ask panel. This builds React elements directly and
-// never injects HTML, so model output cannot add markup or scripts. Links
-// render as plain text: opening agent-chosen URLs from the app is not wanted.
+// (bold, lists, headings, code, LaTeX); showing it raw left `**28.4**` and
+// `\(h = 8\)` in the Ask panel. Text is built as React elements and never
+// injected as HTML, so model output cannot add markup or scripts. Links render
+// as plain text: opening agent-chosen URLs from the app is not wanted. The
+// only injected HTML is KaTeX output (see MathTex), generated with trust off.
 
 import { Fragment, type ReactNode } from 'react'
 
+import { MathTex } from './MathTex'
 import styles from './MarkdownText.module.css'
 
 type Block =
@@ -13,10 +15,12 @@ type Block =
   | { kind: 'paragraph'; text: string }
   | { kind: 'list'; ordered: boolean; items: string[] }
   | { kind: 'code'; text: string }
-  | { kind: 'math'; text: string }
+  | { kind: 'math'; text: string; open?: boolean; opener?: string; closer?: string }
   | { kind: 'rule' }
 
 const LIST_ITEM = /^\s*(?:([-*+])|(\d+)[.)])\s+(.*)$/
+// `\[1\]` or `\[2, 3\]`: a citation whose brackets the model escaped.
+const ESCAPED_CITATION = /^\d+(?:\s*[,–-]\s*\d+)*$/
 
 export function parseBlocks(source: string): Block[] {
   const lines = source.replace(/\r\n?/g, '\n').split('\n')
@@ -42,19 +46,54 @@ export function parseBlocks(source: string): Block[] {
       blocks.push({ kind: 'code', text: code.join('\n') })
       continue
     }
-    const mathFence = trimmed === '$$' ? '$$' : trimmed === '\\[' ? '\\]' : null
-    if (mathFence) {
-      flush()
-      const math: string[] = []
-      for (i++; i < lines.length && lines[i].trim() !== mathFence; i++) math.push(lines[i])
-      blocks.push({ kind: 'math', text: math.join('\n').trim() })
-      continue
-    }
-    const oneLineMath = trimmed.match(/^(?:\$\$(.+)\$\$|\\\[(.+)\\\])$/)
-    if (oneLineMath) {
-      flush()
-      blocks.push({ kind: 'math', text: (oneLineMath[1] ?? oneLineMath[2]).trim() })
-      continue
+    const mathOpen = trimmed.startsWith('$$') ? '$$' : trimmed.startsWith('\\[') ? '\\[' : null
+    if (mathOpen) {
+      const closer = mathOpen === '$$' ? '$$' : '\\]'
+      const first = trimmed.slice(2)
+      const oneLine = first.length >= 2 && first.endsWith(closer) && !first.slice(0, -2).includes(closer)
+      if (oneLine && !(mathOpen === '\\[' && ESCAPED_CITATION.test(first.slice(0, -2).trim()))) {
+        // One-line display: `$$ x $$` or `\[ x \]`.
+        flush()
+        blocks.push({ kind: 'math', text: first.slice(0, -2).trim(), opener: mathOpen, closer })
+        continue
+      }
+      if (!oneLine && !first.includes(closer)) {
+        // Multi-line display block. Inside a list, an indented block belongs
+        // to the current item instead of ending the list.
+        const inItem = list !== null && /^\s+/.test(line)
+        if (!inItem) flush()
+        const math: string[] = first.trim() ? [first] : []
+        let closed = false
+        for (i++; i < lines.length; i++) {
+          const at = lines[i].indexOf(closer)
+          if (at >= 0) {
+            math.push(lines[i].slice(0, at))
+            closed = true
+            // Text after the closing delimiter (`$$ where ...`, `\] (2)`) is
+            // parsed again as its own line rather than swallowed.
+            const rest = lines[i].slice(at + closer.length)
+            if (rest.trim()) {
+              lines[i] = rest
+              i--
+            }
+            break
+          }
+          math.push(lines[i])
+        }
+        const text = math.join('\n').trim()
+        if (inItem && closed && list) {
+          // TeX ignores newlines (rows use \\), so the block fits on one line.
+          list.items[list.items.length - 1] += ` $$${math.map((part) => part.trim()).join(' ').trim()}$$`
+          continue
+        }
+        if (inItem) flush()
+        // An unclosed fence is a formula still streaming in.
+        blocks.push(closed
+          ? { kind: 'math', text, opener: mathOpen, closer }
+          : { kind: 'math', text, open: true })
+        continue
+      }
+      // Otherwise (`$$a$$ and $$b$$`, `\[1\] Smith`) the inline renderer handles it.
     }
     if (trimmed === '') {
       flush()
@@ -92,9 +131,26 @@ export function parseBlocks(source: string): Block[] {
   return blocks
 }
 
-// Order matters: code first so its contents are not parsed further. Single
-// `$` is not math: answers quote prices and shell variables far more often.
-const INLINE = /(`[^`\n]+`)|(\\\((.+?)\\\))|(\$\$([^$\n]+?)\$\$)|(\*\*(.+?)\*\*|__(.+?)__)|(\*([^*\n]+?)\*|(?<![\w])_([^_\n]+?)_(?![\w]))|(\[([^\]\n]+)\]\(([^)\s]+)\))/g
+// Order matters only for matches at the same index; the earliest match wins.
+// Code spans and escaped `\$` keep their literal meaning. Single-dollar math
+// follows Pandoc's rule so prices stay text: the opening `$` is followed by a
+// non-space, the closing `$` follows a non-space and is not followed by a
+// digit, and the formula cannot span a newline or a code span. A closing `$`
+// followed by a letter or `$` (`$PATH$HOME`) is not math either. Every
+// repeated class is bounded so unclosed delimiters in very long lines cannot
+// make matching quadratic while an answer streams.
+const INLINE = new RegExp([
+  /(`[^`\n]{1,1000}`)/.source, // 1 code
+  /(\\\$)/.source, // 2 escaped dollar
+  /(\\\((.{1,2000}?)\\\))/.source, // 3,4 \( \)
+  /(\$\$((?:\\.|[^$\\\n]){1,2000}?)\$\$)/.source, // 5,6 $$ $$
+  /(\$(?![\s$])((?:\\.|[^$\\`\n]){0,1000}?)(?<![\s\\])\$(?![\w$]))/.source, // 7,8 $ $
+  /(\*\*(.{1,2000}?)\*\*|__(.{1,2000}?)__)/.source, // 9,10,11 strong
+  /(\*([^*\n]{1,1000}?)\*|(?<![\w])_([^_\n]{1,1000}?)_(?![\w]))/.source, // 12,13,14 em
+  /(\[([^\]\n]{1,500})\]\(([^)\s]{1,2000})\))/.source, // 15,16,17 link
+  /(\\\[(\d+(?:\s*[,–-]\s*\d+)*)\\\])/.source, // 18,19 escaped citation \[1\]
+  /(\\\[(.{1,2000}?)\\\])/.source, // 20,21 \[ \] inside a line
+].join('|'), 'g')
 
 export function renderInline(text: string, keyPrefix = 'i'): ReactNode[] {
   const nodes: ReactNode[] = []
@@ -105,11 +161,15 @@ export function renderInline(text: string, keyPrefix = 'i'): ReactNode[] {
     if (index > last) nodes.push(text.slice(last, index))
     const key = `${keyPrefix}-${n++}`
     if (match[1]) nodes.push(<code key={key} className={styles.code}>{match[1].slice(1, -1)}</code>)
-    else if (match[2]) nodes.push(<span key={key} className={styles.math}>{match[3]}</span>)
-    else if (match[4]) nodes.push(<span key={key} className={styles.math}>{match[5]}</span>)
-    else if (match[6]) nodes.push(<strong key={key}>{renderInline(match[7] ?? match[8], key)}</strong>)
-    else if (match[9]) nodes.push(<em key={key}>{renderInline(match[10] ?? match[11], key)}</em>)
-    else if (match[12]) nodes.push(<span key={key} className={styles.link} title={match[14]}>{renderInline(match[13], key)}</span>)
+    else if (match[2]) nodes.push('$')
+    else if (match[3]) nodes.push(<MathTex key={key} tex={match[4]} source={match[3]} display={false} />)
+    else if (match[5]) nodes.push(<MathTex key={key} tex={match[6]} source={match[5]} display />)
+    else if (match[7]) nodes.push(<MathTex key={key} tex={match[8]} source={match[7]} display={false} />)
+    else if (match[9]) nodes.push(<strong key={key}>{renderInline(match[10] ?? match[11], key)}</strong>)
+    else if (match[12]) nodes.push(<em key={key}>{renderInline(match[13] ?? match[14], key)}</em>)
+    else if (match[15]) nodes.push(<span key={key} className={styles.link} title={match[17]}>{renderInline(match[16], key)}</span>)
+    else if (match[18]) nodes.push(`[${match[19]}]`)
+    else if (match[20]) nodes.push(<MathTex key={key} tex={match[21]} source={match[20]} display />)
     last = index + match[0].length
   }
   if (last < text.length) nodes.push(text.slice(last))
@@ -139,7 +199,9 @@ export function MarkdownText({ text }: { text: string }) {
           case 'code':
             return <pre key={key} className={styles.pre}><code>{block.text}</code></pre>
           case 'math':
-            return <p key={key} className={styles.mathBlock}>{block.text}</p>
+            return block.open
+              ? <pre key={key} className={styles.mathPending} data-math-pending="">{block.text}</pre>
+              : <MathTex key={key} tex={block.text} source={`${block.opener ?? '$$'}\n${block.text}\n${block.closer ?? '$$'}`} display block />
           case 'rule':
             return <hr key={key} />
           default:

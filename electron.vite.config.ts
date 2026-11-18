@@ -46,6 +46,9 @@ export default defineConfig({
     },
     build: {
       rollupOptions: { input: resolve('src/index.html') },
+      // The CSP (default-src 'self') blocks data: fonts, so KaTeX fonts must
+      // ship as files rather than being inlined into the stylesheet.
+      assetsInlineLimit: (file) => (/\.(woff2?|ttf|otf)$/.test(file) ? false : undefined),
     },
   },
 })

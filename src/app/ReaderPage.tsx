@@ -10,6 +10,7 @@
 // thing that re-rasterises the canvas; until then the previous canvas is
 // stretched to the new size.
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { bindTextLayerSelection } from './textLayerSelection'
 import { TextLayer, type PDFDocumentProxy, type RenderTask } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import type { HighlightRecord } from '../../core/highlights/repo'
 import {
@@ -161,6 +162,7 @@ export function ReaderPage({
     if (!container) return
     let cancelled = false
     let textLayer: TextLayer | null = null
+    let unbindSelection: (() => void) | null = null
 
     void (async () => {
       try {
@@ -176,6 +178,7 @@ export function ReaderPage({
         })
         await textLayer.render()
         if (cancelled) return
+        unbindSelection = bindTextLayerSelection(container)
         setTextVersion((v) => v + 1)
       } catch (err: unknown) {
         if (!cancelled) console.error(`[Reader] Failed to build text layer for page ${pageNumber}:`, err)
@@ -185,6 +188,7 @@ export function ReaderPage({
     return () => {
       cancelled = true
       textLayer?.cancel()
+      unbindSelection?.()
       setTextVersion(0)
     }
   }, [doc, pageNumber, active])

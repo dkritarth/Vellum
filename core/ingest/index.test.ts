@@ -113,6 +113,61 @@ describe('ingest', () => {
     }
   })
 
+  it('keeps stored metadata, outline, summary and added date when a re-ingest cannot reach an agent', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-keep-'))
+    const db = openDb({ path: ':memory:' })
+    const offline: AcpClient = { newSession: async () => { throw new Error('adapter exited: not signed in') } }
+    try {
+      const first = await ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client: new FakeClient([textUpdate(AGENT_JSON), doneUpdate]) })
+      const before = getPaper(db, first.slug)!
+      expect(before.authors).toEqual(['Agent Author'])
+      expect(before.summary).toBeTruthy()
+
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      const second = await ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client: offline })
+      const after = getPaper(db, second.slug)!
+
+      expect(second.slug).toBe(first.slug)
+      expect(after.title).toBe(before.title)
+      expect(after.authors).toEqual(before.authors)
+      expect(after.year).toBe(before.year)
+      expect(after.venue).toBe(before.venue)
+      expect(after.abstract).toBe(before.abstract)
+      expect(after.sections).toEqual(before.sections)
+      expect(after.summary).toBe(before.summary)
+      expect(after.addedAt).toBe(before.addedAt)
+      expect(second.title).toBe(before.title)
+    } finally {
+      db.close()
+    }
+  })
+
+  it('updates metadata when a re-ingest extracts new values, keeping the added date', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-refresh-'))
+    const db = openDb({ path: ':memory:' })
+    const refreshed = JSON.stringify({
+      sections: [{ title: 'Overview', startOffset: 0, endOffset: 30 }],
+      metadata: { title: 'Refreshed Title', authors: ['New Author'], year: 2027 },
+    })
+    try {
+      const first = await ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client: new FakeClient([textUpdate(AGENT_JSON), doneUpdate]) })
+      const before = getPaper(db, first.slug)!
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      await ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client: new FakeClient([textUpdate(refreshed), doneUpdate]) })
+      const after = getPaper(db, first.slug)!
+      expect(after.title).toBe('Refreshed Title')
+      expect(after.authors).toEqual(['New Author'])
+      expect(after.year).toBe(2027)
+      expect(after.sections).toEqual([{ title: 'Overview', startOffset: 0, endOffset: 30 }])
+      // Fields the new extraction omitted keep their stored values.
+      expect(after.venue).toBe(before.venue)
+      expect(after.abstract).toBe(before.abstract)
+      expect(after.addedAt).toBe(before.addedAt)
+    } finally {
+      db.close()
+    }
+  })
+
   it('writes paper.pdf + paper.md, inserts the DB row, and returns an IngestResult', async () => {
     tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-'))
     const db = openDb({ path: ':memory:' })

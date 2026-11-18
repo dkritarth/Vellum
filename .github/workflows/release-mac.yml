@@ -8,6 +8,7 @@ on:
       - electron-builder.yml
       - scripts/after-pack-adhoc-sign.cjs
       - scripts/release-metadata.mjs
+      - scripts/check-package-contents.mjs
       - test/packaged-mac-smoke.mjs
       - test/harness.mjs
       - package.json
@@ -47,6 +48,11 @@ jobs:
           test -n "$app"
           file "$app/Contents/Resources/native/better_sqlite3.node" | grep -q arm64
           codesign --verify --deep --strict --verbose=2 "$app"
+      # Gate scope is the unpacked Vellum.app only; the DMG and ZIP are not inspected.
+      - name: Check package contents
+        run: |
+          app=$(find release -maxdepth 2 -name Vellum.app | head -1)
+          node scripts/check-package-contents.mjs "$app"
       - name: Exercise the packaged app
         run: |
           app=$(find release -maxdepth 2 -name Vellum.app | head -1)

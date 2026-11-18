@@ -62,15 +62,50 @@
 }
 
 .math {
-  font-family: 'Cambria Math', 'STIX Two Math', 'Latin Modern Math', Georgia, serif;
-  font-style: italic;
+  white-space: nowrap;
 }
 
-.mathBlock {
-  font-family: 'Cambria Math', 'STIX Two Math', 'Latin Modern Math', Georgia, serif;
-  font-style: italic;
-  text-align: center;
+/* Wide equations scroll inside the chat panel instead of widening it. */
+.mathDisplay {
+  display: block;
+  max-width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
+  margin: 0 0 8px;
+  padding: 2px 0;
+}
+
+.mathDisplay :global(.katex-display) {
+  margin: 0.4em 0;
+}
+
+.markdown :global(.katex) {
+  font-size: 1.08em;
+  color: inherit;
+}
+
+.mathError,
+.mathErrorBlock,
+.mathPending {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  white-space: pre-wrap;
+}
+
+.mathError {
+  padding: 1px 4px;
+}
+
+.mathErrorBlock,
+.mathPending {
+  padding: 6px 10px;
+  overflow-x: auto;
+}
+
+.mathPending {
+  opacity: 0.75;
 }
 
 .link {

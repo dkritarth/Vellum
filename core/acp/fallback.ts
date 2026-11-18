@@ -6,7 +6,7 @@
 // chain, because each session start may take up to the client's handshake
 // timeout (a cold Claude start legitimately needs about 16 s).
 
-import type { AcpBackend, AcpClient, AcpSession } from './client.js'
+import type { AcpBackend, AcpClient, AcpSession, AcpSessionOptions } from './client.js'
 
 /** Codex is the validated priority backend, then Claude, then Gemini. */
 export const DEFAULT_BACKEND_ORDER: readonly AcpBackend[] = ['codex', 'claude', 'antigravity']
@@ -25,8 +25,13 @@ export function backendOrder(preferred?: AcpBackend | readonly AcpBackend[]): Ac
 
 /** Start a session within `ms`, or undefined. A session that starts after
  * the budget ran out is disposed instead of leaking its adapter. */
-async function startWithin(client: AcpClient, backend: AcpBackend, ms: number): Promise<AcpSession | undefined> {
-  const attempt = client.newSession(backend)
+async function startWithin(
+  client: AcpClient,
+  backend: AcpBackend,
+  ms: number,
+  sessionOptions?: AcpSessionOptions,
+): Promise<AcpSession | undefined> {
+  const attempt = client.newSession(backend, sessionOptions)
   let timer: ReturnType<typeof setTimeout> | undefined
   const expired = new Promise<'expired'>((resolve) => { timer = setTimeout(() => resolve('expired'), ms) })
   const outcome = await Promise.race([attempt.catch(() => undefined), expired])
@@ -43,12 +48,13 @@ export async function newSessionWithFallback(
   client: AcpClient,
   backends: readonly AcpBackend[],
   deadlineMs = BACKGROUND_DEADLINE_MS,
+  sessionOptions?: AcpSessionOptions,
 ): Promise<{ session: AcpSession; backend: AcpBackend } | undefined> {
   const deadline = Date.now() + deadlineMs
   for (const backend of backends) {
     const remaining = deadline - Date.now()
     if (remaining <= 0) return undefined
-    const session = await startWithin(client, backend, remaining)
+    const session = await startWithin(client, backend, remaining, sessionOptions)
     if (session) return { session, backend }
   }
   return undefined
@@ -72,7 +78,7 @@ export async function runWithFallback<T>(
   backends: readonly AcpBackend[],
   turn: (session: AcpSession) => Promise<T>,
   accept: (result: T) => boolean,
-  options: { deadlineMs?: number; maxTurns?: number } = {},
+  options: { deadlineMs?: number; maxTurns?: number; sessionOptions?: AcpSessionOptions } = {},
 ): Promise<FallbackRun<T> | undefined> {
   const deadline = Date.now() + (options.deadlineMs ?? BACKGROUND_DEADLINE_MS)
   const maxTurns = options.maxTurns ?? BACKGROUND_MAX_TURNS
@@ -82,7 +88,7 @@ export async function runWithFallback<T>(
     if (turns >= maxTurns) break
     const remaining = deadline - Date.now()
     if (remaining <= 0) break
-    const session = await startWithin(client, backend, remaining)
+    const session = await startWithin(client, backend, remaining, options.sessionOptions)
     if (!session) continue
     turns += 1
     try {

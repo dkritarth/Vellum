@@ -1,3 +1,4 @@
+import { dirname } from 'node:path'
 import type { AcpBackend, AcpClient, AcpSession } from '../acp/client.js'
 import { backendOrder, runWithFallback } from '../acp/fallback.js'
 import { StdioAcpClient } from '../acp/stdio-client.js'
@@ -12,7 +13,8 @@ export async function summarizePaper(
     backendOrder(options.backend),
     (session) => summarizeWith(session, mdPath),
     (summary) => summary !== undefined,
-    { deadlineMs: options.deadlineMs },
+    // Scope the agent to the paper directory (#236).
+    { deadlineMs: options.deadlineMs, sessionOptions: { cwd: dirname(mdPath) } },
   )
   return run?.result
 }

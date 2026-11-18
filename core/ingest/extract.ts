@@ -34,6 +34,7 @@
 // injectable seam tests use). StdioAcpClient is the one concrete
 // implementation of that contract and is only ever used as this module's
 // default; core/acp/ itself is untouched.
+import { dirname } from 'node:path'
 import type { AcpBackend, AcpClient, AcpSession, AcpUpdate } from '../acp/client.js'
 import { backendOrder, runWithFallback } from '../acp/fallback.js'
 import { StdioAcpClient } from '../acp/stdio-client.js'
@@ -113,7 +114,8 @@ export async function extractPaper(mdPath: string, options: ExtractOptions = {})
     backendOrder(options.backend),
     (session) => extractWith(session, mdPath),
     (result) => Object.keys(result.metadata).length > 0,
-    { deadlineMs: options.deadlineMs },
+    // Scope the agent to the paper directory (#236).
+    { deadlineMs: options.deadlineMs, sessionOptions: { cwd: dirname(mdPath) } },
   )
   if (!run) return emptyResult()
   // Report the backend only when it produced metadata, so the summary step

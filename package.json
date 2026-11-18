@@ -24,6 +24,7 @@
     "test:gate:usage": "node test/usage-live.mjs",
     "dist": "electron-vite build && electron-builder --linux --publish never",
     "dist:mac": "electron-vite build && electron-builder --mac --arm64 --publish never",
+    "check:package": "node scripts/check-package-contents.mjs",
     "test:gate:reader": "node test/reader-gate.mjs",
     "test:gate:reader-scroll-zoom": "node test/reader-scroll-zoom-gate.mjs",
     "test:gate:app-ux": "node test/app-ux-live.mjs",

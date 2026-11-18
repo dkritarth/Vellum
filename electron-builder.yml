@@ -24,6 +24,23 @@ mac:
       to: native/better_sqlite3.node
   artifactName: ${productName}-${version}-${arch}.${ext}
   # Apple Silicon only. SQLite's N-API prebuild matches the target platform.
+  # The app loads resources/native/better_sqlite3.node (extraResources above),
+  # so better-sqlite3's own prebuilds and C/C++ build sources are dead weight.
+  # Other-platform canvas binaries only appear when packaging from a non-Mac
+  # host. scripts/check-package-contents.mjs enforces all of this on the .app.
+  # A platform `files` list replaces the top-level one, so repeat its includes.
+  files:
+    - out/**/*
+    - package.json
+    - '!node_modules/better-sqlite3/{prebuilds,deps,src,build}/**'
+    - '!node_modules/better-sqlite3/binding.gyp'
+    - '!node_modules/node-addon-api/**/*.{h,hpp,c,cc,cpp,gyp,gypi}'
+    - '!node_modules/node-addon-api/{tools,package-support.json}'
+    - '!node_modules/@napi-rs/canvas-{android,freebsd,linux,win32}-*/**'
+    - '!node_modules/@napi-rs/canvas-darwin-x64/**'
+    - '!node_modules/**/{CODE_OF_CONDUCT,README,CHANGELOG,HISTORY}*'
+    - '!node_modules/@agentclientprotocol/sdk/dist/**/*.test.js*'
+    - '!node_modules/@agentclientprotocol/sdk/dist/{examples,test-support}/**'
   # No Developer ID is configured: scripts/after-pack-adhoc-sign.cjs ad-hoc
   # signs the bundle, so the first launch needs right-click > Open (or
   # `xattr -cr /Applications/Vellum.app`).

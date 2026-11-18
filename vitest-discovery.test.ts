@@ -44,7 +44,7 @@ it.each([{ filters: [] }, { filters: ['sentinel'] }])(
       const result = await execFileAsync(process.execPath, [
         runner, 'run', ...filters, '--root', root, '--config', config,
         '--reporter=json', '--outputFile', report, '--no-cache',
-        '--maxWorkers=1', '--minWorkers=1',
+        '--maxWorkers=1',
       ], { cwd: root, timeout: 20_000 }).then(
         () => ({ code: 0, output: '' }),
         (error: Error & { code: number; stdout: string; stderr: string }) => ({

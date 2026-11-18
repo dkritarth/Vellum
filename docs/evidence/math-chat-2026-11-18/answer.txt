@@ -2,7 +2,7 @@ I’ll read the paper file directly, then summarize the requested equations with
 
 The paper moves from a discrete residual update to continuous dynamics: a residual layer adds a learned change to the current state, while a neural ODE specifies the state’s derivative and lets a solver compute the result.
 
-Residual update: 
+Residual update:
 ℎ
 𝑡
 +
@@ -66,7 +66,7 @@ dh(t)
 
 (Eq. 2, “Introduction”). The solver integrates this vector field from the input state to obtain the output state.
 
-For training, the paper defines the adjoint as 
+For training, the paper defines the adjoint as
 𝑎
 (
 𝑡
@@ -80,7 +80,7 @@ For training, the paper defines the adjoint as
 (
 𝑡
 )
-a(t)=∂L/∂z(t) (Section 2, “Reverse-mode automatic differentiation of ODE solutions”). It describes this as the gradient of the loss with respect to the hidden state at time 
+a(t)=∂L/∂z(t) (Section 2, “Reverse-mode automatic differentiation of ODE solutions”). It describes this as the gradient of the loss with respect to the hidden state at time
 𝑡
 t. Its dynamics are
 
@@ -185,7 +185,7 @@ dt
 
 (Eq. 5, Section 2). In the paper’s description, this integral accumulates how changes to the dynamics parameters affect the loss along the trajectory.
 
-The complete parameter-gradient expression again, written inline, is: 
+The complete parameter-gradient expression again, written inline, is:
 𝑑
 𝐿
 𝑑

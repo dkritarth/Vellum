@@ -8,6 +8,7 @@
 import { existsSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { basename, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 export type InputKind = 'arxiv' | 'doi' | 'pdf_url' | 'local_pdf'
 
@@ -36,6 +37,25 @@ const LEGACY_ARXIV_URL_RE = /^https?:\/\/(?:www\.)?arxiv\.org\/(?:abs|pdf)\/(.+?
 // DOI: "10.<registrant>/<suffix>" per the DOI handbook, bare or as a URL.
 const DOI_BARE_RE = /^10\.\d{4,9}\/\S+$/
 const DOI_URL_RE = /^https?:\/\/(dx\.)?doi\.org\/(10\.\d{4,9}\/\S+)$/i
+// arXiv registers DOIs with DataCite (printed on arXiv PDFs since 2022);
+// Crossref has no record of them, so they route to the arXiv path.
+const ARXIV_DOI_RE = /^10\.48550\/arxiv\.(.+)$/i
+const IDENTITY_HOST_RE = /^(?:www\.)?arxiv\.org$|^(?:dx\.)?doi\.org$/i
+
+/** Query strings and fragments never identify an arXiv paper or a DOI
+ * (`?context=cs.LG`, `#abstract`, `?utm_source=…`); drop them for those
+ * hosts. Generic PDF URLs keep their query (it can select the file). */
+function withoutQueryOnIdentityHosts(input: string): string {
+  if (!/^https?:\/\//i.test(input)) return input
+  let url: URL
+  try {
+    url = new URL(input)
+  } catch {
+    return input
+  }
+  if (!IDENTITY_HOST_RE.test(url.hostname) || (!url.search && !url.hash)) return input
+  return `${url.protocol}//${url.host}${url.pathname}`
+}
 
 /**
  * Filesystem-safe slug: lowercase, [a-z0-9._-] only, no path separators.
@@ -59,10 +79,18 @@ function sourceInput(kind: 'doi' | 'pdf_url' | 'local_pdf', name: string, value:
 }
 
 export function classifyInput(raw: string): ClassifiedInput {
-  const trimmed = raw.trim()
+  let trimmed = raw.trim()
   if (trimmed.length === 0) {
     throw new Error('classifyInput: empty input')
   }
+  if (/^file:/i.test(trimmed)) {
+    try {
+      trimmed = fileURLToPath(trimmed)
+    } catch {
+      throw new Error(`classifyInput: malformed file URL: ${trimmed}`)
+    }
+  }
+  trimmed = withoutQueryOnIdentityHosts(trimmed)
 
   const arxivUrlMatch = trimmed.match(ARXIV_URL_RE)
   if (arxivUrlMatch?.groups) {
@@ -82,7 +110,16 @@ export function classifyInput(raw: string): ClassifiedInput {
   }
 
   const doiUrlMatch = trimmed.match(DOI_URL_RE)
-  const doiName = doiUrlMatch ? decodeURIComponent(doiUrlMatch[2]) : trimmed
+  let doiName = trimmed
+  if (doiUrlMatch) {
+    try {
+      doiName = decodeURIComponent(doiUrlMatch[2])
+    } catch {
+      throw new Error(`classifyInput: malformed DOI URL: ${trimmed}`)
+    }
+  }
+  const arxivDoi = doiName.match(ARXIV_DOI_RE)
+  if (arxivDoi) return classifyInput(arxivDoi[1])
   if (DOI_BARE_RE.test(doiName)) {
     // DOI case folding applies to ASCII letters; URL escaping is transport-only.
     // https://www.crossref.org/documentation/member-setup/constructing-your-dois/

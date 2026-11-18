@@ -15,7 +15,8 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    // Vitest 5 no longer excludes dist by default; keep build output out.
     // Match paths within this checkout, even when it lives inside a worktree.
-    exclude: [...configDefaults.exclude, '**/.claude/worktrees/**'],
+    exclude: [...configDefaults.exclude, '**/dist/**', '**/.claude/worktrees/**'],
   },
 })

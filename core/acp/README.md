@@ -47,31 +47,81 @@ that `AcpSession.prompt()` yields from, mapped onto `AcpUpdate` via
 `mapSessionUpdate`. The RPC promise from `session/prompt` settling pushes the
 terminal `done`/`error` update and closes the queue.
 
+### Session mode (the policy only works if the adapter asks)
+
+Both adapters start in a mode that approves workspace writes **in-process,
+without ever sending `session/request_permission`**, which would bypass the
+policy below entirely. Verified against the installed sources
+(`claude-agent-acp` 0.107.0, `codex-acp` 2.2.2):
+
+| Backend | Default mode | What it auto-approves | Mode Vellum forces |
+| --- | --- | --- | --- |
+| `claude` | `auto` (or the user's `permissions.defaultMode`, e.g. `acceptEdits`): `session-mode.js` `resolveInitialPermissionMode` | file edits inside cwd | `default` ("Manual: always ask before making changes") |
+| `codex` | `agent` (`auto_review` + `workspace-write`): `AgentMode.DEFAULT_AGENT_MODE` | writes inside the workspace | `read-only` (read-only sandbox, approval `on-request`) |
+
+After `session/new`, `newSession` reads the announced `modes`, sends
+`session/set_mode` when the current mode is not the safe one, and logs
+`[vellum:acp] session mode backend=… initial=… enforced=…`. It **fails closed**:
+if the adapter announces no modes, does not offer the safe mode, rejects
+`set_mode`, or announces a `current_mode_update` away from it, the adapter is
+killed and `newSession` rejects. For Codex the child env also carries
+`INITIAL_AGENT_MODE=read-only`, so the session starts read-only before
+`set_mode`. Constants: `SAFE_SESSION_MODE` in `stdio-client.ts`. Antigravity
+has no such mode switch and is unchanged.
+
+Claude can still reach the network through its own tools (`WebFetch`,
+`WebSearch`); in `default` mode these send `session/request_permission`
+(`fetch`), which the policy rejects.
+
 ### Permission policy (deny by default)
 
 Paper text is untrusted (arbitrary PDFs and arXiv downloads), and Vellum has no
 permission prompt UI yet. `requestPermission` therefore decides from
-`toolCall.kind` alone, in `permission-policy.ts`:
+`toolCall.kind` and, for `read` and `search`, the paths the call names, in
+`permission-policy.ts`:
 
 | `toolCall.kind` | Outcome |
 | --- | --- |
-| `read`, `search`, `think` | Allow: selects `allow_once`, else `allow_always`; cancels if neither is offered |
-| `edit`, `delete`, `move`, `execute`, `switch_mode`, `other`, `fetch`, absent or unknown | Reject: selects `reject_once`, else `reject_always`; cancels if neither is offered |
+| `think` | Allow: selects `allow_once`, else `allow_always`; cancels if neither is offered |
+| `read`, `search` | Allow only when every path named in `toolCall.locations[].path` and path-like `rawInput` fields (`path`, `file_path`, `paths`, `uri`, escaping globs, …) resolves inside the session cwd after `..` and symlinks are resolved. A `read` that names no path is rejected. A `search` that names no local path but carries a `query`/`url` (a web search) is rejected. |
+| `edit`, `delete`, `move`, `execute`, `switch_mode`, `other`, `fetch`, absent, `null` or unknown | Reject: selects `reject_once`, else `reject_always`; cancels if neither is offered |
 
 `fetch` is denied on purpose. It reaches the network, so injected paper text
 could use it to send the paper or other local content to an attacker, and
 grounding only needs local file reads. An allow option is never selected for a
 denied kind, even when it is the only option offered. Every decision is logged
-as `[vellum:acp] permission backend=… kind=… decision=…` (override with the
-`onPermissionDecision` constructor option).
+as `[vellum:acp] permission backend=… kind=… decision=…` plus `reason="…"` when
+a read/search was refused (override with the `onPermissionDecision`
+constructor option).
+
+### Web search (Codex)
+
+`search` is **not** a local-only kind. Codex's native web search is reported as
+`kind: search` and runs **without** a permission request, so the policy cannot
+stop it; injected paper text could put paper content in a query. Vellum
+therefore disables it in the adapter env (`buildAdapterEnv`, `CODEX_CONFIG`):
+
+- `web_search = "disabled"` removes the native tool.
+- `features.apps = false` is also required. With only `web_search` disabled,
+  Codex fell back to the ChatGPT Apps connector tool
+  `mcp.codex_apps.search_service.web_run` (kind `execute`, no permission
+  request, live results returned). With `apps` off, 4 of 4 probe turns made no
+  search call (3 of 3 made one with neither key set).
+
+Both keys override the user's own `CODEX_CONFIG`. Residual risk: MCP servers the
+user configured in `~/.codex/config.toml` are not touched and can still reach
+the network. Claude's `WebSearch`/`WebFetch` are covered by the permission
+policy (see above).
 
 ### Session working directory
 
 `newSession(backend, { cwd })` forwards `cwd` to `session/new`. The chat
 manager, ingest extract and ingest summary pass the paper directory
 (`dirname(paper.md)`), so adapters that scope file access to cwd still read
-`paper.md` but not the Vellum source tree. With no `cwd` the client falls back
-to the OS temp directory, never `process.cwd()`.
+`paper.md` but not the Vellum source tree, and the permission policy scopes
+`read`/`search` to it. With no `cwd` the client creates a private `0700`
+`mkdtemp` directory for that session and removes it on dispose (or on a failed
+handshake). It never uses `process.cwd()` or the shared OS temp dir.
 
 `SpawnAdapter` is an injectable seam: unit tests substitute a small
 dependency-free ndjson JSON-RPC script in place of the real adapter binary,
@@ -149,7 +199,8 @@ An absent or blank override leaves `CODEX_CONFIG` untouched. Claude receives
 no model override. Vellum also retains `-c model=<JSON-encoded value>` as one
 argv entry for legacy adapter compatibility, without invoking a shell.
 Current 2.2.2 server entry ignores arbitrary argv and reads `CODEX_CONFIG`.
-No provider, authentication, sandbox, or service-tier default changes.
+No provider, authentication, or service-tier default changes. Vellum does force
+the session mode and Codex web-search limits described above.
 See [issue #136 verification](../../docs/verification/issue-136.md) for
 official source locations, delivery evidence, and live verification limits.
 

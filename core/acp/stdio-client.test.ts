@@ -56,9 +56,27 @@ function send(msg) {
   process.stdout.write(JSON.stringify(msg) + '\n')
 }
 
+let sessionCwd = null
+const permissionReplies = new Map()
+let pendingPrompt = null
+function finishPermissionProbe() {
+  const summary = JSON.stringify({ cwd: sessionCwd, outcomes: Object.fromEntries(permissionReplies) })
+  send({
+    jsonrpc: '2.0',
+    method: 'session/update',
+    params: { sessionId: 'sess-1', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: summary } } },
+  })
+  send({ jsonrpc: '2.0', id: pendingPrompt, result: { stopReason: 'end_turn' } })
+}
+
 rl.on('line', (line) => {
   if (!line.trim()) return
   const msg = JSON.parse(line)
+  if (msg.method === undefined && typeof msg.id === 'string' && msg.id.startsWith('perm-')) {
+    permissionReplies.set(msg.id.slice(5), msg.result.outcome)
+    if (permissionReplies.size === 5) finishPermissionProbe()
+    return
+  }
   if (msg.method === 'initialize') {
     // 'stall-handshake' never answers initialize, simulating a hung adapter
     // before the handshake completes.
@@ -66,8 +84,27 @@ rl.on('line', (line) => {
     const agentCapabilities = mode.startsWith('embed') ? { promptCapabilities: { embeddedContext: true } } : {}
     send({ jsonrpc: '2.0', id: msg.id, result: { protocolVersion: 1, agentCapabilities } })
   } else if (msg.method === 'session/new') {
+    sessionCwd = msg.params.cwd
     send({ jsonrpc: '2.0', id: msg.id, result: { sessionId: 'sess-1' } })
   } else if (msg.method === 'session/prompt') {
+    // 'permission-probe' asks for permission on five tool kinds, then reports
+    // the outcomes it received together with the cwd given to session/new.
+    if (mode === 'permission-probe') {
+      pendingPrompt = msg.id
+      const options = [
+        { optionId: 'allow', name: 'Allow', kind: 'allow_once' },
+        { optionId: 'reject', name: 'Reject', kind: 'reject_once' },
+      ]
+      for (const kind of ['read', 'search', 'execute', 'edit', 'fetch']) {
+        send({
+          jsonrpc: '2.0',
+          id: 'perm-' + kind,
+          method: 'session/request_permission',
+          params: { sessionId: 'sess-1', toolCall: { toolCallId: 't-' + kind, title: kind, kind }, options },
+        })
+      }
+      return
+    }
     // 'slow-stream' answers with chunks spaced 30ms apart (total ~180ms) so
     // a test can set an idle budget well under the total turn duration:
     // every gap stays under the idle bound while the total exceeds it.
@@ -206,6 +243,53 @@ describe('mapSessionUpdate', () => {
   it('falls back to tool_result for update kinds with no dedicated AcpUpdate kind', () => {
     const raw = { sessionUpdate: 'plan', entries: [] }
     expect(mapSessionUpdate(raw as never)).toEqual({ kind: 'tool_result', data: raw })
+  })
+})
+
+describe('StdioAcpClient permission policy and cwd', () => {
+  async function probe(client: StdioAcpClient, cwd?: string): Promise<{ cwd: string; outcomes: Record<string, { outcome: string; optionId?: string }> }> {
+    const session = await client.newSession('codex', cwd === undefined ? undefined : { cwd })
+    try {
+      const updates = await collect(session.prompt({ text: 'probe' }))
+      const text = updates.filter((u) => u.kind === 'text').map((u) => (u.data as { text: string }).text).join('')
+      return JSON.parse(text)
+    } finally {
+      await session.dispose()
+    }
+  }
+
+  it('grants read-only tool kinds and rejects edit, execute and fetch', async () => {
+    const log: Array<{ kind: string | undefined; decision: string }> = []
+    const client = new StdioAcpClient(spawnFakeAgent('permission-probe'), {}, {
+      onPermissionDecision: (entry) => log.push({ kind: entry.kind, decision: entry.decision }),
+    })
+    const result = await probe(client)
+    expect(result.outcomes).toEqual({
+      read: { outcome: 'selected', optionId: 'allow' },
+      search: { outcome: 'selected', optionId: 'allow' },
+      execute: { outcome: 'selected', optionId: 'reject' },
+      edit: { outcome: 'selected', optionId: 'reject' },
+      fetch: { outcome: 'selected', optionId: 'reject' },
+    })
+    expect(log.map((entry) => `${entry.kind}:${entry.decision}`).sort()).toEqual([
+      'edit:reject', 'execute:reject', 'fetch:reject', 'read:allow', 'search:allow',
+    ])
+  })
+
+  it('passes the requested cwd to session/new', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vellum-cwd-'))
+    try {
+      const result = await probe(new StdioAcpClient(spawnFakeAgent('permission-probe'), {}, { onPermissionDecision: () => {} }), dir)
+      expect(result.cwd).toBe(dir)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('defaults the session cwd to the OS temp dir, never the process cwd', async () => {
+    const result = await probe(new StdioAcpClient(spawnFakeAgent('permission-probe'), {}, { onPermissionDecision: () => {} }))
+    expect(result.cwd).toBe(tmpdir())
+    expect(result.cwd).not.toBe(process.cwd())
   })
 })
 

@@ -34,6 +34,7 @@
 // injectable seam tests use). StdioAcpClient is the one concrete
 // implementation of that contract and is only ever used as this module's
 // default; core/acp/ itself is untouched.
+import { dirname } from 'node:path'
 import type { AcpBackend, AcpClient, AcpUpdate } from '../acp/client.js'
 import { StdioAcpClient } from '../acp/stdio-client.js'
 
@@ -102,7 +103,7 @@ export async function extractPaper(mdPath: string, options: ExtractOptions = {})
   const client = options.client ?? new StdioAcpClient()
   const backend = options.backend ?? 'claude'
 
-  const session = await client.newSession(backend).catch(() => undefined)
+  const session = await client.newSession(backend, { cwd: dirname(mdPath) }).catch(() => undefined)
   if (!session) return emptyResult()
 
   try {

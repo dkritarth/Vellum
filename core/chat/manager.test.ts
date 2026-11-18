@@ -32,15 +32,17 @@ class FakeClient implements AcpClient {
   sessions: FakeSession[] = []
   newSessionCalls = 0
   backends: AcpBackend[] = []
+  cwds: Array<string | undefined> = []
 
   constructor(
     private readonly updates: AcpUpdate[] = [],
     private readonly newSessionImpl?: () => Promise<AcpSession>,
   ) {}
 
-  async newSession(backend: AcpBackend): Promise<AcpSession> {
+  async newSession(backend: AcpBackend, options?: { cwd?: string }): Promise<AcpSession> {
     this.newSessionCalls += 1
     this.backends.push(backend)
+    this.cwds.push(options?.cwd)
     if (this.newSessionImpl) return this.newSessionImpl()
     const session = new FakeSession(this.updates)
     this.sessions.push(session)
@@ -66,6 +68,14 @@ describe('ChatManager', () => {
 
   afterEach(() => {
     db.close()
+  })
+
+  it('opens each ACP session in the paper directory, not the process cwd', async () => {
+    const client = new FakeClient([doneUpdate])
+    const manager = new ChatManager(client)
+    const { session } = manager.openChat({ db, paperSlug: slug })
+    await manager.runTurn({ db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'hi' }, () => {})
+    expect(client.cwds).toEqual(['data/papers/attention-is-all-you-need'])
   })
 
   it('rejects a concurrent prompt before creating an ACP session or persisting its question', async () => {

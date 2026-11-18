@@ -14,8 +14,8 @@
 
 import { spawn, type ChildProcessByStdio } from 'node:child_process'
 import { existsSync, readFileSync, statSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { delimiter, join } from 'node:path'
+import { homedir, tmpdir } from 'node:os'
+import { delimiter, isAbsolute, join, resolve } from 'node:path'
 import { Readable, Writable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
 import {
@@ -36,8 +36,10 @@ import type {
   AcpClient,
   AcpPromptRequest,
   AcpSession,
+  AcpSessionOptions,
   AcpUpdate,
 } from './client.js'
+import { decidePermission } from './permission-policy.js'
 
 /** The shape of the adapter subprocess: stdin/stdout piped (ACP transport),
  * stderr inherited (adapter diagnostics go straight to Vellum's own stderr). */
@@ -601,15 +603,45 @@ class StdioAcpSession implements AcpSession {
   }
 }
 
+/** Optional collaborators for `StdioAcpClient`. */
+export interface StdioAcpClientOptions {
+  /** Called for every `session/request_permission` with the policy outcome.
+   * Defaults to a one-line `console.info` audit entry. */
+  onPermissionDecision?: (entry: PermissionAuditEntry) => void
+}
+
+export interface PermissionAuditEntry {
+  backend: AcpBackend
+  kind: string | undefined
+  title: string | undefined
+  decision: 'allow' | 'reject' | 'cancelled'
+  optionId?: string
+}
+
+function logPermissionDecision(entry: PermissionAuditEntry): void {
+  console.info(`[vellum:acp] permission backend=${entry.backend} kind=${entry.kind ?? 'unknown'} decision=${entry.decision}`)
+}
+
+/** Working directory for `session/new`. Callers pass the paper or data
+ * directory so adapters that sandbox to cwd see only paper content. When
+ * none is given, use the OS temp dir rather than the app's own process cwd
+ * (which is the source checkout in development). */
+export function resolveSessionCwd(cwd: string | undefined): string {
+  if (cwd === undefined || cwd.trim() === '') return tmpdir()
+  return isAbsolute(cwd) ? cwd : resolve(cwd)
+}
+
 /** Real ACP transport: spawns the backend's first-party adapter subprocess
  * and drives it over stdio JSON-RPC via `@agentclientprotocol/sdk`. */
 export class StdioAcpClient implements AcpClient {
   constructor(
     private readonly spawnAdapter: SpawnAdapter = defaultSpawnAdapter,
     private readonly timeouts: StdioAcpClientTimeouts = {},
+    private readonly options: StdioAcpClientOptions = {},
   ) {}
 
-  async newSession(backend: AcpBackend): Promise<AcpSession> {
+  async newSession(backend: AcpBackend, sessionOptions: AcpSessionOptions = {}): Promise<AcpSession> {
+    const cwd = resolveSessionCwd(sessionOptions.cwd)
     const command = ADAPTERS[backend].command
     const child = this.spawnAdapter(backend)
     const tracker = describeChildFailure(child, command)
@@ -626,14 +658,16 @@ export class StdioAcpClient implements AcpClient {
         session?.route(params.sessionId, mapSessionUpdate(params.update))
       },
       requestPermission: (req: RequestPermissionRequest): RequestPermissionResponse => {
-        // Headless client, no UI wired yet (that's a later card). Auto-allow
-        // so the on-plan smoke test can complete unattended; auto-reject if
-        // the adapter offers no allow option. Revisit once the Ask panel
-        // wires a real permission prompt.
-        const allow = req.options.find((o) => o.kind === 'allow_once' || o.kind === 'allow_always')
-        return {
-          outcome: allow ? { outcome: 'selected', optionId: allow.optionId } : { outcome: 'cancelled' },
+        // No permission prompt UI exists yet and paper text is untrusted, so
+        // only read-only tool kinds are granted. See permission-policy.ts.
+        const decision = decidePermission(req)
+        try {
+          const audit = this.options.onPermissionDecision ?? logPermissionDecision
+          audit({ backend, kind: decision.kind, title: decision.title, decision: decision.decision, optionId: decision.optionId })
+        } catch {
+          // Audit logging must never change a permission outcome.
         }
+        return decision.response
       },
     })
 
@@ -661,7 +695,7 @@ export class StdioAcpClient implements AcpClient {
       ])
 
       const newSessionResult = await Promise.race([
-        connection.newSession({ cwd: process.cwd(), mcpServers: [] }),
+        connection.newSession({ cwd, mcpServers: [] }),
         failure,
         handshake.promise,
       ])

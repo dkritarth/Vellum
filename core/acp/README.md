@@ -47,10 +47,31 @@ that `AcpSession.prompt()` yields from, mapped onto `AcpUpdate` via
 `mapSessionUpdate`. The RPC promise from `session/prompt` settling pushes the
 terminal `done`/`error` update and closes the queue.
 
-The `requestPermission` client handler auto-allows (falls back to cancel if
-no allow option is offered) — there's no UI yet to ask a human, so headless
-tool-call permission is a deliberate placeholder until the Ask panel wires a
-real prompt.
+### Permission policy (deny by default)
+
+Paper text is untrusted (arbitrary PDFs and arXiv downloads), and Vellum has no
+permission prompt UI yet. `requestPermission` therefore decides from
+`toolCall.kind` alone, in `permission-policy.ts`:
+
+| `toolCall.kind` | Outcome |
+| --- | --- |
+| `read`, `search`, `think` | Allow: selects `allow_once`, else `allow_always`; cancels if neither is offered |
+| `edit`, `delete`, `move`, `execute`, `switch_mode`, `other`, `fetch`, absent or unknown | Reject: selects `reject_once`, else `reject_always`; cancels if neither is offered |
+
+`fetch` is denied on purpose. It reaches the network, so injected paper text
+could use it to send the paper or other local content to an attacker, and
+grounding only needs local file reads. An allow option is never selected for a
+denied kind, even when it is the only option offered. Every decision is logged
+as `[vellum:acp] permission backend=… kind=… decision=…` (override with the
+`onPermissionDecision` constructor option).
+
+### Session working directory
+
+`newSession(backend, { cwd })` forwards `cwd` to `session/new`. The chat
+manager, ingest extract and ingest summary pass the paper directory
+(`dirname(paper.md)`), so adapters that scope file access to cwd still read
+`paper.md` but not the Vellum source tree. With no `cwd` the client falls back
+to the OS temp directory, never `process.cwd()`.
 
 `SpawnAdapter` is an injectable seam: unit tests substitute a small
 dependency-free ndjson JSON-RPC script in place of the real adapter binary,

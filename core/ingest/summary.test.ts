@@ -19,6 +19,14 @@ it('generates a grounded summary using the paper markdown context', async () => 
   expect(session.request?.contextFiles).toEqual(['/papers/p1/paper.md'])
 })
 
+it('opens the session in the paper directory, not the process cwd', async () => {
+  const session = new FakeSession()
+  let cwd: string | undefined
+  const client: AcpClient = { newSession: async (_backend, options) => { cwd = options?.cwd; return session } }
+  await summarizePaper('/papers/p1/paper.md', { client })
+  expect(cwd).toBe('/papers/p1')
+})
+
 it.each(['error', 'throw', 'EOF'] as const)('discards nonempty summary after %s and attempts disposal', async (failure) => {
   let disposed = false
   const client: AcpClient = {

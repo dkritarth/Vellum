@@ -38,8 +38,32 @@ export type AskStreamEvent = (
   | { kind: 'text'; text: string }
   | { kind: 'tool_activity' }
   | { kind: 'done'; message: ChatMessage }
+  /** The user stopped the turn. `message` is the saved partial answer, absent
+   * when the agent had produced no answer text yet (nothing is saved then). */
+  | { kind: 'cancelled'; message?: ChatMessage }
   | { kind: 'error'; message: string }
 ) & { sequence?: number }
+
+/** Appended to a partial answer saved after the user pressed Stop. Persisted
+ * with the answer so a restart shows the same marked text. */
+export const STOPPED_MARKER = '*(stopped)*'
+
+/** After `session/cancel`, how long an adapter may take to end its turn
+ * before the session is disposed and the turn ends anyway. */
+const DEFAULT_CANCEL_GRACE_MS = 5_000
+
+export interface ChatManagerOptions {
+  cancelGraceMs?: number
+}
+
+/** Cancellation state for one active turn, kept out of `AskActiveTurn` so it
+ * never crosses IPC (an AcpSession is not structured-cloneable). */
+interface TurnControl {
+  backend: AcpBackend
+  cancelRequested: boolean
+  session?: AcpSession
+  graceTimer?: ReturnType<typeof setTimeout>
+}
 
 /** Pulls plain text out of an AcpUpdate whose kind is 'text' (a raw ACP
  * ContentBlock in `data`). Mirrors core/ingest/extract.ts's textFromUpdate —
@@ -154,9 +178,13 @@ export class ChatManager {
   // ACP conversations are cached per paper. Lock before any async work,
   // including session creation, and keep ownership outside the renderer.
   private readonly activeTurns = new Map<string, AskActiveTurn>()
+  private readonly turnControls = new Map<string, TurnControl>()
   private readonly resettingPapers = new Set<string>()
+  private readonly cancelGraceMs: number
 
-  constructor(private readonly client: AcpClient) {}
+  constructor(private readonly client: AcpClient, options: ChatManagerOptions = {}) {
+    this.cancelGraceMs = options.cancelGraceMs ?? DEFAULT_CANCEL_GRACE_MS
+  }
 
   /**
    * Open (or reload) the Ask tab for a paper: reuses the most recent chat
@@ -215,14 +243,44 @@ export class ChatManager {
       sequence: 0,
     }
     this.activeTurns.set(params.paperSlug, activeTurn)
+    const control: TurnControl = { backend: params.backend ?? DEFAULT_BACKEND, cancelRequested: false }
+    this.turnControls.set(params.paperSlug, control)
     const release = (): void => {
-      if (this.activeTurns.get(params.paperSlug) === activeTurn) this.activeTurns.delete(params.paperSlug)
+      if (this.activeTurns.get(params.paperSlug) !== activeTurn) return
+      this.activeTurns.delete(params.paperSlug)
+      this.turnControls.delete(params.paperSlug)
+      clearTimeout(control.graceTimer)
     }
-    return this.runActiveTurn(params, (event) => {
+    return this.runActiveTurn(params, control, (event) => {
       if (event.kind === 'text') activeTurn.text += event.text
-      if (event.kind === 'done' || event.kind === 'error') release()
+      if (event.kind === 'done' || event.kind === 'cancelled' || event.kind === 'error') release()
       onEvent({ ...event, sequence: ++activeTurn.sequence })
     }).finally(release)
+  }
+
+  /**
+   * Stop the paper's active turn: send ACP `session/cancel` and let the turn
+   * end itself (stopReason 'cancelled'). An adapter that has not ended the
+   * turn after the grace period is disposed, which ends the turn too.
+   * Returns false when `requestId` is not this paper's active turn. Repeat
+   * calls for the same turn are no-ops that return true.
+   */
+  cancelTurn(params: { paperSlug: string; requestId: string }): boolean {
+    const turn = this.activeTurns.get(params.paperSlug)
+    const control = this.turnControls.get(params.paperSlug)
+    if (!turn || !control || turn.requestId !== params.requestId) return false
+    if (control.cancelRequested) return true
+    control.cancelRequested = true
+    // No agent session yet: runActiveTurn ends the turn when it starts.
+    if (control.session) this.cancelSession(params.paperSlug, control, control.session)
+    return true
+  }
+
+  private cancelSession(paperSlug: string, control: TurnControl, session: AcpSession): void {
+    session.cancel().catch(() => undefined)
+    control.graceTimer = setTimeout(() => {
+      void this.disposeSession(paperSlug, control.backend, session)
+    }, this.cancelGraceMs)
   }
 
   private requireIdle(paperSlug: string): void {
@@ -231,7 +289,11 @@ export class ChatManager {
     }
   }
 
-  private async runActiveTurn(params: RunTurnParams, onEvent: (event: AskStreamEvent) => void): Promise<void> {
+  private async runActiveTurn(
+    params: RunTurnParams,
+    control: TurnControl,
+    onEvent: (event: AskStreamEvent) => void,
+  ): Promise<void> {
     const backend = params.backend ?? DEFAULT_BACKEND
 
     // Snapshot history *before* adding this turn's user message — this is
@@ -248,6 +310,12 @@ export class ChatManager {
       onEvent({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
       return
     }
+    control.session = acpSession
+    if (control.cancelRequested) {
+      // Stopped while the agent was starting: nothing was sent to it.
+      onEvent({ kind: 'cancelled' })
+      return
+    }
 
     // Only recap on a freshly spawned session (app restart, or a prior
     // turn's error evicted the cache) — an already-live session already has
@@ -262,6 +330,7 @@ export class ChatManager {
     let lastMessageId: string | undefined
     let messageBreak = false
     let latestUsageUpdate: { used?: number; size?: number; costAmount?: number; costCurrency?: string } | undefined
+    let stopped = false
     let promptUsage: {
       inputTokens?: number | null
       outputTokens?: number | null
@@ -300,10 +369,22 @@ export class ChatManager {
           // A broken turn likely means a broken session — evict the cache
           // so the next turn spawns fresh rather than reusing a dead one.
           await this.disposeSession(params.paperSlug, backend)
+          // After Stop, an adapter that died or was disposed ends the turn: that is a stop.
+          if (control.cancelRequested) {
+            stopped = true
+            break
+          }
           onEvent({ kind: 'error', message: errorMessageFromUpdate(update) })
           return
         } else if (update.kind === 'done') {
           const doneData = update.data as { stopReason?: string; usage?: { inputTokens?: number; outputTokens?: number; thoughtTokens?: number; cachedReadTokens?: number; cachedWriteTokens?: number; totalTokens?: number } | null } | undefined
+          if (doneData?.stopReason === 'cancelled' && control.cancelRequested) {
+            // The user pressed Stop and the agent ended its turn cleanly, so
+            // its session stays valid and is reused.
+            stopped = true
+            promptUsage = doneData.usage ?? null
+            break
+          }
           // Cancellation and limits leave incomplete agent context. Reuse the
           // existing failure path: discard partial output and evict before retry.
           if (doneData?.stopReason === 'cancelled') {
@@ -349,6 +430,20 @@ export class ChatManager {
       // must never fail the user chat turn.
     }
 
+    // A stopped turn keeps its partial answer, marked, so the thread and a
+    // restart show the same text. With no answer text nothing is saved.
+    if (stopped) {
+      const message = accumulated.trim()
+        ? addChatMessage(params.db, {
+            sessionId: params.chatSessionId,
+            role: 'assistant',
+            content: `${accumulated.trimEnd()}\n\n${STOPPED_MARKER}`,
+          })
+        : undefined
+      onEvent(message ? { kind: 'cancelled', message } : { kind: 'cancelled' })
+      return
+    }
+
     const message = addChatMessage(params.db, {
       sessionId: params.chatSessionId,
       role: 'assistant',
@@ -386,10 +481,17 @@ export class ChatManager {
     await Promise.all([...this.acpSessions.keys()].map((backend) => this.disposeSession(paperSlug, backend)))
   }
 
-  private async disposeSession(paperSlug: string, backend: AcpBackend): Promise<void> {
+  private async disposeSession(paperSlug: string, backend: AcpBackend, only?: AcpSession): Promise<void> {
     const sessions = this.acpSessions.get(backend)
     const entry = sessions?.get(paperSlug)
-    if (!entry) return
+    if (!entry) {
+      await only?.dispose().catch(() => undefined)
+      return
+    }
+    if (only && entry.session !== only) {
+      await only.dispose().catch(() => undefined)
+      return
+    }
     sessions?.delete(paperSlug)
     if (sessions?.size === 0) this.acpSessions.delete(backend)
     await entry.session.dispose().catch(() => undefined)

@@ -10,6 +10,7 @@ type UpdateListener = (payload: { requestId: string; event: unknown }) => void
 let askOpen: ReturnType<typeof vi.fn>
 let askNewChat: ReturnType<typeof vi.fn>
 let askStart: ReturnType<typeof vi.fn>
+let askCancel: ReturnType<typeof vi.fn>
 let onAskUpdate: ReturnType<typeof vi.fn>
 let updateListeners: UpdateListener[]
 
@@ -22,6 +23,7 @@ beforeEach(() => {
   askOpen = vi.fn().mockResolvedValue({ session: { id: 1, paperSlug: 'p1', backend: 'claude', title: null, createdAt: 't' }, messages: [] })
   askNewChat = vi.fn().mockResolvedValue({ session: { id: 2, paperSlug: 'p1', backend: 'claude', title: null, createdAt: 't2' }, messages: [] })
   askStart = vi.fn().mockResolvedValue({ requestId: 'req-1' })
+  askCancel = vi.fn().mockResolvedValue(true)
   onAskUpdate = vi.fn((listener: UpdateListener) => {
     updateListeners.push(listener)
     return () => {
@@ -31,7 +33,7 @@ beforeEach(() => {
 
   Object.defineProperty(window, 'vellum', {
     configurable: true,
-    value: { askOpen, askNewChat, askStart, onAskUpdate, questionsGet: vi.fn().mockResolvedValue([]), questionsRegenerate: vi.fn().mockResolvedValue([]) },
+    value: { askOpen, askNewChat, askStart, askCancel, onAskUpdate, questionsGet: vi.fn().mockResolvedValue([]), questionsRegenerate: vi.fn().mockResolvedValue([]) },
   })
 })
 
@@ -628,6 +630,98 @@ describe('AskPanel', () => {
         text: 'How does attention scale with sequence length?',
       })
     })
+  })
+})
+
+describe('Stop control (#254)', () => {
+  async function startTurn(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+    await waitFor(() => expect(screen.getByLabelText(/ask a question/i)).toBeEnabled())
+    await user.type(screen.getByLabelText(/ask a question/i), 'Explain everything')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(askStart).toHaveBeenCalled())
+  }
+
+  it('offers Stop only while a turn is active', async () => {
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    await waitFor(() => expect(screen.getByLabelText(/ask a question/i)).toBeEnabled())
+    expect(screen.queryByRole('button', { name: 'Stop' })).not.toBeInTheDocument()
+
+    await startTurn(user)
+    expect(await screen.findByRole('button', { name: 'Stop' })).toBeEnabled()
+    await act(async () => emit({ requestId: 'req-1', event: { kind: 'done', sequence: 1, message: { id: 5, role: 'assistant', content: 'Done' } } }))
+    expect(screen.queryByRole('button', { name: 'Stop' })).not.toBeInTheDocument()
+  })
+
+  it('cancels the active request, keeps the marked partial answer, and re-enables the composer', async () => {
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    await startTurn(user)
+    await act(async () => emit({ requestId: 'req-1', event: { kind: 'text', sequence: 1, text: 'Partial answer' } }))
+    expect(await screen.findByText('Partial answer')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Stop' }))
+    expect(askCancel).toHaveBeenCalledWith({ slug: 'p1', requestId: 'req-1' })
+    // Stop is acknowledged but the turn is still ending: no double cancel.
+    expect(screen.getByRole('button', { name: 'Stopping…' })).toBeDisabled()
+    expect(screen.getByLabelText(/ask a question/i)).toBeDisabled()
+
+    await act(async () => emit({
+      requestId: 'req-1',
+      event: { kind: 'cancelled', sequence: 2, message: { id: 6, role: 'assistant', content: 'Partial answer\n\n*(stopped)*' } },
+    }))
+    expect(await screen.findByText('(stopped)')).toBeInTheDocument()
+    expect(screen.getByText('Partial answer')).toBeInTheDocument()
+    expect(screen.getByLabelText(/ask a question/i)).toBeEnabled()
+    expect(screen.queryByRole('button', { name: /^Stop/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('drops the streaming bubble when a stopped turn had produced no answer', async () => {
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    await startTurn(user)
+    await user.click(await screen.findByRole('button', { name: 'Stop' }))
+    await act(async () => emit({ requestId: 'req-1', event: { kind: 'cancelled', sequence: 1 } }))
+    await waitFor(() => expect(screen.getByLabelText(/ask a question/i)).toBeEnabled())
+    expect(screen.getByText('Explain everything')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('is reachable and activatable from the keyboard', async () => {
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    await startTurn(user)
+    const stop = await screen.findByRole('button', { name: 'Stop' })
+    // A native button in the tab order: focusable and activated by Enter.
+    expect(stop.tagName).toBe('BUTTON')
+    expect(stop).not.toHaveAttribute('tabindex', '-1')
+    stop.focus()
+    expect(stop).toHaveFocus()
+    await user.keyboard('{Enter}')
+    expect(askCancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('sends a Stop pressed before the request id is acknowledged once it arrives', async () => {
+    let resolveStart!: (result: { requestId: string }) => void
+    askStart.mockReturnValueOnce(new Promise((resolve) => { resolveStart = resolve }))
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    await startTurn(user)
+    await user.click(await screen.findByRole('button', { name: 'Stop' }))
+    expect(askCancel).not.toHaveBeenCalled()
+    await act(async () => resolveStart({ requestId: 'late' }))
+    await waitFor(() => expect(askCancel).toHaveBeenCalledWith({ slug: 'p1', requestId: 'late' }))
+  })
+
+  it('surfaces a failed cancel and lets the user retry Stop', async () => {
+    askCancel.mockRejectedValueOnce(new Error('ipc down'))
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    await startTurn(user)
+    await user.click(await screen.findByRole('button', { name: 'Stop' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('ipc down')
+    expect(await screen.findByRole('button', { name: 'Stop' })).toBeEnabled()
   })
 })
 

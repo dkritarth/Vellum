@@ -53,6 +53,10 @@ export interface AcpUpdate {
 export interface AcpSession {
   /** Send a turn; yields streaming updates until `done`. */
   prompt(req: AcpPromptRequest): AsyncIterable<AcpUpdate>
+  /** Ask the agent to stop the turn in flight (ACP `session/cancel`). The
+   * agent ends that turn with stopReason 'cancelled', so `prompt()` still
+   * finishes with a `done` update. No-op when no turn is in flight. */
+  cancel(): Promise<void>
   dispose(): Promise<void>
 }
 

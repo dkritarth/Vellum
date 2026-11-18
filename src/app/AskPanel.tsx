@@ -76,6 +76,10 @@ export function AskPanel({
   const [loadError, setLoadError] = useState<string | null>(null)
   const [backend, setBackend] = useState<ChatBackend>('claude')
   const [switchingSession, setSwitchingSession] = useState(false)
+  // Stop was pressed; the turn is ending (ACP session/cancel is async).
+  const [stopping, setStopping] = useState(false)
+  // Stop pressed before askStart returned the request id to cancel.
+  const stopBeforeAck = useRef(false)
   const activeRequestId = useRef<string | null>(null)
   const activeTurnSessionId = useRef<number | null>(null)
   const displayedSessionId = useRef<number | null>(null)
@@ -117,6 +121,17 @@ export function AskPanel({
       }
       setSending(false)
       activeRequestId.current = null
+    } else if (event.kind === 'cancelled') {
+      // A stopped turn saved its partial answer (marked) only when it had text.
+      const persisted = event.message
+      if (activeTurnSessionId.current === displayedSessionId.current) {
+        setMessages((current) => [
+          ...current.filter((m) => m.id !== STREAMING_ID),
+          ...(persisted ? [{ id: persisted.id, role: persisted.role, content: persisted.content }] : []),
+        ])
+      }
+      setSending(false)
+      activeRequestId.current = null
     } else if (event.kind === 'error') {
       setMessages((current) => current.filter((m) => m.id !== STREAMING_ID))
       setError(event.message)
@@ -132,6 +147,13 @@ export function AskPanel({
     queuedUpdates.current = []
     for (const payload of queued) applyUpdate(payload)
   }, [applyUpdate])
+
+  useEffect(() => {
+    if (!sending) {
+      setStopping(false)
+      stopBeforeAck.current = false
+    }
+  }, [sending])
 
   useEffect(() => window.vellum.onAskUpdate((payload) => {
     if (awaitingRequest.current) queuedUpdates.current.push(payload)
@@ -208,6 +230,21 @@ export function AskPanel({
     }
   }, [slug, targetSessionId, deletionRevision, loadRevision, replayUpdates])
 
+  const requestStop = useCallback((requestId: string) => {
+    window.vellum.askCancel({ slug, requestId }).catch((err: unknown) => {
+      setStopping(false)
+      setError(err instanceof Error ? err.message : String(err))
+    })
+  }, [slug])
+
+  const stopTurn = useCallback(() => {
+    if (stopping) return
+    setStopping(true)
+    const requestId = activeRequestId.current
+    if (requestId) requestStop(requestId)
+    else stopBeforeAck.current = true
+  }, [stopping, requestStop])
+
   const sendTurn = useCallback(async (prompt?: string) => {
     const text = (prompt ?? input).trim()
     if (!text || sessionId === null || sending || awaitingRequest.current || activeRequestId.current) return
@@ -227,6 +264,10 @@ export function AskPanel({
       activeRequestId.current = requestId
       activeTurnSessionId.current = sessionId
       replayUpdates()
+      if (stopBeforeAck.current) {
+        stopBeforeAck.current = false
+        requestStop(requestId)
+      }
     } catch (err) {
       if (generation !== contextGeneration.current) return
       awaitingRequest.current = false
@@ -234,7 +275,7 @@ export function AskPanel({
       setError(err instanceof Error ? err.message : String(err))
       setSending(false)
     }
-  }, [input, sessionId, sending, slug, replayUpdates])
+  }, [input, sessionId, sending, slug, replayUpdates, requestStop])
 
   // [R1-05] Process injected prompt from PDF text selection actions
   useEffect(() => {
@@ -363,9 +404,16 @@ export function AskPanel({
           }}
           disabled={disabled}
         />
-        <button type="submit" className={styles.sendButton} disabled={disabled || !input.trim()}>
-          {sending ? 'Sending…' : 'Send'}
-        </button>
+        <div className={styles.actions}>
+          <button type="submit" className={styles.sendButton} disabled={disabled || !input.trim()}>
+            {sending ? 'Sending…' : 'Send'}
+          </button>
+          {sending ? (
+            <button type="button" className={styles.stopButton} disabled={stopping} onClick={stopTurn}>
+              {stopping ? 'Stopping…' : 'Stop'}
+            </button>
+          ) : null}
+        </div>
       </form>
     </div>
   )

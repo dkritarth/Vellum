@@ -484,6 +484,26 @@ ipcMain.handle('vellum:ask-start', (event: IpcMainInvokeEvent, params: unknown):
   return { requestId }
 })
 
+function parseAskCancelParams(value: unknown): { slug: string; requestId: string } {
+  if (typeof value !== 'object' || value === null) {
+    throw new Error('vellum:ask-cancel: params must be an object')
+  }
+  const candidate = value as Record<string, unknown>
+  const requestId = candidate['requestId']
+  if (typeof requestId !== 'string' || requestId.length === 0 || requestId.length > 100) {
+    throw new Error('vellum:ask-cancel: invalid requestId')
+  }
+  return { slug: requireSlug(candidate['slug'], 'vellum:ask-cancel'), requestId }
+}
+
+// Stops the paper's streaming turn via ACP session/cancel. Resolves true when
+// the request matched the active turn; the turn then ends on its own with a
+// 'cancelled' update over `vellum:ask-update`.
+ipcMain.handle('vellum:ask-cancel', (_event, params: unknown): boolean => {
+  const { slug, requestId } = parseAskCancelParams(params)
+  return getChatManager().cancelTurn({ paperSlug: slug, requestId })
+})
+
 // Finder/launcher starts get a minimal PATH; recover the login shell's so
 // npm/Homebrew-installed ACP adapters (and node) are found.
 if (app.isPackaged && process.platform !== 'win32') {

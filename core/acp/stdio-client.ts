@@ -584,6 +584,13 @@ class StdioAcpSession implements AcpSession {
     }
   }
 
+  async cancel(): Promise<void> {
+    // The session/cancel notification goes out on the same ordered stream as
+    // the prompt request, so it cannot overtake it.
+    if (this.disposed || !this.queue) return
+    await this.connection.cancel({ sessionId: this.sessionId })
+  }
+
   async dispose(): Promise<void> {
     if (this.disposePromise) return this.disposePromise
     this.disposed = true

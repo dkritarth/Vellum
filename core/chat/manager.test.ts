@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { AcpBackend, AcpClient, AcpPromptRequest, AcpSession, AcpUpdate } from '../acp/client.js'
 import { upsertPaper } from '../library/repo.js'
 import { openDb } from '../store/db.js'
-import { ChatManager, type AskStreamEvent } from './manager.js'
+import { ChatManager, STOPPED_MARKER, type AskStreamEvent } from './manager.js'
 import { getChatMessages } from './repo.js'
 import { listUsageRecords, getUsageSummary } from '../usage/repo.js'
 
@@ -26,6 +26,42 @@ class FakeSession implements AcpSession {
   async dispose(): Promise<void> {
     this.disposed = true
   }
+
+  async cancel(): Promise<void> {}
+}
+
+/** Streams chunks, then holds the turn open until it is cancelled or disposed.
+ * An adapter that honors cancel ends the turn with stopReason 'cancelled';
+ * one that ignores it keeps the turn open until dispose() interrupts it. */
+class StreamingSession implements AcpSession {
+  disposed = false
+  cancelCalls = 0
+  private release!: () => void
+  private readonly ended = new Promise<void>((resolve) => { this.release = resolve })
+
+  constructor(private readonly chunks: string[], private readonly honorsCancel: boolean) {}
+
+  async *prompt(): AsyncIterable<AcpUpdate> {
+    for (const chunk of this.chunks) yield textUpdate(chunk)
+    await this.ended
+    if (this.disposed) yield { kind: 'error', data: { message: 'session disposed' } }
+    else yield { kind: 'done', data: { stopReason: 'cancelled' } }
+  }
+
+  async cancel(): Promise<void> {
+    this.cancelCalls += 1
+    if (this.honorsCancel) this.release()
+  }
+
+  async dispose(): Promise<void> {
+    this.disposed = true
+    this.release()
+  }
+}
+
+async function until(condition: () => boolean): Promise<void> {
+  for (let i = 0; i < 200 && !condition(); i++) await new Promise((resolve) => setTimeout(resolve, 5))
+  expect(condition()).toBe(true)
 }
 
 class FakeClient implements AcpClient {
@@ -95,6 +131,7 @@ describe('ChatManager', () => {
         await gate
         yield { kind: 'error', data: { message: 'Disconnected' } }
       },
+      async cancel() {},
       async dispose() {},
     }) }
     const manager = new ChatManager(client)
@@ -483,6 +520,127 @@ describe('ChatManager', () => {
       await manager.disposeAll()
     },
   )
+
+  describe('stop an active turn (#254)', () => {
+    function start(manager: ChatManager, events: AskStreamEvent[], requestId = 'req-1') {
+      const { session } = manager.openChat({ db, paperSlug: slug })
+      const turn = manager.runTurn(
+        { requestId, db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'Explain everything' },
+        (event) => events.push(event),
+      )
+      return { session, turn }
+    }
+
+    it('cancels the ACP turn, saves the partial answer with a stopped marker, and keeps the session', async () => {
+      const streaming = new StreamingSession(['Section 1 says ', 'attention.'], true)
+      const client = new FakeClient([], async () => streaming)
+      const manager = new ChatManager(client)
+      const events: AskStreamEvent[] = []
+      const { session, turn } = start(manager, events)
+      await until(() => events.filter((e) => e.kind === 'text').length === 2)
+
+      expect(manager.cancelTurn({ paperSlug: slug, requestId: 'req-1' })).toBe(true)
+      await turn
+
+      expect(streaming.cancelCalls).toBe(1)
+      expect(streaming.disposed).toBe(false)
+      const last = events.at(-1)
+      expect(last).toMatchObject({ kind: 'cancelled', message: { role: 'assistant', content: `Section 1 says attention.\n\n${STOPPED_MARKER}` } })
+      expect(getChatMessages(db, session.id).map((m) => m.content)).toEqual([
+        'Explain everything',
+        `Section 1 says attention.\n\n${STOPPED_MARKER}`,
+      ])
+      expect(manager.openChat({ db, paperSlug: slug }).activeTurn).toBeNull()
+      // The agent conversation stays usable: the next turn reuses the session.
+      await manager.runTurn({ db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'again' }, () => {})
+      expect(client.newSessionCalls).toBe(1)
+    })
+
+    it('saves nothing but the question when stopped before any answer text', async () => {
+      const streaming = new StreamingSession([], true)
+      const manager = new ChatManager(new FakeClient([], async () => streaming))
+      const events: AskStreamEvent[] = []
+      const { session, turn } = start(manager, events)
+      await new Promise((resolve) => setTimeout(resolve, 20)) // let the prompt start streaming
+
+      expect(manager.cancelTurn({ paperSlug: slug, requestId: 'req-1' })).toBe(true)
+      await turn
+
+      expect(events.at(-1)).toEqual(expect.objectContaining({ kind: 'cancelled' }))
+      expect((events.at(-1) as { message?: unknown }).message).toBeUndefined()
+      expect(getChatMessages(db, session.id).map((m) => m.role)).toEqual(['user'])
+      expect(manager.openChat({ db, paperSlug: slug }).activeTurn).toBeNull()
+    })
+
+    it('ignores a cancel for another paper or request id', async () => {
+      const streaming = new StreamingSession(['partial'], true)
+      const manager = new ChatManager(new FakeClient([], async () => streaming))
+      const events: AskStreamEvent[] = []
+      const { turn } = start(manager, events)
+      await until(() => events.some((e) => e.kind === 'text'))
+
+      expect(manager.cancelTurn({ paperSlug: slug, requestId: 'other' })).toBe(false)
+      expect(manager.cancelTurn({ paperSlug: 'another-paper', requestId: 'req-1' })).toBe(false)
+      expect(streaming.cancelCalls).toBe(0)
+      expect(manager.cancelTurn({ paperSlug: slug, requestId: 'req-1' })).toBe(true)
+      expect(manager.cancelTurn({ paperSlug: slug, requestId: 'req-1' })).toBe(true) // idempotent
+      await turn
+      expect(streaming.cancelCalls).toBe(1)
+      expect(manager.cancelTurn({ paperSlug: slug, requestId: 'req-1' })).toBe(false) // turn is over
+    })
+
+    it('disposes an adapter that ignores cancel after the grace period and still ends the turn', async () => {
+      const streaming = new StreamingSession(['partial answer'], false)
+      const client = new FakeClient([], async () => streaming)
+      const manager = new ChatManager(client, { cancelGraceMs: 30 })
+      const events: AskStreamEvent[] = []
+      const { session, turn } = start(manager, events)
+      await until(() => events.some((e) => e.kind === 'text'))
+
+      manager.cancelTurn({ paperSlug: slug, requestId: 'req-1' })
+      expect(streaming.disposed).toBe(false)
+      await turn
+
+      expect(streaming.cancelCalls).toBe(1)
+      expect(streaming.disposed).toBe(true)
+      expect(events.at(-1)).toMatchObject({ kind: 'cancelled', message: { content: `partial answer\n\n${STOPPED_MARKER}` } })
+      expect(getChatMessages(db, session.id)).toHaveLength(2)
+      // The evicted session is replaced by a fresh one on the next turn.
+      await manager.runTurn({ db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'again' }, () => {})
+      expect(client.newSessionCalls).toBe(2)
+    })
+
+    it('does not dispose an adapter that honors cancel within the grace period', async () => {
+      const streaming = new StreamingSession(['partial'], true)
+      const manager = new ChatManager(new FakeClient([], async () => streaming), { cancelGraceMs: 30 })
+      const events: AskStreamEvent[] = []
+      const { turn } = start(manager, events)
+      await until(() => events.some((e) => e.kind === 'text'))
+      manager.cancelTurn({ paperSlug: slug, requestId: 'req-1' })
+      await turn
+      await new Promise((resolve) => setTimeout(resolve, 60))
+      expect(streaming.disposed).toBe(false)
+    })
+
+    it('ends a turn stopped while the agent session is still starting without sending the prompt', async () => {
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => { release = resolve })
+      const created = new FakeSession([textUpdate('never sent'), doneUpdate])
+      const client = new FakeClient([], async () => { await gate; return created })
+      const manager = new ChatManager(client)
+      const events: AskStreamEvent[] = []
+      const { session, turn } = start(manager, events)
+
+      expect(manager.cancelTurn({ paperSlug: slug, requestId: 'req-1' })).toBe(true)
+      release()
+      await turn
+
+      expect(created.requests).toHaveLength(0)
+      expect(events.map((e) => e.kind)).toEqual(['cancelled'])
+      expect(getChatMessages(db, session.id).map((m) => m.role)).toEqual(['user'])
+      expect(manager.openChat({ db, paperSlug: slug }).activeTurn).toBeNull()
+    })
+  })
 
   it('surfaces a mid-stream error update without persisting a partial assistant message', async () => {
     const client = new FakeClient([textUpdate('partial '), { kind: 'error', data: { message: 'turn timed out' } }])

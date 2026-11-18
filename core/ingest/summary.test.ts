@@ -84,3 +84,17 @@ it('returns no summary for a completed empty turn', async () => {
   } } }
   await expect(summarizePaper('/papers/p1/paper.md', { client })).resolves.toBeUndefined()
 })
+
+it('falls back to another backend when the preferred one cannot start', async () => {
+  const tried: string[] = []
+  const session = new FakeSession()
+  const client: AcpClient = {
+    async newSession(backend) {
+      tried.push(backend)
+      if (backend !== 'codex') throw new Error('not signed in')
+      return session
+    },
+  }
+  await expect(summarizePaper('/papers/p1/paper.md', { client, backend: 'claude' })).resolves.toBe('Grounded paper summary.')
+  expect(tried).toEqual(['claude', 'codex'])
+})

@@ -1,15 +1,23 @@
-import type { AcpBackend, AcpClient } from '../acp/client.js'
-import { backendOrder, newSessionWithFallback } from '../acp/fallback.js'
+import type { AcpBackend, AcpClient, AcpSession } from '../acp/client.js'
+import { backendOrder, runWithFallback } from '../acp/fallback.js'
 import { StdioAcpClient } from '../acp/stdio-client.js'
 
 export async function summarizePaper(
   mdPath: string,
-  options: { client?: AcpClient; backend?: AcpBackend | readonly AcpBackend[] } = {},
+  options: { client?: AcpClient; backend?: AcpBackend | readonly AcpBackend[]; deadlineMs?: number } = {},
 ): Promise<string | undefined> {
   const client = options.client ?? new StdioAcpClient()
-  const started = await newSessionWithFallback(client, backendOrder(options.backend))
-  if (!started) return undefined
-  const { session } = started
+  const run = await runWithFallback(
+    client,
+    backendOrder(options.backend),
+    (session) => summarizeWith(session, mdPath),
+    (summary) => summary !== undefined,
+    { deadlineMs: options.deadlineMs },
+  )
+  return run?.result
+}
+
+async function summarizeWith(session: AcpSession, mdPath: string): Promise<string | undefined> {
   try {
     let text = ''
     let completed = false
@@ -35,7 +43,5 @@ export async function summarizePaper(
     return completed ? text.trim() || undefined : undefined
   } catch {
     return undefined
-  } finally {
-    await session.dispose().catch(() => undefined)
   }
 }

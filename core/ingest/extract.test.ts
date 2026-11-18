@@ -299,6 +299,20 @@ describe('extractPaper backend fallback', () => {
     expect(tried).toEqual(['claude', 'codex'])
   })
 
+  it('retries on the next backend when the first turn returns no metadata', async () => {
+    const tried: string[] = []
+    const client: AcpClient = {
+      async newSession(backend) {
+        tried.push(backend)
+        return new FakeSession(backend === 'codex' ? [textUpdate('I could not read the file.'), doneUpdate] : [textUpdate(HAPPY_JSON), doneUpdate])
+      },
+    }
+    const result = await extractPaper('/data/papers/x/paper.md', { client })
+    expect(tried).toEqual(['codex', 'claude'])
+    expect(result.degraded).toBe(false)
+    expect(result.backend).toBe('claude')
+  })
+
   it('tries Codex first when no backend is given', async () => {
     const tried: string[] = []
     const client: AcpClient = {

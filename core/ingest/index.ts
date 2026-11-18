@@ -117,6 +117,13 @@ function resolveIngestSource(
   }).immediate()
 }
 
+let lastWorkingBackend: AcpBackend | undefined
+
+/** Test seam: forget the backend remembered from earlier imports. */
+export function resetIngestBackendMemory(): void {
+  lastWorkingBackend = undefined
+}
+
 /**
  * Ingest a paper end-to-end: classify -> fetch -> convert -> extract -> write
  * files + DB row. See module comment for the idempotency guarantee.
@@ -141,9 +148,13 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
     // Sequential writes settle before cleanup even if one fails.
     await writeFile(candidate.pdfPath, fetched.pdfBytes)
     await writeFile(candidate.mdPath, markdown)
-    const extracted = await extractPaper(candidate.mdPath, { client: options.client, backend: options.backend })
+    // The backend that last produced metadata in this process goes first, so
+    // later imports do not re-probe adapters that are missing or signed out.
+    const preferred = backendOrder(lastWorkingBackend ? [lastWorkingBackend, ...backendOrder(options.backend)] : options.backend)
+    const extracted = await extractPaper(candidate.mdPath, { client: options.client, backend: preferred })
+    if (extracted.backend) lastWorkingBackend = extracted.backend
     // Start the summary on whichever backend just worked for extraction.
-    const summaryBackends = extracted.backend ? backendOrder([extracted.backend, ...backendOrder(options.backend)]) : options.backend
+    const summaryBackends = extracted.backend ? backendOrder([extracted.backend, ...preferred]) : preferred
     const summary = await summarizePaper(candidate.mdPath, { client: options.client, backend: summaryBackends })
 
     // Prefer the agent's paper.md-derived metadata (extract.ts); fall back to

@@ -23,7 +23,7 @@ import { addChatMessage, createChatSession, getChatMessages, getChatSession, get
 import { assignPaperToCollection, createCollection, listPaperCollections } from '../collections/repo.js'
 import { openDb } from '../store/db.js'
 import { getNote, upsertNote } from '../notes/repo.js'
-import { fallbackTitle, ingest } from './index.js'
+import { fallbackTitle, ingest, resetIngestBackendMemory } from './index.js'
 
 const FIXTURE_PDF = fileURLToPath(new URL('./fixtures/sample.pdf', import.meta.url))
 
@@ -78,6 +78,31 @@ describe('ingest', () => {
     if (tmpDir) {
       rmSync(tmpDir, { recursive: true, force: true })
       tmpDir = undefined
+    }
+  })
+
+  it('starts the summary on the extraction backend and remembers it for the next import', async () => {
+    resetIngestBackendMemory()
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-backend-'))
+    const db = openDb({ path: ':memory:' })
+    const tried: string[] = []
+    const client: AcpClient = {
+      async newSession(backend) {
+        tried.push(backend)
+        if (backend === 'codex') throw new Error('codex: not signed in')
+        return new FakeSession([textUpdate(AGENT_JSON), doneUpdate])
+      },
+    }
+    try {
+      await ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client, backend: 'codex' })
+      // Extraction: codex fails, claude works. Summary starts on claude.
+      expect(tried).toEqual(['codex', 'claude', 'claude'])
+      tried.length = 0
+      await ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client, backend: 'codex' })
+      expect(tried).toEqual(['claude', 'claude'])
+    } finally {
+      db.close()
+      resetIngestBackendMemory()
     }
   })
 

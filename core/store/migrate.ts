@@ -47,11 +47,16 @@ export function runMigrations(db: Database, migrations: Migration[] = MIGRATIONS
 
   for (const migration of pending) {
     const apply = db.transaction(() => {
+      // Another connection (a second app instance) may have applied this
+      // migration since `applied` was read. Re-check under the write lock
+      // that `.immediate()` takes, so DDL never runs twice.
+      const current = db.pragma('user_version', { simple: true }) as number
+      if (current >= migration.version) return
       db.exec(migration.sql)
       // `user_version` cannot be bound as a parameter; the value here is a
       // trusted integer from our own MIGRATIONS array, never user input.
       db.pragma(`user_version = ${migration.version}`)
     })
-    apply()
+    apply.immediate()
   }
 }

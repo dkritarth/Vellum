@@ -23,6 +23,6 @@ it('build ships matching PDF fonts, decoders, JS fallbacks and licenses beside e
   const files = readdirSync(assets)
   expect(files.some((file) => /^KaTeX_Main-Regular.*\.woff2$/.test(file))).toBe(true)
   for (const file of files.filter((name) => name.endsWith('.css'))) {
-    expect(readFileSync(resolve(assets, file), 'utf8')).not.toMatch(/url\(\s*["']?data:font/)
+    expect(readFileSync(resolve(assets, file), 'utf8')).not.toMatch(/url\(\s*["']?data:/)
   }
 }, 90000)

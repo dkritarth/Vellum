@@ -19,6 +19,7 @@ const QUESTION = [
   'Use inline $...$ math in sentences and display $$...$$ blocks on their own lines.',
   'Include the residual update, the ODE dz/dt, the adjoint a(t) and its dynamics, and the parameter gradient dL/dtheta.',
   'Put one inline formula inside a bulleted list item next to bold text.',
+  'Also write the full parameter-gradient expression once more as a single long inline $...$ formula inside a sentence.',
 ].join(' ')
 
 let session = await launchIsolatedApp()
@@ -43,6 +44,10 @@ async function mathStats() {
       rawDollar: (clone.textContent.match(/\$/g) ?? []).length,
       rawCommands: (clone.textContent.match(/\\(frac|partial|theta|mathrm|int|dot)\b/g) ?? []).length,
       overflowing: last.scrollWidth > last.clientWidth + 1,
+      threadOverflowing: (() => {
+        const thread = last.closest('[class*=thread]')
+        return thread ? thread.scrollWidth > thread.clientWidth + 1 : null
+      })(),
     }
   })
 }
@@ -103,7 +108,9 @@ try {
   const wideWidth = await answers().last().evaluate((node) => node.getBoundingClientRect().width)
   console.log('answer widths after resize:', { narrowWidth, wideWidth })
   assert.notEqual(Math.round(narrowWidth), Math.round(wideWidth), 'panel resize should change the answer width')
-  assert.equal((await mathStats()).overflowing, false, 'message must not overflow horizontally')
+  const resized = await mathStats()
+  assert.equal(resized.overflowing, false, 'message must not overflow horizontally')
+  assert.equal(resized.threadOverflowing, false, 'chat thread must not scroll horizontally')
 
   assertNoConsoleErrors(consoleLines)
   allConsole.push(...consoleLines)

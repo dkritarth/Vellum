@@ -1,0 +1,243 @@
+I’ll read the paper file directly, then summarize the requested equations with section-specific citations and short quotes.
+
+The paper moves from a discrete residual update to continuous dynamics: a residual layer adds a learned change to the current state, while a neural ODE specifies the state’s derivative and lets a solver compute the result.
+
+Residual update: 
+ℎ
+𝑡
++
+1
+=
+ℎ
+𝑡
++
+𝑓
+(
+ℎ
+𝑡
+,
+𝜃
+𝑡
+)
+h
+t+1
+	​
+
+=h
+t
+	​
+
++f(h
+t
+	​
+
+,θ
+t
+	​
+
+) (Eq. 1, “Introduction”). It is a discrete step: the next hidden state equals the current state plus the residual transformation.
+
+The continuous version defines the hidden-state trajectory by
+
+𝑑
+ℎ
+(
+𝑡
+)
+𝑑
+𝑡
+=
+𝑓
+(
+ℎ
+(
+𝑡
+)
+,
+𝑡
+,
+𝜃
+)
+dt
+dh(t)
+	​
+
+=f(h(t),t,θ)
+
+(Eq. 2, “Introduction”). The solver integrates this vector field from the input state to obtain the output state.
+
+For training, the paper defines the adjoint as 
+𝑎
+(
+𝑡
+)
+=
+∂
+𝐿
+/
+∂
+𝑧
+(
+𝑡
+)
+a(t)=∂L/∂z(t) (Section 2, “Reverse-mode automatic differentiation of ODE solutions”). It describes this as the gradient of the loss with respect to the hidden state at time 
+𝑡
+t. Its dynamics are
+
+𝑑
+𝑎
+(
+𝑡
+)
+𝑑
+𝑡
+=
+−
+𝑎
+(
+𝑡
+)
+⊤
+∂
+𝑓
+(
+𝑧
+(
+𝑡
+)
+,
+𝑡
+,
+𝜃
+)
+∂
+𝑧
+dt
+da(t)
+	​
+
+=−a(t)
+⊤
+∂z
+∂f(z(t),t,θ)
+	​
+
+
+(Eq. 4, Section 2). The adjoint is integrated backward in time to recover gradients with respect to earlier states.
+
+The parameter gradient is
+
+𝑑
+𝐿
+𝑑
+𝜃
+=
+−
+∫
+𝑡
+0
+𝑡
+1
+𝑎
+(
+𝑡
+)
+⊤
+∂
+𝑓
+(
+𝑧
+(
+𝑡
+)
+,
+𝑡
+,
+𝜃
+)
+∂
+𝜃
+ 
+𝑑
+𝑡
+dθ
+dL
+	​
+
+=−∫
+t
+0
+	​
+
+t
+1
+	​
+
+	​
+
+a(t)
+⊤
+∂θ
+∂f(z(t),t,θ)
+	​
+
+dt
+
+(Eq. 5, Section 2). In the paper’s description, this integral accumulates how changes to the dynamics parameters affect the loss along the trajectory.
+
+The complete parameter-gradient expression again, written inline, is: 
+𝑑
+𝐿
+𝑑
+𝜃
+=
+−
+∫
+𝑡
+0
+𝑡
+1
+𝑎
+(
+𝑡
+)
+⊤
+∂
+𝑓
+(
+𝑧
+(
+𝑡
+)
+,
+𝑡
+,
+𝜃
+)
+∂
+𝜃
+ 
+𝑑
+𝑡
+dθ
+dL
+	​
+
+=−∫
+t
+0
+	​
+
+t
+1
+	​
+
+	​
+
+a(t)
+⊤
+∂θ
+∂f(z(t),t,θ)
+	​
+
+dt.

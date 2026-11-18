@@ -3,6 +3,7 @@ import { render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import { MarkdownText, parseBlocks } from './MarkdownText'
+import { clearMathCache, MAX_TEX_LENGTH } from './MathTex'
 
 // Regression input from issue #228 (Neural ODE answer screenshot).
 const NEURAL_ODE = [
@@ -139,8 +140,83 @@ describe('MarkdownText math rendering (#228)', () => {
   })
 
   it('renders restored history identically to a fresh render', () => {
+    clearMathCache()
     const first = render(<MarkdownText text={NEURAL_ODE} />).container.innerHTML
+    clearMathCache()
     const second = render(<MarkdownText text={NEURAL_ODE} />).container.innerHTML
     expect(second).toBe(first)
+  })
+
+  // Review findings on PR #231.
+  it('closes a display fence that has trailing text and keeps the rest of the answer', () => {
+    const text = 'Intro.\n\n$$\nx = 1\n$$ where x is the state.\n\n## Next section\n\nMore prose.\n\n\\[\ny = 2\n\\] (2)'
+    const blocks = parseBlocks(text)
+    expect(blocks.filter((block) => block.kind === 'math').map((block) => block.kind === 'math' && Boolean(block.open))).toEqual([false, false])
+    const { container } = render(<MarkdownText text={text} />)
+    expect(container.querySelectorAll('.katex-display')).toHaveLength(2)
+    expect(container.querySelector('[data-math-pending]')).toBeNull()
+    expect(container.textContent).toContain('where x is the state.')
+    expect(container.textContent).toContain('Next section')
+    expect(container.textContent).toContain('More prose.')
+    expect(container.textContent).toContain('(2)')
+  })
+
+  it('treats escaped-bracket citations as text, not math', () => {
+    const { container } = render(<MarkdownText text={'\\[1\\]\n\nAs shown in \\[2, 3\\], ODEs work.'} />)
+    expect(container.querySelector('.katex')).toBeNull()
+    expect(container.textContent).toContain('[1]')
+    expect(container.textContent).toContain('As shown in [2, 3], ODEs work.')
+  })
+
+  it('typesets inline \\[ \\] used mid-sentence as display math', () => {
+    const { container } = render(<MarkdownText text={'The update \\[h_{t+1} = h_t + f(h_t)\\] is Euler.'} />)
+    expect(container.querySelectorAll('.katex-display')).toHaveLength(1)
+    expect(container.textContent).toContain('is Euler.')
+  })
+
+  it('keeps display math inside its list item instead of splitting the list', () => {
+    const { container } = render(<MarkdownText text={'1. first\n   $$\n   x = \\frac{a}{b}\n   $$\n2. second'} />)
+    const lists = container.querySelectorAll('ol')
+    expect(lists).toHaveLength(1)
+    const items = lists[0].querySelectorAll(':scope > li')
+    expect(items).toHaveLength(2)
+    expect(items[0].querySelector('.katex-display')).not.toBeNull()
+  })
+
+  it('leaves currency and shell variables literal', () => {
+    const text = 'From $5 to $10, costs $3.50 and $4, US$5 million, $5-$10, echo $PATH$HOME.'
+    const { container } = render(<MarkdownText text={text} />)
+    expect(container.querySelector('.katex')).toBeNull()
+    expect(container.textContent).toBe(text)
+  })
+
+  it('shows the original \\[ \\] delimiters when a display block fails', () => {
+    const { container } = render(<MarkdownText text={'\\[\n\\frac{1\n\\]'} />)
+    const fallback = container.querySelector('[data-math-error]')!
+    expect(fallback.textContent).toContain('\\[')
+    expect(fallback.textContent).not.toContain('$$')
+  })
+
+  it('falls back to source for formulas longer than the size cap', () => {
+    const tex = 'x+'.repeat(MAX_TEX_LENGTH)
+    const { container } = render(<MarkdownText text={`$$\n${tex}1\n$$`} />)
+    expect(container.querySelector('.katex')).toBeNull()
+    expect(container.querySelector('[data-math-error]')).not.toBeNull()
+  })
+
+  it('stops runaway macro expansion and clamps huge dimensions', () => {
+    const { container } = render(<MarkdownText text={'$\\def\\a{\\a}\\a$ and $\\rule{500em}{500em}$'} />)
+    expect(container.querySelectorAll('[data-math-error]')).toHaveLength(1)
+    const rule = container.querySelector('.katex .katex-rule') as HTMLElement | null
+    expect(rule).not.toBeNull()
+    expect(rule!.getAttribute('style')).not.toMatch(/500em/)
+  })
+
+  it('renders long degenerate single-line input quickly', () => {
+    for (const text of ['['.repeat(30000), 'see ['.repeat(10000), '\\('.repeat(10000), '**' + 'word '.repeat(10000), '$a '.repeat(10000)]) {
+      const started = performance.now()
+      render(<MarkdownText text={text} />)
+      expect(performance.now() - started).toBeLessThan(400)
+    }
   })
 })

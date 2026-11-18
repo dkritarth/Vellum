@@ -1,6 +1,9 @@
 .markdown {
   white-space: normal;
   overflow-wrap: anywhere;
+  /* A formula that cannot wrap scrolls inside the message, never the thread. */
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .markdown > :first-child {
@@ -59,10 +62,6 @@
   background: rgba(0, 0, 0, 0.35);
   white-space: pre;
   overflow-x: auto;
-}
-
-.math {
-  white-space: nowrap;
 }
 
 /* Wide equations scroll inside the chat panel instead of widening it. */

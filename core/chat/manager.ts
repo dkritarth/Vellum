@@ -26,10 +26,12 @@ import type { Database } from 'better-sqlite3'
 
 import type { AcpBackend, AcpClient, AcpSession, AcpUpdate } from '../acp/client.js'
 import type { ChatMessage, ChatSession } from './repo.js'
-import { addChatMessage, createChatSession, getChatMessages, getChatSession, getLatestChatSession } from './repo.js'
+import { addChatMessage, createChatSession, getChatMessages, getChatSession, getLatestChatSession, getPreferredChatBackend } from './repo.js'
 import { recordTurnUsage } from '../usage/repo.js'
 
-const DEFAULT_BACKEND: AcpBackend = 'claude'
+// Codex is the validated priority backend. New conversations otherwise
+// follow the backend the user last chatted with (getPreferredChatBackend).
+const DEFAULT_BACKEND: AcpBackend = 'codex'
 
 /** Renderer-facing shape of a streamed turn event — a thin, UI-friendly
  * projection of AcpUpdate (whose `data` is intentionally `unknown`/raw ACP
@@ -165,7 +167,7 @@ export class ChatManager {
    * Never touches the ACP layer — cheap, safe to call on every tab focus.
    */
   openChat(params: OpenChatParams): AskOpenResult {
-    const backend = params.backend ?? DEFAULT_BACKEND
+    const backend = params.backend ?? getPreferredChatBackend(params.db) ?? DEFAULT_BACKEND
     let existing: ChatSession | undefined
     if (params.chatSessionId) {
       const candidate = getChatSession(params.db, params.chatSessionId)
@@ -188,7 +190,7 @@ export class ChatManager {
    * inserts a new chat_sessions row. Rejects while this paper has an active turn.
    */
   async newChat(params: OpenChatParams): Promise<ChatSession> {
-    const backend = params.backend ?? DEFAULT_BACKEND
+    const backend = params.backend ?? getPreferredChatBackend(params.db) ?? DEFAULT_BACKEND
     this.requireIdle(params.paperSlug)
     this.resettingPapers.add(params.paperSlug)
     try {

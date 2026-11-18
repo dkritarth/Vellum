@@ -1,11 +1,15 @@
-import { dirname } from 'node:path'
 import type { AcpBackend, AcpClient } from '../acp/client.js'
+import { backendOrder, newSessionWithFallback } from '../acp/fallback.js'
 import { StdioAcpClient } from '../acp/stdio-client.js'
 
-export async function summarizePaper(mdPath: string, options: { client?: AcpClient; backend?: AcpBackend } = {}): Promise<string | undefined> {
+export async function summarizePaper(
+  mdPath: string,
+  options: { client?: AcpClient; backend?: AcpBackend | readonly AcpBackend[] } = {},
+): Promise<string | undefined> {
   const client = options.client ?? new StdioAcpClient()
-  const session = await client.newSession(options.backend ?? 'claude', { cwd: dirname(mdPath) }).catch(() => undefined)
-  if (!session) return undefined
+  const started = await newSessionWithFallback(client, backendOrder(options.backend))
+  if (!started) return undefined
+  const { session } = started
   try {
     let text = ''
     let completed = false

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { openDb } from '../store/db.js'
 import { upsertPaper } from '../library/repo.js'
-import { addChatMessage, createChatSession, deleteChatSession, getChatMessages, getLatestChatSession, listChatSessions, updateChatSessionTitle } from './repo.js'
+import { addChatMessage, createChatSession, deleteChatSession, getChatMessages, getLatestChatSession, getPreferredChatBackend, listChatSessions, updateChatSessionTitle } from './repo.js'
 
 describe('chat repo', () => {
   let db: Database
@@ -161,5 +161,23 @@ describe('chat repo', () => {
     found = listChatSessions(db).find((item) => item.id === s.id)
     expect(found).toBeUndefined()
     expect(getChatMessages(db, s.id)).toHaveLength(0)
+  })
+
+  it('prefers the backend of the most recently used conversation', () => {
+    expect(getPreferredChatBackend(db)).toBeUndefined()
+    const claude = createChatSession(db, { paperSlug: 'attention-is-all-you-need', backend: 'claude' })
+    expect(getPreferredChatBackend(db)).toBe('claude')
+    const codex = createChatSession(db, { paperSlug: 'attention-is-all-you-need', backend: 'codex' })
+    addChatMessage(db, { sessionId: codex.id, role: 'user', content: 'first' })
+    // A newer empty session does not outrank actual use.
+    createChatSession(db, { paperSlug: 'attention-is-all-you-need', backend: 'antigravity' })
+    expect(getPreferredChatBackend(db)).toBe('codex')
+    addChatMessage(db, { sessionId: claude.id, role: 'user', content: 'later' })
+    expect(getPreferredChatBackend(db)).toBe('claude')
+  })
+
+  it('ignores unknown stored backend names', () => {
+    db.prepare(`INSERT INTO chat_sessions (paper_slug, backend, created_at) VALUES (?, 'legacy', ?)`).run('attention-is-all-you-need', new Date().toISOString())
+    expect(getPreferredChatBackend(db)).toBeUndefined()
   })
 })

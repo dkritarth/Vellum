@@ -24,6 +24,7 @@ import { join } from 'node:path'
 import type { Database } from 'better-sqlite3'
 
 import type { AcpBackend, AcpClient } from '../acp/client.js'
+import { backendOrder } from '../acp/fallback.js'
 import type { PaperRecord } from '../library/repo.js'
 import { getPaper, upsertPaper } from '../library/repo.js'
 import { classifyInput } from './classify.js'
@@ -74,7 +75,10 @@ export interface IngestOptions {
   /** Injectable ACP client for the extract step. Defaults to StdioAcpClient
    * (spawns a real adapter) inside extractPaper() — tests must pass a fake. */
   client?: AcpClient
-  backend?: AcpBackend
+  /** Preferred backend(s) for metadata extraction and summary. Others are
+   * tried after them, so a missing or signed-out adapter does not degrade
+   * every import (see core/acp/fallback.ts). */
+  backend?: AcpBackend | readonly AcpBackend[]
 }
 
 const DEFAULT_DATA_DIR = 'data'
@@ -138,7 +142,9 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
     await writeFile(candidate.pdfPath, fetched.pdfBytes)
     await writeFile(candidate.mdPath, markdown)
     const extracted = await extractPaper(candidate.mdPath, { client: options.client, backend: options.backend })
-    const summary = await summarizePaper(candidate.mdPath, { client: options.client, backend: options.backend })
+    // Start the summary on whichever backend just worked for extraction.
+    const summaryBackends = extracted.backend ? backendOrder([extracted.backend, ...backendOrder(options.backend)]) : options.backend
+    const summary = await summarizePaper(candidate.mdPath, { client: options.client, backend: summaryBackends })
 
     // Prefer the agent's paper.md-derived metadata (extract.ts); fall back to
     // the raw fetch-time metadata (arXiv/Crossref) for whatever the agent

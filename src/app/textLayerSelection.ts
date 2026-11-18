@@ -14,18 +14,32 @@ const layers = new Map<HTMLElement, HTMLElement>()
 let globalListeners: AbortController | null = null
 // Where the current primary-button drag started.
 let blankStart: { layer: HTMLElement; x: number; y: number } | null = null
+// Cleared when a new press starts or the window loses focus, so a drag that
+// ended outside the window cannot leave a stale start behind.
 
-// After a forward drag that began at or left of a line's first glyph, move the selection's start
-// to the beginning of the span on that line.
-function snapBlankStart(): void {
-  const start = blankStart
-  blankStart = null
-  const selection = document.getSelection()
+type DragStart = { layer: HTMLElement; x: number; y: number }
+
+/** First text node inside `element`, in document order. */
+function firstTextNode(element: Element): Text | null {
+  const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+  return walker.nextNode() as Text | null
+}
+
+/**
+ * After a forward drag that began at or left of a line's first glyph, move
+ * the selection's start to the beginning of that line's span. The span is the
+ * layer's direct child, so a citation marker wrapped inside it (readerText.ts)
+ * does not change which box counts as the line. Exported for tests.
+ */
+export function snapSelectionStart(start: DragStart | null, selection: Selection | null): void {
   if (!start || !selection || selection.rangeCount !== 1 || selection.isCollapsed) return
   const anchor = selection.anchorNode
-  const span = anchor?.parentElement
-  if (!anchor || anchor.nodeType !== Node.TEXT_NODE || !span || span === start.layer || !start.layer.contains(span)) return
-  if (selection.anchorOffset === 0) return
+  if (!anchor || anchor.nodeType !== Node.TEXT_NODE || !start.layer.contains(anchor)) return
+  let span = anchor.parentElement
+  while (span && span.parentElement !== start.layer) span = span.parentElement
+  if (!span) return
+  const first = firstTextNode(span)
+  if (!first || (anchor === first && selection.anchorOffset === 0)) return
   const rect = span.getBoundingClientRect()
   const sameLine = start.y >= rect.top && start.y <= rect.bottom
   if (!sameLine || start.x > rect.left + 1) return
@@ -34,7 +48,13 @@ function snapBlankStart(): void {
   if (range.startContainer !== anchor || range.startOffset !== selection.anchorOffset) return
   const focusNode = selection.focusNode
   if (!focusNode) return
-  selection.setBaseAndExtent(anchor, 0, focusNode, selection.focusOffset)
+  selection.setBaseAndExtent(first, 0, focusNode, selection.focusOffset)
+}
+
+function snapBlankStart(): void {
+  const start = blankStart
+  blankStart = null
+  snapSelectionStart(start, document.getSelection())
 }
 
 function reset(end: HTMLElement, layer: HTMLElement): void {
@@ -49,7 +69,11 @@ function enableGlobalListeners(): void {
   let pointerDown = false
   const resetAll = () => layers.forEach(reset)
 
-  document.addEventListener('pointerdown', () => { pointerDown = true }, { signal })
+  // Runs before a layer's mousedown records the new start.
+  document.addEventListener('pointerdown', () => {
+    pointerDown = true
+    blankStart = null
+  }, { signal })
   document.addEventListener('pointerup', () => {
     pointerDown = false
     resetAll()
@@ -59,6 +83,7 @@ function enableGlobalListeners(): void {
   document.addEventListener('mouseup', snapBlankStart, { capture: true, signal })
   window.addEventListener('blur', () => {
     pointerDown = false
+    blankStart = null
     resetAll()
   }, { signal })
   document.addEventListener('keyup', () => {
@@ -85,6 +110,8 @@ function enableGlobalListeners(): void {
 }
 
 export function bindTextLayerSelection(layer: HTMLElement): () => void {
+  // A second guard would be orphaned at full height after either unbind.
+  if (layers.has(layer)) throw new Error('bindTextLayerSelection: layer is already bound')
   const end = document.createElement('div')
   end.className = 'endOfContent'
   layer.append(end)

@@ -28,13 +28,19 @@ export function IngestModal({ isOpen, onClose, onSuccess }: IngestModalProps): J
 
   // Each opening starts clean: the modal stays mounted while closed, so
   // without this a failed attempt's input and error reappear next time.
-  useEffect(() => {
+  // Reset during render (not in an effect) so the reopened dialog's first
+  // painted frame never shows the previous attempt.
+  const [wasOpen, setWasOpen] = useState(isOpen)
+  if (wasOpen !== isOpen) {
+    setWasOpen(isOpen)
     if (isOpen) {
       setInput('')
       setError(null)
-      // Also forget the native picker's file so re-picking it fires `change`.
-      if (fileInputRef.current) fileInputRef.current.value = ''
     }
+  }
+  useEffect(() => {
+    // Also forget the native picker's file so re-picking it fires `change`.
+    if (isOpen && fileInputRef.current) fileInputRef.current.value = ''
   }, [isOpen])
 
   if (!isOpen) return null

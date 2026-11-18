@@ -259,4 +259,36 @@ describe('runMigrations', () => {
     db = new Database(dbPath)
     expectRecoveredState()
   })
+
+  it('does not re-apply a migration another connection finished after this one read the version', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vellum-migrate-race-'))
+    const path = join(dir, 'app.db')
+    const migrations: Migration[] = [
+      { version: 1, sql: 'CREATE TABLE a (id INTEGER PRIMARY KEY);' },
+      { version: 2, sql: 'CREATE TABLE b (id INTEGER PRIMARY KEY);' },
+    ]
+    const first = new Database(path)
+    const second = new Database(path)
+    try {
+      runMigrations(first, migrations.slice(0, 1))
+      // `second` reads user_version = 1, then `first` applies version 2
+      // before `second` starts its own transaction.
+      const read = second.pragma.bind(second)
+      let raced = false
+      second.pragma = ((source: string, options?: { simple?: boolean }) => {
+        const result = read(source, options)
+        if (!raced && source === 'user_version') {
+          raced = true
+          runMigrations(first, migrations)
+        }
+        return result
+      }) as typeof second.pragma
+      expect(() => runMigrations(second, migrations)).not.toThrow()
+      expect(read('user_version', { simple: true })).toBe(2)
+    } finally {
+      first.close()
+      second.close()
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 })

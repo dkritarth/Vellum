@@ -162,4 +162,22 @@ describe('TrashView [L2-04]', () => {
     expect(alert).not.toHaveTextContent(/Error invoking|SQLITE/)
     expect(screen.getByText('Attention Is All You Need')).toBeInTheDocument()
   })
+
+  it.each([
+    ['load', () => listPapers.mockRejectedValueOnce(new Error("Error invoking remote method 'vellum:list-papers': Error: database is locked"))],
+    ['restore', () => paperRestore.mockRejectedValueOnce(new Error("Error invoking remote method 'vellum:paper-restore': Error: restorePaper: database is locked"))],
+    ['purge', () => paperPurge.mockRejectedValueOnce(new Error("Error invoking remote method 'vellum:paper-purge': Error: purgePaper: database is locked"))],
+  ] as const)('shows %s failures without Electron IPC noise', async (action, fail) => {
+    fail()
+    render(<TrashView />)
+    if (action === 'restore') {
+      fireEvent.click(await screen.findByRole('button', { name: 'Restore Attention Is All You Need' }))
+    } else if (action === 'purge') {
+      fireEvent.click(await screen.findByRole('button', { name: 'Delete Attention Is All You Need permanently' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Confirm purge' }))
+    }
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).not.toMatch(/invoking remote method|Error:|restorePaper|purgePaper/)
+    expect(alert.textContent).toMatch(/database is locked/i)
+  })
 })

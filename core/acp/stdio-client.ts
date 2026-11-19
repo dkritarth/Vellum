@@ -238,6 +238,12 @@ export const CODEX_RESTRICTED_FEATURES = {
   hooks: false,
   multi_agent: false,
   multi_agent_v2: false,
+  // Can install MCP dependencies or run local automation over the network
+  // with no session/request_permission; Vellum needs none of them.
+  skill_mcp_dependency_install: false,
+  skill_search: false,
+  in_app_local_automation: false,
+  in_app_updates: false,
 } as const
 
 /** Claude Code settings keys that carry sign-in or model choice, not policy.

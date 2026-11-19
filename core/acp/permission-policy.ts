@@ -258,8 +258,13 @@ function resolveComponents(abs: string, budget: { hops: number }): string {
       if (lstatSync(next).isSymbolicLink()) target = readlinkSync(next)
     } catch (error) {
       if (!isMissing(error)) throw error
-      // Missing component: nothing further can be a link; append the rest.
-      return resolve(next, ...parts.slice(i + 1))
+      // Missing component: nothing below it exists, so nothing further can be a
+      // link. A later `..` could still climb back above it into an existing
+      // symlink (`nope/../link/x`), and an adapter that normalises lexically
+      // would follow that link, so refuse rather than collapse it.
+      const rest = parts.slice(i + 1)
+      if (rest.includes('..')) throw new Error('`..` after a missing path component')
+      return resolve(next, ...rest)
     }
     if (target === undefined) {
       current = next

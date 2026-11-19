@@ -420,6 +420,14 @@ describe('symlink followed before ..', () => {
     expect(decide(request('search', ALL_OPTIONS, { title: 'Find', rawInput: { pattern: 'link/../*' } })).decision).toBe('reject')
   })
 
+  it('rejects .. after a missing component that climbs back into a symlink', () => {
+    expect(isInsideDirectory('nope/../link/secret.txt', cwd)).toBe(false)
+    expect(decide(readOf(`${cwd}/nope/../link/secret.txt`)).decision).toBe('reject')
+    expect(decide(request('read', ALL_OPTIONS, { rawInput: { file_path: 'nope/../link/x' } })).decision).toBe('reject')
+    // A missing path with no `..` after the gap is still inside.
+    expect(isInsideDirectory('nope/new.md', cwd)).toBe(true)
+  })
+
   it('still allows .. that stays on real directories inside the session directory', () => {
     mkdirSync(join(cwd, 'real'), { recursive: true })
     expect(decide(readOf(`${cwd}/real/../paper.md`)).decision).toBe('allow')

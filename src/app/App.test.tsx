@@ -422,6 +422,18 @@ describe('chat navigation ownership', () => {
     await waitFor(() => expect(chat(1)).toHaveAttribute('aria-selected', 'true'))
   })
 
+  it('keeps the draft when the chat Ask already shows is clicked again', async () => {
+    const { user, chat } = await setup()
+    await user.click(chat(1))
+    await waitFor(() => expect(window.vellum.askOpen).toHaveBeenCalledTimes(1))
+    await user.type(screen.getByLabelText('Ask a question'), 'Unsent draft')
+    await user.click(chat(1))
+    await waitFor(() => expect(window.vellum.getPaper).toHaveBeenCalledTimes(2))
+    expect(window.vellum.askOpen).toHaveBeenCalledTimes(1)
+    expect(screen.getByLabelText('Ask a question')).toHaveValue('Unsent draft')
+    expect(chat(1)).toHaveAttribute('aria-selected', 'true')
+  })
+
   it('keeps displayed chat and draft until associated paper resolves, then commits both', async () => {
     const { user, chat } = await setup()
     await user.click(chat(1))

@@ -57,7 +57,7 @@ interface AskPanelProps {
   /** Changes on every Chats-list click, so re-selecting the same chat reloads it. */
   targetSessionNonce?: number
   /** Reports the conversation the panel shows, e.g. after New chat. */
-  onSessionDisplayed?: (sessionId: number) => void
+  onSessionDisplayed?: (sessionId: number | null) => void
 }
 
 export function AskPanel({
@@ -71,6 +71,8 @@ export function AskPanel({
 }: AskPanelProps): JSX.Element {
   const sessionDisplayed = useRef(onSessionDisplayed)
   sessionDisplayed.current = onSessionDisplayed
+  // Unmounted (another tab): nothing is displayed, so the Chats list falls back to the selection.
+  useEffect(() => () => sessionDisplayed.current?.(null), [])
   const [deletionRevision, setDeletionRevision] = useState(0)
   const [loadRevision, setLoadRevision] = useState(0)
   // Durable IDs are never reused. Keep tombstones across Ask tab remounts.

@@ -46,7 +46,7 @@ interface RightPanelProps {
   /** Changes on every Chats-list click so re-selecting a chat reloads it. */
   targetSessionNonce?: number
   /** AskPanel reports the conversation it shows. */
-  onSessionDisplayed?: (sessionId: number) => void
+  onSessionDisplayed?: (sessionId: number | null) => void
 }
 
 export function RightPanel({
@@ -104,7 +104,7 @@ function renderTabContent(
   slug: string | undefined,
   onJumpToHighlight: ((highlight: HighlightRecord) => void) | undefined,
   injectedPrompt: InjectedPrompt | null | undefined,
-  target: { targetSessionId?: number | null; targetSessionNonce?: number; onSessionDisplayed?: (sessionId: number) => void },
+  target: { targetSessionId?: number | null; targetSessionNonce?: number; onSessionDisplayed?: (sessionId: number | null) => void },
   deletedSessionIds?: readonly number[],
   highlightsRevision?: number,
   onHighlightDeleted?: (paperSlug: string) => void,

@@ -101,9 +101,13 @@ export function App(): JSX.Element {
       }
       if (paper) {
         setChatBanner(null)
+        // Ask already shows this chat: reloading would wipe the unsent draft.
+        const alreadyShown = session.id === displayedChatSessionId && paper.slug === activeTabId && rightPanelTab === 'Ask'
         openPaper({ slug: paper.slug, title: paper.title })
-        setSelectedChatSessionId(session.id)
-        setChatNavigationNonce((nonce) => nonce + 1)
+        if (!alreadyShown) {
+          setSelectedChatSessionId(session.id)
+          setChatNavigationNonce((nonce) => nonce + 1)
+        }
         setRightPanelTab('Ask')
       } else {
         setChatBanner(`Chat "${session.title}" references paper "${session.paperSlug}" which was not found in your library.`)
@@ -121,6 +125,7 @@ export function App(): JSX.Element {
 
   function handleSessionDeleted(id: number): void {
     if (chatNavigation.current?.sessionId === id) chatNavigation.current = null
+    setDisplayedChatSessionId((displayed) => (displayed === id ? null : displayed))
     setDeletedSessionIds((ids) => [...ids, id])
   }
 

@@ -440,8 +440,14 @@ export class ChatManager {
       }
     } catch (err) {
       await this.disposeSession(params.paperSlug, backend)
-      onEvent({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
-      return
+      // The prompt stream can throw once the grace period disposed the session
+      // after Stop. That is still a stop: keep the partial answer, marked.
+      if (control.cancelRequested && control.graceDisposed) {
+        stopped = true
+      } else {
+        onEvent({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
+        return
+      }
     }
 
     const turnIndex = priorMessages.filter((m) => m.role === 'user').length

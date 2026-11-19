@@ -653,6 +653,17 @@ describe('Stop control (#254)', () => {
     expect(screen.queryByRole('button', { name: 'Stop' })).not.toBeInTheDocument()
   })
 
+  it('hides Stop while the paper answers in another of its chats', async () => {
+    askOpen.mockResolvedValue({
+      session: { id: 2, paperSlug: 'p1', backend: 'codex', title: null, createdAt: 't' },
+      messages: [],
+      activeTurn: { requestId: 'other-chat', chatSessionId: 1, text: 'Other chat partial', sequence: 1 },
+    })
+    render(<AskPanel slug="p1" />)
+    expect(await screen.findByRole('button', { name: 'Sending…' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Stop' })).not.toBeInTheDocument()
+  })
+
   it('cancels the active request, keeps the marked partial answer, and re-enables the composer', async () => {
     const user = userEvent.setup()
     render(<AskPanel slug="p1" />)

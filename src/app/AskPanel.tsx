@@ -424,7 +424,8 @@ export function AskPanel({
           <button type="submit" className={styles.sendButton} disabled={disabled || !input.trim()}>
             {sending ? 'Sending…' : 'Send'}
           </button>
-          {sending ? (
+          {/* The paper's turn may belong to another of its chats: Stop only the one shown. */}
+          {sending && (activeTurnSessionId.current === null || activeTurnSessionId.current === sessionId) ? (
             <button type="button" className={styles.stopButton} disabled={stopping} onClick={stopTurn}>
               {stopping ? 'Stopping…' : 'Stop'}
             </button>

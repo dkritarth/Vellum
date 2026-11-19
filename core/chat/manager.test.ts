@@ -610,6 +610,28 @@ describe('ChatManager', () => {
       expect(client.newSessionCalls).toBe(2)
     })
 
+    it('keeps a Stop as a stop when the prompt stream throws after the grace dispose', async () => {
+      class ThrowingSession extends StreamingSession {
+        async *prompt(): AsyncIterable<AcpUpdate> {
+          for await (const update of super.prompt()) {
+            if (update.kind === 'error') throw new Error('stream closed')
+            yield update
+          }
+        }
+      }
+      const streaming = new ThrowingSession(['partial answer'], false)
+      const manager = new ChatManager(new FakeClient([], async () => streaming), { cancelGraceMs: 30 })
+      const events: AskStreamEvent[] = []
+      const { session, turn } = start(manager, events)
+      await until(() => events.some((e) => e.kind === 'text'))
+      manager.cancelTurn({ paperSlug: slug, requestId: 'req-1' })
+      await turn
+      expect(streaming.disposed).toBe(true)
+      expect(events.some((e) => e.kind === 'error')).toBe(false)
+      expect(events.at(-1)).toMatchObject({ kind: 'cancelled', message: { content: `partial answer\n\n${STOPPED_MARKER}` } })
+      expect(getChatMessages(db, session.id)).toHaveLength(2)
+    })
+
     it('does not dispose an adapter that honors cancel within the grace period', async () => {
       const streaming = new StreamingSession(['partial'], true)
       const manager = new ChatManager(new FakeClient([], async () => streaming), { cancelGraceMs: 30 })

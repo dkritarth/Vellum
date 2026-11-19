@@ -35,7 +35,8 @@
 // implementation of that contract and is only ever used as this module's
 // default; core/acp/ itself is untouched.
 import { dirname } from 'node:path'
-import type { AcpBackend, AcpClient, AcpUpdate } from '../acp/client.js'
+import type { AcpBackend, AcpClient, AcpSession, AcpUpdate } from '../acp/client.js'
+import { backendOrder, runWithFallback } from '../acp/fallback.js'
 import { StdioAcpClient } from '../acp/stdio-client.js'
 
 export interface ExtractedSection {
@@ -60,13 +61,18 @@ export interface ExtractResult {
    * unparseable, or fields were dropped for the wrong shape. Sections and
    * metadata may be partial or empty. Not an error: [P1-05] explicitly requires degrading, not throwing. */
   degraded: boolean
+  /** Backend whose session ran the extraction, when one started. */
+  backend?: AcpBackend
 }
 
 export interface ExtractOptions {
   /** Injectable ACP client — defaults to the real StdioAcpClient. Tests pass
    * a fake that yields canned AcpUpdates instead of spawning an adapter. */
   client?: AcpClient
-  backend?: AcpBackend
+  /** Preferred backend(s); the others are tried after them (see fallback.ts). */
+  backend?: AcpBackend | readonly AcpBackend[]
+  /** Overall time budget across backends (see core/acp/fallback.ts). */
+  deadlineMs?: number
 }
 
 /** Fresh literal per call (not a shared constant) — callers may reasonably
@@ -101,42 +107,48 @@ function buildPrompt(mdPath: string): string {
  */
 export async function extractPaper(mdPath: string, options: ExtractOptions = {}): Promise<ExtractResult> {
   const client = options.client ?? new StdioAcpClient()
-  const backend = options.backend ?? 'claude'
+  // A backend whose session starts but whose turn yields no metadata (stream
+  // failure, unparseable output) gets one retry on the next backend.
+  const run = await runWithFallback(
+    client,
+    backendOrder(options.backend),
+    (session) => extractWith(session, mdPath),
+    (result) => Object.keys(result.metadata).length > 0,
+    // Scope the agent to the paper directory (#236).
+    { deadlineMs: options.deadlineMs, sessionOptions: { cwd: dirname(mdPath) } },
+  )
+  if (!run) return emptyResult()
+  // Report the backend only when it produced metadata, so the summary step
+  // starts on a backend known to work.
+  return run.accepted && !run.result.degraded ? { ...run.result, backend: run.backend } : run.result
+}
 
-  const session = await client.newSession(backend, { cwd: dirname(mdPath) }).catch(() => undefined)
-  if (!session) return emptyResult()
-
+async function extractWith(session: AcpSession, mdPath: string): Promise<ExtractResult> {
+  let raw = ''
+  let completed = false
   try {
-    let raw = ''
-    let completed = false
-
-    try {
-      for await (const update of session.prompt({ text: buildPrompt(mdPath), contextFiles: [mdPath] })) {
-        if (update.kind === 'text') {
-          raw += textFromUpdate(update)
-        } else if (update.kind === 'error') {
-          break
-        } else if (update.kind === 'done') {
-          // Legacy clients emit done without a reason. Honor that contract,
-          // but only end_turn is successful when a reason is exposed.
-          const stopReason = typeof update.data === 'object' && update.data !== null
-            ? (update.data as Record<string, unknown>).stopReason
-            : undefined
-          completed = stopReason === undefined || stopReason === 'end_turn'
-          break
-        }
+    for await (const update of session.prompt({ text: buildPrompt(mdPath), contextFiles: [mdPath] })) {
+      if (update.kind === 'text') {
+        raw += textFromUpdate(update)
+      } else if (update.kind === 'error') {
+        break
+      } else if (update.kind === 'done') {
+        // Legacy clients emit done without a reason. Honor that contract,
+        // but only end_turn is successful when a reason is exposed.
+        const stopReason = typeof update.data === 'object' && update.data !== null
+          ? (update.data as Record<string, unknown>).stopReason
+          : undefined
+        completed = stopReason === undefined || stopReason === 'end_turn'
+        break
       }
-    } catch {
-      completed = false
-      // Stream itself threw (adapter died mid-turn, transport error, ...).
-      // Fall through to parsing whatever text was collected before the throw.
     }
-
-    const result = parseAgentOutput(raw)
-    return { ...result, degraded: result.degraded || !completed }
-  } finally {
-    await session.dispose().catch(() => undefined)
+  } catch {
+    completed = false
+    // Stream itself threw (adapter died mid-turn, transport error, ...).
+    // Fall through to parsing whatever text was collected before the throw.
   }
+  const result = parseAgentOutput(raw)
+  return { ...result, degraded: result.degraded || !completed }
 }
 
 /** Pulls plain text out of an AcpUpdate whose kind is 'text'. `data` is

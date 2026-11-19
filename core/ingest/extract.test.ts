@@ -279,3 +279,49 @@ describe('extractPaper', () => {
     expect(session.disposed).toBe(true)
   })
 })
+
+describe('extractPaper backend fallback', () => {
+  it('falls back to Codex when the Claude adapter cannot start', async () => {
+    const tried: string[] = []
+    const session = new FakeSession([textUpdate(HAPPY_JSON), doneUpdate])
+    const client: AcpClient = {
+      async newSession(backend) {
+        tried.push(backend)
+        if (backend !== 'codex') throw new Error(`failed to spawn ACP adapter for ${backend}`)
+        return session
+      },
+    }
+
+    const result = await extractPaper('/data/papers/x/paper.md', { client, backend: 'claude' })
+
+    expect(result.degraded).toBe(false)
+    expect(result.metadata.title).toBe('Attention Is All You Need, Again')
+    expect(tried).toEqual(['claude', 'codex'])
+  })
+
+  it('retries on the next backend when the first turn returns no metadata', async () => {
+    const tried: string[] = []
+    const client: AcpClient = {
+      async newSession(backend) {
+        tried.push(backend)
+        return new FakeSession(backend === 'codex' ? [textUpdate('I could not read the file.'), doneUpdate] : [textUpdate(HAPPY_JSON), doneUpdate])
+      },
+    }
+    const result = await extractPaper('/data/papers/x/paper.md', { client })
+    expect(tried).toEqual(['codex', 'claude'])
+    expect(result.degraded).toBe(false)
+    expect(result.backend).toBe('claude')
+  })
+
+  it('tries Codex first when no backend is given', async () => {
+    const tried: string[] = []
+    const client: AcpClient = {
+      async newSession(backend) {
+        tried.push(backend)
+        return new FakeSession([textUpdate(HAPPY_JSON), doneUpdate])
+      },
+    }
+    await extractPaper('/data/papers/x/paper.md', { client })
+    expect(tried).toEqual(['codex'])
+  })
+})

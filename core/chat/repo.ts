@@ -9,6 +9,7 @@
 // paper's own markdown/PDF never passes through this module.
 
 import type { Database } from 'better-sqlite3'
+import { isAcpBackend, type AcpBackend } from '../acp/client.js'
 
 export type ChatRole = 'user' | 'assistant'
 
@@ -102,6 +103,16 @@ export function getLatestChatSession(db: Database, paperSlug: string): ChatSessi
     .prepare(`SELECT * FROM chat_sessions WHERE paper_slug = ? ORDER BY id DESC LIMIT 1`)
     .get(paperSlug) as ChatSessionRow | undefined
   return row ? toSession(row) : undefined
+}
+
+/** Backend of the conversation the user most recently wrote in, falling back
+ * to the newest session. Background agent work (ingest) starts with it. */
+export function getPreferredChatBackend(db: Database): AcpBackend | undefined {
+  const row = (db.prepare(
+    `SELECT s.backend FROM chat_messages m JOIN chat_sessions s ON s.id = m.session_id
+     WHERE m.role = 'user' ORDER BY m.id DESC LIMIT 1`,
+  ).get() ?? db.prepare(`SELECT backend FROM chat_sessions ORDER BY id DESC LIMIT 1`).get()) as { backend: string } | undefined
+  return row && isAcpBackend(row.backend) ? row.backend : undefined
 }
 
 /** Fetch one chat session by id, or undefined if it doesn't exist. Used by

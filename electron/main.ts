@@ -20,7 +20,7 @@ import { StdioAcpClient } from '../core/acp/stdio-client.js'
 import type { AskOpenResult, AskStartParams, AskStreamEvent } from '../core/chat/manager.js'
 import { ACP_BACKENDS, isAcpBackend, type AcpBackend } from '../core/acp/client.js'
 import { ChatManager } from '../core/chat/manager.js'
-import { getChatSession } from '../core/chat/repo.js'
+import { getChatSession, getPreferredChatBackend } from '../core/chat/repo.js'
 import { ingest } from '../core/ingest/index.js'
 import type { IngestResult } from '../core/ingest/index.js'
 import { getPaper, listPapers, trashPaper, restorePaper, purgePaper } from '../core/library/repo.js'
@@ -151,7 +151,10 @@ ipcMain.handle('vellum:ingest', async (_event, input: unknown): Promise<IngestRe
   if (typeof input !== 'string' || input.trim().length === 0) {
     throw new Error('vellum:ingest: input must be a non-empty string')
   }
-  return ingest(input, { db: getDb(), dataDir: resolveDataRoot() })
+  const db = getDb()
+  // Extraction and summary start on the backend the user last chatted with,
+  // then try the others, so a Codex-only install still gets metadata.
+  return ingest(input, { db, dataDir: resolveDataRoot(), backend: getPreferredChatBackend(db) })
 })
 
 const SORT_COLUMN_VALUES: readonly PaperSortColumn[] = ['addedAt', 'year', 'title']

@@ -119,6 +119,38 @@ describe('decidePermission', () => {
       expect(decide(request('search', ALL_OPTIONS, { rawInput: { glob: `${outside}/**` } })).decision).toBe('reject')
     })
 
+    it('rejects globs that climb out through ..', () => {
+      const patterns = ['*/../../../../etc/*', '**/../../../../etc/passwd', '{a,..}/{a,..}/{a,..}/etc/passwd', '[.][.]/[.][.]/etc/passwd', '*/[.][.]/*', '?/../x']
+      for (const pattern of patterns) {
+        expect(decide(request('search', ALL_OPTIONS, { rawInput: { pattern } })).decision, `pattern ${pattern}`).toBe('reject')
+        expect(decide(request('search', ALL_OPTIONS, { rawInput: { glob: pattern, path: cwd } })).decision, `glob ${pattern}`).toBe('reject')
+        expect(decide(request('read', ALL_OPTIONS, { locations: [{ path: `${cwd}/${pattern}` }] })).decision, `location ${pattern}`).toBe('reject')
+      }
+    })
+
+    it('rejects the reproduced probes', () => {
+      expect(decide(request('search', ALL_OPTIONS, { rawInput: { pattern: '*/../../../../etc/*' } })).decision).toBe('reject')
+      expect(decide(request('read', ALL_OPTIONS, { locations: [{ path: join(cwd, '*/../../../../etc/passwd') }] })).decision).toBe('reject')
+    })
+
+    it('rejects a dangling symlink inside the directory that points outside', () => {
+      symlinkSync(join(outside, 'missing.txt'), join(cwd, 'dangling'))
+      symlinkSync(join(outside, 'no-such-dir'), join(cwd, 'dangling-dir'))
+      expect(decide(readOf(join(cwd, 'dangling'))).decision).toBe('reject')
+      expect(decide(readOf(join(cwd, 'dangling-dir', 'x.txt'))).decision).toBe('reject')
+    })
+
+    it('allows a dangling symlink that points inside', () => {
+      symlinkSync(join(cwd, 'not-yet.md'), join(cwd, 'dangling-in'))
+      expect(decide(readOf(join(cwd, 'dangling-in'))).decision).toBe('allow')
+    })
+
+    it('rejects a symlink loop without hanging', () => {
+      symlinkSync(join(cwd, 'loop-b'), join(cwd, 'loop-a'))
+      symlinkSync(join(cwd, 'loop-a'), join(cwd, 'loop-b'))
+      expect(typeof decide(readOf(join(cwd, 'loop-a'))).decision).toBe('string')
+    })
+
     it('allows a glob that stays inside', () => {
       expect(decide(request('search', ALL_OPTIONS, { rawInput: { pattern: `${cwd}/**/*.md` } })).decision).toBe('allow')
     })

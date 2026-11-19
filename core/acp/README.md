@@ -63,8 +63,10 @@ After `session/new`, `newSession` reads the announced `modes`, sends
 `session/set_mode` when the current mode is not the safe one, and logs
 `[vellum:acp] session mode backend=… initial=… enforced=…`. It **fails closed**:
 if the adapter announces no modes, does not offer the safe mode, rejects
-`set_mode`, or announces a `current_mode_update` away from it, the adapter is
-killed and `newSession` rejects. For Codex the child env also carries
+`set_mode`, or announces a `current_mode_update` away from it during the handshake, the
+adapter is killed and `newSession` rejects. A `current_mode_update` away from it
+after the session exists fails the in-flight turn with an error, kills the
+adapter and fails every later prompt. For Codex the child env also carries
 `INITIAL_AGENT_MODE=read-only`, so the session starts read-only before
 `set_mode`. Constants: `SAFE_SESSION_MODE` in `stdio-client.ts`. Antigravity
 has no such mode switch and is unchanged.
@@ -83,7 +85,7 @@ permission prompt UI yet. `requestPermission` therefore decides from
 | `toolCall.kind` | Outcome |
 | --- | --- |
 | `think` | Allow: selects `allow_once`, else `allow_always`; cancels if neither is offered |
-| `read`, `search` | Allow only when every path named in `toolCall.locations[].path` and path-like `rawInput` fields (`path`, `file_path`, `paths`, `uri`, escaping globs, …) resolves inside the session cwd after `..` and symlinks are resolved. A `read` that names no path is rejected. A `search` that names no local path but carries a `query`/`url` (a web search) is rejected. |
+| `read`, `search` | Allow only when every path named in `toolCall.locations[].path` and path-like `rawInput` fields (`path`, `file_path`, `paths`, `uri`, escaping globs, …) resolves inside the session cwd after `..` and symlinks (including dangling ones) are resolved. A glob that can expand to `..` (a `..` after the first wildcard, or a bracket/brace group containing a dot) is rejected. A `read` that names no path is rejected. A `search` that names no local path but carries a `query`/`url` (a web search) is rejected. |
 | `edit`, `delete`, `move`, `execute`, `switch_mode`, `other`, `fetch`, absent, `null` or unknown | Reject: selects `reject_once`, else `reject_always`; cancels if neither is offered |
 
 `fetch` is denied on purpose. It reaches the network, so injected paper text
@@ -112,6 +114,37 @@ Both keys override the user's own `CODEX_CONFIG`. Residual risk: MCP servers the
 user configured in `~/.codex/config.toml` are not touched and can still reach
 the network. Claude's `WebSearch`/`WebFetch` are covered by the permission
 policy (see above).
+
+### Codex file reads are not path-scoped by the permission policy
+
+Codex reads files by running shell commands inside codex-cli's read-only
+sandbox. Its permission profile (Codex rollout `turn_context`) is
+`file_system: restricted, entries: [root: read]`, so every file on the machine
+is readable and Codex sends **no** `session/request_permission` for it. The
+path scoping above only sees requests the adapter chooses to send (kinds
+`execute`, `other`, `switch_mode`), so it cannot scope Codex reads.
+
+codex-acp 2.2.2 sends `approvalPolicy: on-request` and a `readOnly`
+`sandboxPolicy` on every turn, so Vellum cannot select `untrusted` approval,
+and a restricted `default_permissions` filesystem profile in `CODEX_CONFIG` made
+Codex session creation fail on the development host (the bwrap fs helper cannot
+start there). Neither was shipped. Instead `buildAdapterEnv` sets
+`features.shell_tool = false` and `features.unified_exec = false`. With both off
+the tool list reported by Codex has no command runner (`apply_patch`,
+`view_image`, MCP resource tools, goals, clock, image generation), and a
+request to read an absolute path was answered "no file or shell reader exposed".
+
+Consequences and residual risk:
+
+- Codex grounding relies on the paper text Vellum embeds in the prompt
+  (`MAX_EMBEDDED_CONTEXT_BYTES`, 512 KiB). A larger `paper.md` is only linked
+  and Codex can no longer open it.
+- `view_image` can still read image files by absolute path. `apply_patch` still
+  exists but needs approval, which the policy rejects as kind `edit`.
+- Reads by user-configured MCP servers are not scoped by Vellum.
+- This was verified from the tool list and one model answer on a host where the
+  Codex shell cannot run anyway (bwrap). It was not verified on a host with a
+  working Codex sandbox.
 
 ### Session working directory
 

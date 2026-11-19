@@ -193,7 +193,22 @@ export const SAFE_SESSION_MODE: Partial<Record<AcpBackend, string>> = {
  *    that did before). User-configured MCP servers in ~/.codex/config.toml are
  *    not touched and remain a residual risk. */
 const CODEX_WEB_SEARCH = 'disabled'
-const CODEX_RESTRICTED_FEATURES = { apps: false } as const
+/** Codex reads files by running shell commands (`cat`, `rg`) inside codex-cli's
+ * read-only sandbox, whose profile is `root: read`: every file on the machine
+ * is readable and no `session/request_permission` is sent, so the path scoping
+ * in permission-policy.ts never sees those reads. codex-acp 2.2.2 cannot
+ * narrow that profile: it sends `approvalPolicy: on-request` and a
+ * `readOnly` sandboxPolicy on every turn, and a restricted
+ * `default_permissions` profile made session creation fail on this host
+ * (the bwrap fs helper cannot start). So the shell tools are removed instead:
+ * with `shell_tool` and `unified_exec` both off, the model's tool list (read
+ * from the Codex rollout) has no command runner, and a request to read an
+ * absolute path was answered "no file or shell reader exposed". Papers up to
+ * MAX_EMBEDDED_CONTEXT_BYTES are embedded in the prompt, so grounding does not
+ * need the shell; larger papers are only linked and Codex cannot open them.
+ * Still exposed: `view_image` (reads image files by path), `apply_patch`
+ * (approval-gated, rejected as kind `edit`) and user-configured MCP servers. */
+const CODEX_RESTRICTED_FEATURES = { apps: false, shell_tool: false, unified_exec: false } as const
 
 const RAW_API_KEY_ENV = ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'OPENAI_API_KEY', 'CODEX_API_KEY']
 
@@ -545,7 +560,23 @@ class StdioAcpSession implements AcpSession {
     }
   }
 
+  private unsafeMessage: string | undefined
+
+  /** The adapter left its safe session mode: fail the in-flight turn with
+   * the reason, kill the adapter, and make every later prompt fail. */
+  failUnsafe(message: string): void {
+    if (this.unsafeMessage !== undefined) return
+    this.unsafeMessage = message
+    // dispose() pushes a generic 'session disposed'; push the reason first.
+    this.queue?.push({ kind: 'error', data: { message } })
+    void this.dispose().catch(() => undefined)
+  }
+
   async *prompt(req: AcpPromptRequest): AsyncIterable<AcpUpdate> {
+    if (this.unsafeMessage !== undefined) {
+      yield { kind: 'error', data: { message: this.unsafeMessage } }
+      return
+    }
     if (this.disposed) {
       yield { kind: 'error', data: { message: 'session disposed' } }
       return
@@ -716,7 +747,17 @@ export class StdioAcpClient implements AcpClient {
 
     const toClient = (_agent: Agent): Client => ({
       sessionUpdate: (params: SessionNotification) => {
-        if (params.update.sessionUpdate === 'current_mode_update') announcedMode = params.update.currentModeId
+        if (params.update.sessionUpdate === 'current_mode_update') {
+          announcedMode = params.update.currentModeId
+          // After the handshake the adapter must stay in the safe mode too:
+          // a later switch (auto, workspace-write, ...) would let it approve
+          // writes without asking this client, so kill the session.
+          const required = SAFE_SESSION_MODE[backend]
+          if (session && required !== undefined && announcedMode !== required) {
+            session.failUnsafe(`${command} switched to the '${announcedMode}' session mode instead of '${required}'; session terminated`)
+            return
+          }
+        }
         session?.route(params.sessionId, mapSessionUpdate(params.update))
       },
       requestPermission: (req: RequestPermissionRequest): RequestPermissionResponse => {
@@ -809,6 +850,10 @@ export class StdioAcpClient implements AcpClient {
         readEmbeddableContext,
         removeEphemeralCwd,
       )
+      const required = SAFE_SESSION_MODE[backend]
+      if (required !== undefined && announcedMode !== undefined && announcedMode !== required) {
+        session.failUnsafe(`${command} switched to the '${announcedMode}' session mode instead of '${required}'; session terminated`)
+      }
       return session
     } catch (err) {
       handshake.cancel()

@@ -46,6 +46,8 @@ const mode = process.argv[1]
 //   no-modes        session/new returns no \`modes\` field at all
 //   no-safe-mode    offers only auto and acceptEdits
 //   set-fails       session/set_mode answers with a JSON-RPC error
+//   drift-mid-turn  after a good handshake, session/prompt announces current_mode_update 'auto' and then stalls
+//   drift-idle      answers the first prompt, then announces current_mode_update 'auto' with no turn in flight
 //   set-ignored     session/set_mode succeeds but the agent announces it stayed in 'auto'
 const modeVariant = process.argv[2] || ''
 const setModeCalls = []
@@ -114,6 +116,16 @@ rl.on('line', (line) => {
     }
     send({ jsonrpc: '2.0', id: msg.id, result: {} })
   } else if (msg.method === 'session/prompt') {
+    if (modeVariant === 'drift-mid-turn') {
+      send({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'sess-1', update: { sessionUpdate: 'current_mode_update', currentModeId: 'auto' } } })
+      return
+    }
+    if (modeVariant === 'drift-idle') {
+      send({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'sess-1', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'ok' } } } })
+      send({ jsonrpc: '2.0', id: msg.id, result: { stopReason: 'end_turn' } })
+      send({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'sess-1', update: { sessionUpdate: 'current_mode_update', currentModeId: 'auto' } } })
+      return
+    }
     // 'modes-probe' reports what the client did to this session.
     if (mode === 'modes-probe') {
       const summary = JSON.stringify({
@@ -395,7 +407,7 @@ describe('StdioAcpClient session mode enforcement', () => {
   it('starts the Codex adapter with INITIAL_AGENT_MODE=read-only and web search disabled', async () => {
     const report = await modes('codex', '', true)
     expect(report.env.INITIAL_AGENT_MODE).toBe('read-only')
-    expect(JSON.parse(report.env.CODEX_CONFIG ?? '{}')).toMatchObject({ web_search: 'disabled', features: { apps: false } })
+    expect(JSON.parse(report.env.CODEX_CONFIG ?? '{}')).toMatchObject({ web_search: 'disabled', features: { apps: false, shell_tool: false, unified_exec: false } })
   })
 
   it('does not touch the mode of an Antigravity session', async () => {
@@ -418,6 +430,44 @@ describe('StdioAcpClient session mode enforcement', () => {
     await expect(client.newSession('claude', { cwd: tmpdir() })).rejects.toThrow(message)
     expect(children).toHaveLength(1)
     expect(children[0].exitCode !== null || children[0].signalCode !== null).toBe(true)
+  })
+})
+
+describe('mode drift after the handshake', () => {
+  function tracked(variant: string): { client: StdioAcpClient; children: AdapterChildProcess[] } {
+    const children: AdapterChildProcess[] = []
+    const spawnTracked: SpawnAdapter = (backend) => {
+      const child = spawnFakeAgent('modes-probe', variant)(backend)
+      children.push(child)
+      return child
+    }
+    return { client: new StdioAcpClient(spawnTracked, {}, { onPermissionDecision: () => {} }), children }
+  }
+  const exited = async (child: AdapterChildProcess): Promise<boolean> => {
+    for (let i = 0; i < 50 && child.exitCode === null && child.signalCode === null; i++) await new Promise((r) => setTimeout(r, 100))
+    return child.exitCode !== null || child.signalCode !== null
+  }
+
+  it('fails the in-flight turn, kills the adapter and fails later prompts when it leaves the safe mode', async () => {
+    const { client, children } = tracked('drift-mid-turn')
+    const session = await client.newSession('claude', { cwd: tmpdir() })
+    const updates = await collect(session.prompt({ text: 'hi' }))
+    expect(updates[0]).toMatchObject({ kind: 'error', data: { message: expect.stringMatching(/switched to the 'auto' session mode instead of 'default'/) } })
+    expect(await exited(children[0]!)).toBe(true)
+    const later = await collect(session.prompt({ text: 'again' }))
+    expect(later[0]).toMatchObject({ kind: 'error', data: { message: expect.stringMatching(/switched to the 'auto'/) } })
+    await session.dispose()
+  })
+
+  it('also catches a drift announced while no turn is in flight', async () => {
+    const { client, children } = tracked('drift-idle')
+    const session = await client.newSession('claude', { cwd: tmpdir() })
+    const first = await collect(session.prompt({ text: 'hi' }))
+    expect(first.at(-1)).toMatchObject({ kind: 'done' })
+    expect(await exited(children[0]!)).toBe(true)
+    const second = await collect(session.prompt({ text: 'again' }))
+    expect(second[0]).toMatchObject({ kind: 'error', data: { message: expect.stringMatching(/switched to the 'auto'/) } })
+    await session.dispose()
   })
 })
 
@@ -700,7 +750,7 @@ describe('buildAdapterEnv', () => {
       service_tier: 'default',
       nested: { keep: true },
       web_search: 'disabled',
-      features: { apps: false },
+      features: { apps: false, shell_tool: false, unified_exec: false },
     })
     expect(sourceEnv.CODEX_CONFIG).toBe('{"model":"old","service_tier":"default","nested":{"keep":true}}')
   })
@@ -709,7 +759,7 @@ describe('buildAdapterEnv', () => {
     const sourceEnv = Object.freeze({ VELLUM_CODEX_MODEL: '  gpt-6.1-sol  ' })
     expect(buildAdapterEnv(sourceEnv, 'codex')).toEqual({
       ...sourceEnv,
-      CODEX_CONFIG: '{"model":"gpt-6.1-sol","web_search":"disabled","features":{"apps":false}}',
+      CODEX_CONFIG: '{"model":"gpt-6.1-sol","web_search":"disabled","features":{"apps":false,"shell_tool":false,"unified_exec":false}}',
       INITIAL_AGENT_MODE: 'read-only',
     })
     expect(sourceEnv).not.toHaveProperty('CODEX_CONFIG')
@@ -718,7 +768,7 @@ describe('buildAdapterEnv', () => {
   it.each([undefined, '', ' \n '])('adds only Vellum session limits to Codex config with no model override (%j)', (model) => {
     const sourceEnv = { VELLUM_CODEX_MODEL: model, CODEX_CONFIG: '{"service_tier":"default"}' }
     const env = buildAdapterEnv(sourceEnv, 'codex')
-    expect(JSON.parse(env.CODEX_CONFIG ?? '')).toEqual({ service_tier: 'default', web_search: 'disabled', features: { apps: false } })
+    expect(JSON.parse(env.CODEX_CONFIG ?? '')).toEqual({ service_tier: 'default', web_search: 'disabled', features: { apps: false, shell_tool: false, unified_exec: false } })
     expect(env.INITIAL_AGENT_MODE).toBe('read-only')
     expect(buildAdapterArgs('codex', sourceEnv)).toEqual([])
   })
@@ -729,7 +779,7 @@ describe('buildAdapterEnv', () => {
       'codex',
     )
     expect(env.INITIAL_AGENT_MODE).toBe('read-only')
-    expect(JSON.parse(env.CODEX_CONFIG ?? '')).toEqual({ model: 'm', web_search: 'disabled', features: { apps: false, keep: true } })
+    expect(JSON.parse(env.CODEX_CONFIG ?? '')).toEqual({ model: 'm', web_search: 'disabled', features: { apps: false, shell_tool: false, unified_exec: false, keep: true } })
   })
 
   it('rejects invalid config without a model override using a fixed message', () => {

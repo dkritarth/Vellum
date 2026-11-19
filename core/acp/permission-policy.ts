@@ -11,8 +11,8 @@
 // that stdio-client.ts forces at session creation (Claude `default`, Codex
 // `read-only`): adapters in their default modes approve in-workspace writes
 // themselves and never ask this client at all.
-import { existsSync, realpathSync } from 'node:fs'
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { lstatSync, readlinkSync } from 'node:fs'
+import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { PermissionOption, RequestPermissionRequest, RequestPermissionResponse } from '@agentclientprotocol/sdk'
 
@@ -56,6 +56,8 @@ const PATH_KEYS = ['path', 'file_path', 'filePath', 'filepath', 'file', 'filenam
 const PATH_LIST_KEYS = ['paths', 'files', 'file_paths', 'filePaths', 'directories']
 /** `rawInput` keys that carry a glob; only checked when they can escape. */
 const GLOB_KEYS = ['pattern', 'glob']
+/** A bracket or brace group containing a dot can expand to `.` or `..`. */
+const GLOB_DOT_CLASS = /\[[^\]]*\.|\{[^}]*\./
 /** `rawInput` keys that mean the request is not a local file search. */
 const REMOTE_KEYS = ['query', 'queries', 'url']
 
@@ -93,7 +95,7 @@ function collectTargets(req: RequestPermissionRequest): string[] {
     for (const key of GLOB_KEYS) {
       // A glob only needs checking when it can leave the search root.
       const value = nonEmptyString(input[key])
-      if (value && (isAbsolute(value) || value.startsWith('~') || value.split(/[\\/]/).includes('..'))) targets.push(value)
+      if (value && (isAbsolute(value) || value.startsWith('~') || value.includes('..') || GLOB_DOT_CLASS.test(value))) targets.push(value)
     }
   }
   return targets
@@ -109,22 +111,37 @@ function looksRemote(req: RequestPermissionRequest): boolean {
 /** Resolves symlinks of the longest existing prefix, then appends the rest, so
  * a path that does not exist yet still resolves through any symlinked parent. */
 function realResolve(path: string): string {
-  const missing: string[] = []
-  let current = path
-  while (!existsSync(current)) {
-    const parent = dirname(current)
-    if (parent === current) break
-    missing.unshift(basename(current))
-    current = parent
+  return resolveComponents(resolve(path), 0)
+}
+
+const MAX_SYMLINK_HOPS = 40
+
+/** Walks `abs` one component at a time with lstat, following symlinks via
+ * readlink even when the link target does not exist (a dangling link inside
+ * cwd must still resolve to where it points). */
+function resolveComponents(abs: string, depth: number): string {
+  if (depth > MAX_SYMLINK_HOPS) return abs
+  const parts = abs.split(sep).filter((part) => part !== '')
+  let current: string = sep
+  let hops = 0
+  for (let i = 0; i < parts.length; i++) {
+    const next = join(current, parts[i])
+    let target: string | undefined
+    try {
+      if (lstatSync(next).isSymbolicLink()) target = readlinkSync(next)
+    } catch {
+      // Missing component: nothing further can be a link; append the rest.
+      return join(next, ...parts.slice(i + 1))
+    }
+    if (target === undefined) {
+      current = next
+      continue
+    }
+    if (++hops + depth > MAX_SYMLINK_HOPS) return join(next, ...parts.slice(i + 1))
+    const linked = isAbsolute(target) ? resolve(target) : resolve(current, target)
+    return resolveComponents(join(linked, ...parts.slice(i + 1)), depth + hops)
   }
-  let real = current
-  try {
-    real = realpathSync(current)
-  } catch {
-    // Unresolvable prefix: keep the lexical path; the containment check below
-    // still rejects anything outside cwd.
-  }
-  return join(real, ...missing)
+  return current
 }
 
 /** True when `target` (absolute, relative to `cwd`, or a file: URI) resolves
@@ -141,8 +158,15 @@ export function isInsideDirectory(target: string, cwd: string): boolean {
     return false
   }
   // Drop a trailing glob so `/paper/dir/**/*.md` resolves to its fixed prefix.
+  // The glob part must never be able to climb: truncating `*/../../etc/*` to
+  // `*` would hide the `..` segments, so refuse any glob that can expand to
+  // `..` (a `..` anywhere, or a bracket/brace group containing a dot).
   const globAt = path.search(/[*?[{]/)
-  if (globAt >= 0) path = path.slice(0, globAt) || '.'
+  if (globAt >= 0) {
+    const globPart = path.slice(globAt)
+    if (globPart.includes('..') || GLOB_DOT_CLASS.test(globPart)) return false
+    path = path.slice(0, globAt) || '.'
+  }
   const root = realResolve(resolve(cwd))
   const real = realResolve(isAbsolute(path) ? resolve(path) : resolve(root, path))
   const rel = relative(root, real)

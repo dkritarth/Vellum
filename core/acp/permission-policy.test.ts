@@ -27,6 +27,16 @@ beforeAll(() => {
 })
 afterAll(() => rmSync(root, { recursive: true, force: true }))
 
+let cleanCount = 0
+/** A session directory with nested Markdown and no symlinks. */
+function cleanDir(): string {
+  const dir = join(root, `clean-${++cleanCount}`)
+  mkdirSync(join(dir, 'sub'), { recursive: true })
+  writeFileSync(join(dir, 'paper.md'), 'paper')
+  writeFileSync(join(dir, 'sub', 'notes.md'), 'notes')
+  return dir
+}
+
 const ALL_OPTIONS: PermissionOption[] = [
   { optionId: 'aa', name: 'Always allow', kind: 'allow_always' },
   { optionId: 'ao', name: 'Allow', kind: 'allow_once' },
@@ -156,7 +166,22 @@ describe('decidePermission', () => {
     })
 
     it('allows a glob that stays inside', () => {
-      expect(decide(request('search', ALL_OPTIONS, { rawInput: { pattern: `${cwd}/**/*.md` } })).decision).toBe('allow')
+      const clean = cleanDir()
+      const req = request('search', ALL_OPTIONS, { rawInput: { pattern: `${clean}/**/*.md` } })
+      expect(decidePermission(req, { cwd: clean }).decision).toBe('allow')
+    })
+
+    it('rejects a wildcard in a non-final component when a directory symlink sits below', () => {
+      // `l*/secret.txt` matches link/secret.txt, which is <root>/outside/sub/secret.txt.
+      expect(isInsideDirectory('l*/secret.txt', cwd)).toBe(false)
+      expect(isInsideDirectory('**/*.md', cwd)).toBe(false)
+      expect(decide(request('search', ALL_OPTIONS, { title: 'grep x', rawInput: { pattern: 'x', glob: 'l*/secret.txt' } })).decision).toBe('reject')
+      // A final-component wildcard cannot descend into a link.
+      expect(isInsideDirectory('*.md', cwd)).toBe(true)
+      // A symlink to a file cannot be descended either.
+      const clean = cleanDir()
+      symlinkSync(join(clean, 'paper.md'), join(clean, 'alias.md'))
+      expect(isInsideDirectory('**/*.md', clean)).toBe(true)
     })
 
     it('rejects a web search (search kind with no local path)', () => {
@@ -247,7 +272,7 @@ describe('decidePermission', () => {
 
       it('treats a Grep/Glob with no path as the session directory', () => {
         expect(decide(grep({ pattern: 'Attention' })).decision).toBe('allow')
-        expect(decide(glob({ pattern: '**/*.md' })).decision).toBe('allow')
+        expect(decidePermission(glob({ pattern: '**/*.md' }), { cwd: cleanDir() }).decision).toBe('allow')
         expect(decide(glob({ pattern: '../../**/*.pem' })).decision).toBe('reject')
         expect(decide(glob({ pattern: '/home/**/id_rsa' })).decision).toBe('reject')
         expect(decide(glob({ pattern: '*/../../etc/*' })).decision).toBe('reject')

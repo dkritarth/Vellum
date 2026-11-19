@@ -11,7 +11,7 @@
 // that stdio-client.ts forces at session creation (Claude `default`, Codex
 // `read-only`): adapters in their default modes approve in-workspace writes
 // themselves and never ask this client at all.
-import { lstatSync, readlinkSync } from 'node:fs'
+import { lstatSync, readdirSync, readlinkSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { PermissionOption, RequestPermissionRequest, RequestPermissionResponse } from '@agentclientprotocol/sdk'
@@ -235,6 +235,45 @@ function realResolve(path: string): string {
 }
 
 const MAX_SYMLINK_HOPS = 40
+const MAX_TREE_ENTRIES = 5000
+
+function linksToFile(link: string): boolean {
+  try {
+    return statSync(link).isFile()
+  } catch {
+    return false
+  }
+}
+
+/** True when no entry beneath `dir` is a symlink to a directory. Fails closed (false) on a
+ * read error or a tree larger than MAX_TREE_ENTRIES. A missing `dir` has no
+ * entries, so it is symlink-free. */
+function symlinkFreeTree(dir: string): boolean {
+  const pending = [dir]
+  let seen = 0
+  try {
+    while (pending.length > 0) {
+      const current = pending.pop() as string
+      let entries
+      try {
+        entries = readdirSync(current, { withFileTypes: true })
+      } catch (error) {
+        if (current === dir && isMissing(error)) return true
+        throw error
+      }
+      for (const entry of entries) {
+        if (++seen > MAX_TREE_ENTRIES) return false
+        // A link to a file cannot be descended; a link to a directory, or one
+        // that does not resolve (it could later), could be.
+        if (entry.isSymbolicLink() && !linksToFile(join(current, entry.name))) return false
+        if (entry.isDirectory()) pending.push(join(current, entry.name))
+      }
+    }
+    return true
+  } catch {
+    return false
+  }
+}
 
 function isMissing(error: unknown): boolean {
   const code = (error as NodeJS.ErrnoException | undefined)?.code
@@ -307,6 +346,13 @@ export function isInsideDirectory(target: string, cwd: string): boolean {
     const globPart = path.slice(globAt)
     if (globPart.includes('..') || GLOB_DOT_CLASS.test(globPart) || GLOB_ROOT_CLASS.test(globPart)) return false
     path = path.slice(0, globAt) || '.'
+    // Only the fixed prefix is resolved. A wildcard in a non-final component
+    // (`l*/s.txt`, `**/*.md`) could match a symlinked directory beneath it,
+    // so allow that only when the tree below the prefix holds no symlink.
+    if (globPart.includes(sep)) {
+      const prefix = isAbsolute(path) ? path : literalRoot + sep + path
+      if (!symlinkFreeTree(prefix.endsWith(sep) ? prefix : dirname(prefix + 'x'))) return false
+    }
   }
   let root: string
   let real: string

@@ -54,6 +54,10 @@ interface AskPanelProps {
   deletedSessionIds?: readonly number[]
   /** [L2-02] Target chat session ID to restore from Chats library */
   targetSessionId?: number | null
+  /** Changes on every Chats-list click, so re-selecting the same chat reloads it. */
+  targetSessionNonce?: number
+  /** Reports the conversation the panel shows, e.g. after New chat. */
+  onSessionDisplayed?: (sessionId: number | null) => void
 }
 
 export function AskPanel({
@@ -61,8 +65,14 @@ export function AskPanel({
   injectedPrompt,
   onInjectedPromptHandled,
   targetSessionId,
+  targetSessionNonce,
+  onSessionDisplayed,
   deletedSessionIds,
 }: AskPanelProps): JSX.Element {
+  const sessionDisplayed = useRef(onSessionDisplayed)
+  sessionDisplayed.current = onSessionDisplayed
+  // Unmounted (another tab): nothing is displayed, so the Chats list falls back to the selection.
+  useEffect(() => () => sessionDisplayed.current?.(null), [])
   const [deletionRevision, setDeletionRevision] = useState(0)
   const [loadRevision, setLoadRevision] = useState(0)
   // Durable IDs are never reused. Keep tombstones across Ask tab remounts.
@@ -178,6 +188,7 @@ export function AskPanel({
         if (cancelled || generation !== contextGeneration.current) return
         setSessionId(result.session.id)
         displayedSessionId.current = result.session.id
+        sessionDisplayed.current?.(result.session.id)
         setBackend(isChatBackend(result.session.backend) ? result.session.backend : 'claude')
         const turn = result.activeTurn
         activeRequestId.current = turn?.requestId ?? null
@@ -206,7 +217,7 @@ export function AskPanel({
       queuedUpdates.current = []
       awaitingRequest.current = false
     }
-  }, [slug, targetSessionId, deletionRevision, loadRevision, replayUpdates])
+  }, [slug, targetSessionId, targetSessionNonce, deletionRevision, loadRevision, replayUpdates])
 
   const sendTurn = useCallback(async (prompt?: string) => {
     const text = (prompt ?? input).trim()
@@ -266,6 +277,7 @@ export function AskPanel({
         if (generation !== contextGeneration.current) return
         setSessionId(result.session.id)
         displayedSessionId.current = result.session.id
+        sessionDisplayed.current?.(result.session.id)
         setBackend(isChatBackend(result.session.backend) ? result.session.backend : 'claude')
         setMessages([])
       })

@@ -400,17 +400,32 @@ try {
     await button('New chat').click()
     await window.waitForFunction(() => document.querySelectorAll('[class*=assistantMessage]').length === 0)
     await tab('Chats').click()
-    // Sidebar polling may still show the old list just after New chat.
-    // Wait for the new empty Codex row, then delete that exact conversation.
-    const empty = chats().filter({ hasText: 'Codex' }).filter({ hasText: '0 turns' }).first()
+    // Sidebar polling may still show the old list just after New chat, and
+    // the second paper has its own empty Codex chat. Wait for this paper's
+    // new empty row, then delete that exact conversation.
+    const empty = chats().filter({ hasText: first }).filter({ hasText: 'Codex' }).filter({ hasText: /(^|\D)0 turns/ }).first()
+    const original = chats().filter({ hasText: first }).filter({ hasText: 'Codex' }).filter({ hasNotText: /(^|\D)0 turns/ }).first()
     await empty.waitFor()
+    // Re-selecting the chat that was open before New chat must reload it (#256).
+    await original.click()
+    await answers().filter({ hasText: /Transformer/i }).first().waitFor()
+    await window.waitForFunction(() => document.querySelector('[role=listbox][aria-label="Chat sessions"] [aria-selected=true]')?.textContent?.includes('0 turns') === false)
     const label = await empty.getByRole('button', { name: /^Delete chat / }).getAttribute('aria-label')
     assert(label)
     window.once('dialog', (dialog) => dialog.accept())
     await button(label).click()
     await button(label).waitFor({ state: 'detached' })
-    await chats().filter({ hasText: 'Codex' }).filter({ hasNotText: '0 turns' }).first().click()
+    // Deleting a conversation that is not displayed leaves Ask untouched.
     await answers().filter({ hasText: /Transformer/i }).first().waitFor()
+    await original.click()
+    await answers().filter({ hasText: /Transformer/i }).first().waitFor()
+    // Clicking the chat Ask already shows keeps the unsent draft.
+    await composer().fill('Unsent draft survives re-click')
+    await original.click()
+    await window.waitForTimeout(500)
+    assert.equal(await composer().inputValue(), 'Unsent draft survives re-click')
+    await answers().filter({ hasText: /Transformer/i }).first().waitFor()
+    await composer().fill('')
   })
   await chapter('Clear note, delete collection, and permanently purge isolated paper', async () => {
     await nav().getByRole('button', { name: 'Library', exact: true }).click()

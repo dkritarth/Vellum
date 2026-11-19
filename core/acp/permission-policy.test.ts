@@ -19,6 +19,11 @@ beforeAll(() => {
   writeFileSync(join(outside, 'key.txt'), 'secret')
   symlinkSync(outside, join(cwd, 'link-out'))
   symlinkSync(join(cwd, 'paper.md'), join(cwd, 'link-in'))
+  // link -> <root>/outside/sub: lexically `link/..` is the paper dir, really `<root>/outside`. (Build such paths by string concat: path.join collapses `..`.)
+  mkdirSync(join(root, 'outside', 'sub'), { recursive: true })
+  writeFileSync(join(root, 'outside', 'secret.txt'), 'secret')
+  symlinkSync(join(root, 'outside', 'sub'), join(cwd, 'link'))
+  writeFileSync(join(cwd, 'secret.txt'), 'inside copy')
 })
 afterAll(() => rmSync(root, { recursive: true, force: true }))
 
@@ -325,9 +330,11 @@ describe('decidePermission', () => {
     expect(decide(request('execute', [])).response.outcome).toEqual({ outcome: 'cancelled' })
   })
 
-  it('uses allow_always for think when allow_once is missing', () => {
+  it('never selects allow_always for any kind: cancels when allow_once is missing', () => {
     const options = ALL_OPTIONS.filter((o) => o.kind !== 'allow_once')
-    expect(decide(request('think', options)).response.outcome).toEqual({ outcome: 'selected', optionId: 'aa' })
+    const decision = decide(request('think', options))
+    expect(decision.response.outcome).toEqual({ outcome: 'cancelled' })
+    expect(decision.decision).toBe('cancelled')
   })
 
   it('never selects allow_always for read or search: cancels when allow_once is missing', () => {
@@ -350,6 +357,73 @@ describe('decidePermission', () => {
 
   it('exposes only read-only kinds as allowed', () => {
     expect([...ALLOWED_TOOL_KINDS].sort()).toEqual(['read', 'search', 'think'])
+  })
+})
+
+describe('decidePermission round-5 review cases', () => {
+  const decide = (kind: ToolKind, extra: Record<string, unknown>) => decidePermission(request(kind, ALL_OPTIONS, extra), { cwd }).decision
+
+  it('glob-checks a Glob pattern even when a Grep-only key is added', () => {
+    expect(decide('search', { title: 'Find `../../**`', rawInput: { pattern: '../../**', output_mode: 'files_with_matches' } })).toBe('reject')
+  })
+
+  it('still treats a grep-titled pattern as a regex', () => {
+    expect(decide('search', { title: 'grep "https://arxiv.org"', rawInput: { pattern: 'https://arxiv.org' } })).toBe('allow')
+  })
+
+  it.each([
+    { path: ['/etc'] },
+    { file_path: ['/etc/passwd'] },
+    { pattern: ['../**'] },
+    { glob: ['../**'] },
+    { path: { nested: '/etc' } },
+    { path: 42 },
+    { paths: '/etc' },
+    { paths: [['/etc']] },
+  ])('rejects a non-string value under a vetted key: %j', (rawInput) => {
+    expect(decide('search', { title: 'Find', rawInput: { pattern: '*.md', ...rawInput } })).toBe('reject')
+  })
+
+  it.each(['{/etc,x}/*', '[/]etc/*', '{/etc}/passwd', '{~,x}/.ssh/*'])('rejects a glob whose group expands to an absolute or home path: %s', (pattern) => {
+    expect(decide('search', { title: 'Find', rawInput: { pattern } })).toBe('reject')
+  })
+
+  it('rejects a glob whose fixed prefix passes through a symlink out of the directory', () => {
+    expect(decide('search', { title: 'Find', rawInput: { pattern: 'link-out/*' } })).toBe('reject')
+    expect(decide('search', { title: 'grep x', rawInput: { pattern: 'x', glob: 'link-out/*.txt' } })).toBe('reject')
+  })
+
+  it('rejects a search whose nested input looks remote', () => {
+    expect(decide('search', { title: 'search', rawInput: { pattern: 'x', action: { type: 'search', query: 'q' } } })).toBe('reject')
+  })
+
+  it('allows reads under a session directory whose name has glob characters', () => {
+    const odd = join(root, 'Attention [2017] {v2} *x')
+    mkdirSync(odd, { recursive: true })
+    writeFileSync(join(odd, 'paper.md'), 'paper')
+    const req = request('read', ALL_OPTIONS, { locations: [{ path: join(odd, 'paper.md') }] })
+    expect(decidePermission(req, { cwd: odd }).decision).toBe('allow')
+    const escape = request('read', ALL_OPTIONS, { locations: [{ path: join(odd, '..', 'secret', 'key.txt') }] })
+    expect(decidePermission(escape, { cwd: odd }).decision).toBe('reject')
+  })
+})
+
+describe('symlink followed before ..', () => {
+  it('rejects read and search of link/../secret.txt (OS reads outside/secret.txt)', () => {
+    expect(decide(readOf(`${cwd}/link/../secret.txt`)).decision).toBe('reject')
+    expect(decide(request('read', ALL_OPTIONS, { rawInput: { file_path: 'link/../secret.txt' } })).decision).toBe('reject')
+    expect(decide(request('search', ALL_OPTIONS, { rawInput: { pattern: 'x', path: `${cwd}/link/../secret.txt` } })).decision).toBe('reject')
+  })
+
+  it('rejects the glob form link/../*', () => {
+    expect(decide(request('search', ALL_OPTIONS, { title: 'Find', rawInput: { pattern: `${cwd}/link/../*` } })).decision).toBe('reject')
+    expect(decide(request('search', ALL_OPTIONS, { title: 'Find', rawInput: { pattern: 'link/../*' } })).decision).toBe('reject')
+  })
+
+  it('still allows .. that stays on real directories inside the session directory', () => {
+    mkdirSync(join(cwd, 'real'), { recursive: true })
+    expect(decide(readOf(`${cwd}/real/../paper.md`)).decision).toBe('allow')
+    expect(isInsideDirectory('link-in', cwd)).toBe(true)
   })
 })
 

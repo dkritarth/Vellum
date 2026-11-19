@@ -129,7 +129,7 @@ codex-acp 2.2.2 sends `approvalPolicy: on-request` and a `readOnly`
 and a restricted `default_permissions` filesystem profile in `CODEX_CONFIG` made
 Codex session creation fail on the development host (the bwrap fs helper cannot
 start there). Neither was shipped. Instead `buildAdapterEnv` sets
-`features.shell_tool = false`, `features.unified_exec = false` and `features.view_image = false`. With both off
+`features.shell_tool = false`, `features.unified_exec = false` and `features.view_image = false`, plus every other default-on feature that can reach a browser, the screen, the network or other code (`browser_use*`, `computer_use`, `in_app_browser`, `image_generation`, `plugins`, `remote_plugin`, `plugin_sharing`, `tool_suggest`, `hooks`, `multi_agent`, `multi_agent_v2`; see `CODEX_RESTRICTED_FEATURES`). With the shell features off
 the tool list reported by Codex has no command runner (`apply_patch`,
 MCP resource tools, goals, clock, image generation), and a
 request to read an absolute path was answered "no file or shell reader exposed".
@@ -143,6 +143,7 @@ Consequences and residual risk:
   read a canary PNG outside cwd with 0 permission requests; with it off the model
   has no such tool. `apply_patch` still
   exists but needs approval, which the policy rejects as kind `edit`.
+- The JavaScript `exec` code-mode isolate stays listed. A live probe found it has no `require`, `process`, Deno or filesystem access. The `collaboration.*` sub-agent tools also stay listed with `multi_agent` off; sub-agents run in the same read-only sandbox.
 - Reads by user-configured MCP servers are not scoped by Vellum.
 - This was verified from the tool list and one model answer on a host where the
   Codex shell cannot run anyway (bwrap). It was not verified on a host with a

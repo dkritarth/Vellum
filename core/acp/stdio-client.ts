@@ -209,9 +209,36 @@ const CODEX_WEB_SEARCH = 'disabled'
  * absolute path was answered "no file or shell reader exposed". Papers up to
  * MAX_EMBEDDED_CONTEXT_BYTES are embedded in the prompt, so grounding does not
  * need the shell; larger papers are only linked and Codex cannot open them.
- * Still exposed: `view_image` (reads image files by path), `apply_patch`
- * (approval-gated, rejected as kind `edit`) and user-configured MCP servers. */
-const CODEX_RESTRICTED_FEATURES = { apps: false, shell_tool: false, unified_exec: false, view_image: false } as const
+ * Other default-on features that can reach a browser, the screen, the network
+ * or other code without a `session/request_permission` are forced off too:
+ * browser_use (+ _external, _full_cdp_access), computer_use, in_app_browser,
+ * image_generation, plugins (+ remote_plugin, plugin_sharing, tool_suggest),
+ * hooks and multi_agent (+ multi_agent_v2). Checked with `codex features list`
+ * (codex-cli 0.170) and tool-list probes under this config.
+ * Still exposed: `apply_patch` (approval-gated, rejected as kind `edit`),
+ * the JavaScript-only `exec` code-mode isolate (no fs, process or network
+ * access per a live probe), the `collaboration.*` sub-agent tools (still
+ * listed with multi_agent off; sub-agents run in the same read-only sandbox)
+ * and user-configured MCP servers. */
+export const CODEX_RESTRICTED_FEATURES = {
+  apps: false,
+  shell_tool: false,
+  unified_exec: false,
+  view_image: false,
+  browser_use: false,
+  browser_use_external: false,
+  browser_use_full_cdp_access: false,
+  computer_use: false,
+  in_app_browser: false,
+  image_generation: false,
+  plugins: false,
+  remote_plugin: false,
+  plugin_sharing: false,
+  tool_suggest: false,
+  hooks: false,
+  multi_agent: false,
+  multi_agent_v2: false,
+} as const
 
 /** Claude Code settings keys that carry sign-in or model choice, not policy.
  * With no setting sources the CLI cannot find a user's `apiKeyHelper` or

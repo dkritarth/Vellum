@@ -21,6 +21,7 @@ import {
   StdioAcpClient,
   buildAdapterArgs,
   buildAdapterEnv,
+  CODEX_RESTRICTED_FEATURES,
   describeSessionError,
   mapSessionUpdate,
   readEmbeddableContext,
@@ -416,7 +417,7 @@ describe('StdioAcpClient session mode enforcement', () => {
   it('starts the Codex adapter with INITIAL_AGENT_MODE=read-only and web search disabled', async () => {
     const report = await modes('codex', '', true)
     expect(report.env.INITIAL_AGENT_MODE).toBe('read-only')
-    expect(JSON.parse(report.env.CODEX_CONFIG ?? '{}')).toMatchObject({ web_search: 'disabled', features: { apps: false, shell_tool: false, unified_exec: false, view_image: false } })
+    expect(JSON.parse(report.env.CODEX_CONFIG ?? '{}')).toMatchObject({ web_search: 'disabled', features: { ...CODEX_RESTRICTED_FEATURES } })
   })
 
   it('disables Claude settings sources through session/new _meta and forwards only auth/model keys', async () => {
@@ -818,6 +819,11 @@ describe('paper context embedding (#101)', () => {
 })
 
 describe('buildAdapterEnv', () => {
+  it.each(['shell_tool','unified_exec','view_image','apps','browser_use','browser_use_external','browser_use_full_cdp_access','computer_use','in_app_browser','image_generation','plugins','remote_plugin','plugin_sharing','tool_suggest','hooks','multi_agent','multi_agent_v2'])('forces Codex feature %s off even when the user config enables it', (feature) => {
+    const env = buildAdapterEnv({ CODEX_CONFIG: JSON.stringify({ features: { [feature]: true } }) }, 'codex')
+    expect(JSON.parse(env.CODEX_CONFIG ?? '').features[feature]).toBe(false)
+  })
+
   it('delivers a trimmed Codex model and existing config to a real subprocess without mutating source', () => {
     const sourceEnv = Object.freeze({
       VELLUM_CODEX_MODEL: '  model "quoted" \n name  ',
@@ -833,7 +839,7 @@ describe('buildAdapterEnv', () => {
       service_tier: 'default',
       nested: { keep: true },
       web_search: 'disabled',
-      features: { apps: false, shell_tool: false, unified_exec: false, view_image: false },
+      features: { ...CODEX_RESTRICTED_FEATURES },
     })
     expect(sourceEnv.CODEX_CONFIG).toBe('{"model":"old","service_tier":"default","nested":{"keep":true}}')
   })
@@ -842,7 +848,7 @@ describe('buildAdapterEnv', () => {
     const sourceEnv = Object.freeze({ VELLUM_CODEX_MODEL: '  gpt-6.1-sol  ' })
     expect(buildAdapterEnv(sourceEnv, 'codex')).toEqual({
       ...sourceEnv,
-      CODEX_CONFIG: '{"model":"gpt-6.1-sol","web_search":"disabled","features":{"apps":false,"shell_tool":false,"unified_exec":false,"view_image":false}}',
+      CODEX_CONFIG: `{"model":"gpt-6.1-sol","web_search":"disabled","features":${JSON.stringify(CODEX_RESTRICTED_FEATURES)}}`,
       INITIAL_AGENT_MODE: 'read-only',
     })
     expect(sourceEnv).not.toHaveProperty('CODEX_CONFIG')
@@ -851,7 +857,7 @@ describe('buildAdapterEnv', () => {
   it.each([undefined, '', ' \n '])('adds only Vellum session limits to Codex config with no model override (%j)', (model) => {
     const sourceEnv = { VELLUM_CODEX_MODEL: model, CODEX_CONFIG: '{"service_tier":"default"}' }
     const env = buildAdapterEnv(sourceEnv, 'codex')
-    expect(JSON.parse(env.CODEX_CONFIG ?? '')).toEqual({ service_tier: 'default', web_search: 'disabled', features: { apps: false, shell_tool: false, unified_exec: false, view_image: false } })
+    expect(JSON.parse(env.CODEX_CONFIG ?? '')).toEqual({ service_tier: 'default', web_search: 'disabled', features: { ...CODEX_RESTRICTED_FEATURES } })
     expect(env.INITIAL_AGENT_MODE).toBe('read-only')
     expect(buildAdapterArgs('codex', sourceEnv)).toEqual([])
   })
@@ -862,7 +868,7 @@ describe('buildAdapterEnv', () => {
       'codex',
     )
     expect(env.INITIAL_AGENT_MODE).toBe('read-only')
-    expect(JSON.parse(env.CODEX_CONFIG ?? '')).toEqual({ model: 'm', web_search: 'disabled', features: { apps: false, shell_tool: false, unified_exec: false, view_image: false, keep: true } })
+    expect(JSON.parse(env.CODEX_CONFIG ?? '')).toEqual({ model: 'm', web_search: 'disabled', features: { ...CODEX_RESTRICTED_FEATURES, keep: true } })
   })
 
   it('rejects invalid config without a model override using a fixed message', () => {

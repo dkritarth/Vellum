@@ -12,7 +12,7 @@
 // `read-only`): adapters in their default modes approve in-workspace writes
 // themselves and never ask this client at all.
 import { lstatSync, readlinkSync } from 'node:fs'
-import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { PermissionOption, RequestPermissionRequest, RequestPermissionResponse } from '@agentclientprotocol/sdk'
 
@@ -77,21 +77,37 @@ function nonEmptyString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() !== '' ? value : undefined
 }
 
-/** Keys only Claude's Grep tool takes; their presence marks `pattern` as a regex. */
-const GREP_ONLY_KEYS = ['output_mode', 'head_limit', 'multiline', '-i', '-n', '-A', '-B', '-C']
-
 /** True when `pattern` is a regex, not a glob. Claude's Grep reports the
- * title `grep …` and takes `pattern` (regex) plus an optional `glob` file
- * filter; Glob reports `Find …` and takes `pattern` as a glob. A regex cannot
- * name a path, so only globs need the escape check. */
-function patternIsRegex(req: RequestPermissionRequest, input: Record<string, unknown>): boolean {
+ * title `grep …` (claude-agent-acp reporters/search.js) and takes `pattern`
+ * (regex) plus an optional `glob` file filter; Glob reports `Find …` and takes
+ * `pattern` as a glob. A regex cannot name a path, so only globs need the
+ * escape check. Only the title decides: input keys are attacker-shapeable,
+ * so adding `output_mode` to a Glob call must not switch its check off. */
+function patternIsRegex(req: RequestPermissionRequest): boolean {
   const title = (req.toolCall as { title?: unknown } | undefined)?.title
-  if (typeof title === 'string' && /^grep\b/.test(title)) return true
-  return GREP_ONLY_KEYS.some((key) => input[key] !== undefined)
+  return typeof title === 'string' && /^grep\b/.test(title)
 }
 
-function globEscapes(value: string): boolean {
-  return isAbsolute(value) || value.startsWith('~') || value.includes('..') || GLOB_DOT_CLASS.test(value) || hasLeadingDotWildcard(value)
+/** A bracket or brace group containing a separator or `~` can expand to an
+ * absolute or home path (`{/etc,x}/*`, `[/]etc`, `{~,x}/.ssh`). */
+const GLOB_ROOT_CLASS = /\[[^\]]*[\\/~]|\{[^}]*[\\/~]/
+
+/** Why a vetted key holds a value of the wrong shape, or undefined. Path and
+ * glob keys take one string, list keys an array of strings; anything else
+ * (an array under `path`, a number, an object) is refused rather than skipped,
+ * since a tool may still interpret it as a path. */
+function vettedShapeError(input: Record<string, unknown>): string | undefined {
+  for (const key of [...PATH_KEYS, ...GLOB_KEYS]) {
+    const value = input[key]
+    if (value !== undefined && value !== null && typeof value !== 'string') return 'unexpected value under a path key'
+  }
+  for (const key of PATH_LIST_KEYS) {
+    const value = input[key]
+    if (value !== undefined && value !== null && !(Array.isArray(value) && value.every((item) => typeof item === 'string'))) {
+      return 'unexpected value under a path key'
+    }
+  }
+  return undefined
 }
 
 /** Every filesystem target the request names. */
@@ -117,12 +133,13 @@ function collectTargets(req: RequestPermissionRequest): string[] {
         if (value) targets.push(value)
       }
     }
-    const regex = patternIsRegex(req, input)
+    const regex = patternIsRegex(req)
     for (const key of GLOB_KEYS) {
       if (key === 'pattern' && regex) continue
-      // A glob only needs checking when it can leave the search root.
+      // Every glob is resolved: besides `..` and absolute forms, its fixed
+      // prefix may pass through a symlink in the session directory.
       const value = nonEmptyString(input[key])
-      if (value && globEscapes(value)) targets.push(value)
+      if (value) targets.push(value)
     }
   }
   return targets
@@ -194,45 +211,63 @@ function looseValueEscapes(value: string, cwd: string): boolean {
   })
 }
 
+/** True when `rawInput`, or any object nested in it, looks like a web search. */
 function looksRemote(req: RequestPermissionRequest): boolean {
-  const input = asRecord((req.toolCall as { rawInput?: unknown } | undefined)?.rawInput)
-  if (!input) return false
-  if (input.type === 'webSearch') return true
-  return REMOTE_KEYS.some((key) => input[key] !== undefined && input[key] !== null)
+  const visit = (value: unknown, depth: number): boolean => {
+    if (depth > MAX_LOOSE_DEPTH || typeof value !== 'object' || value === null) return false
+    if (Array.isArray(value)) return value.some((item) => visit(item, depth + 1))
+    const record = value as Record<string, unknown>
+    if (record.type === 'webSearch' || record.type === 'search') return true
+    if (REMOTE_KEYS.some((key) => record[key] !== undefined && record[key] !== null)) return true
+    return Object.values(record).some((item) => visit(item, depth + 1))
+  }
+  return visit((req.toolCall as { rawInput?: unknown } | undefined)?.rawInput, 0)
 }
 
-/** Resolves symlinks of the longest existing prefix, then appends the rest, so
- * a path that does not exist yet still resolves through any symlinked parent. */
+/** Resolves `path` the way the OS does: component by component, following
+ * symlinks, and applying `..` to the real parent. Never normalise lexically
+ * first: `link/..` with `link -> /outside/sub` is `/outside`, not the
+ * directory holding `link`. A path that does not exist yet resolves through
+ * any symlinked parent. Throws (callers fail closed) on any lstat error other
+ * than a missing component, or on too many symlink hops. */
 function realResolve(path: string): string {
-  return resolveComponents(resolve(path), 0)
+  return resolveComponents(path, { hops: 0 })
 }
 
 const MAX_SYMLINK_HOPS = 40
 
-/** Walks `abs` one component at a time with lstat, following symlinks via
+function isMissing(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code
+  return code === 'ENOENT' || code === 'ENOTDIR'
+}
+
+/** Walks an absolute, un-normalised path with lstat, following symlinks via
  * readlink even when the link target does not exist (a dangling link inside
  * cwd must still resolve to where it points). */
-function resolveComponents(abs: string, depth: number): string {
-  if (depth > MAX_SYMLINK_HOPS) return abs
-  const parts = abs.split(sep).filter((part) => part !== '')
+function resolveComponents(abs: string, budget: { hops: number }): string {
+  const parts = abs.split(sep).filter((part) => part !== '' && part !== '.')
   let current: string = sep
-  let hops = 0
   for (let i = 0; i < parts.length; i++) {
+    if (parts[i] === '..') {
+      current = dirname(current)
+      continue
+    }
     const next = join(current, parts[i])
     let target: string | undefined
     try {
       if (lstatSync(next).isSymbolicLink()) target = readlinkSync(next)
-    } catch {
+    } catch (error) {
+      if (!isMissing(error)) throw error
       // Missing component: nothing further can be a link; append the rest.
-      return join(next, ...parts.slice(i + 1))
+      return resolve(next, ...parts.slice(i + 1))
     }
     if (target === undefined) {
       current = next
       continue
     }
-    if (++hops + depth > MAX_SYMLINK_HOPS) return join(next, ...parts.slice(i + 1))
-    const linked = isAbsolute(target) ? resolve(target) : resolve(current, target)
-    return resolveComponents(join(linked, ...parts.slice(i + 1)), depth + hops)
+    if (++budget.hops > MAX_SYMLINK_HOPS) throw new Error('too many symbolic links')
+    const linked = isAbsolute(target) ? target : current + sep + target
+    return resolveComponents([linked, ...parts.slice(i + 1)].join(sep), budget)
   }
   return current
 }
@@ -254,15 +289,29 @@ export function isInsideDirectory(target: string, cwd: string): boolean {
   // The glob part must never be able to climb: truncating `*/../../etc/*` to
   // `*` would hide the `..` segments, so refuse any glob that can expand to
   // `..` (a `..` anywhere, or a bracket/brace group containing a dot).
+  // A literal session-directory prefix may itself contain glob characters
+  // (`Attention [2017] {v2}`); strip it before looking for a glob so they are
+  // not mistaken for one. The remainder is resolved against the directory.
+  const literalRoot = resolve(cwd)
+  // Compare the raw string: normalising first would collapse `*/..` and hide it.
+  if (path === literalRoot) path = '.'
+  else if (path.startsWith(literalRoot + sep)) path = path.slice(literalRoot.length + 1)
   if (hasLeadingDotWildcard(path)) return false
   const globAt = path.search(/[*?[{]/)
   if (globAt >= 0) {
     const globPart = path.slice(globAt)
-    if (globPart.includes('..') || GLOB_DOT_CLASS.test(globPart)) return false
+    if (globPart.includes('..') || GLOB_DOT_CLASS.test(globPart) || GLOB_ROOT_CLASS.test(globPart)) return false
     path = path.slice(0, globAt) || '.'
   }
-  const root = realResolve(resolve(cwd))
-  const real = realResolve(isAbsolute(path) ? resolve(path) : resolve(root, path))
+  let root: string
+  let real: string
+  try {
+    root = realResolve(literalRoot)
+    // Raw concatenation: join/resolve would collapse `..` before symlinks are followed.
+    real = realResolve(isAbsolute(path) ? path : root + sep + path)
+  } catch {
+    return false
+  }
   const rel = relative(root, real)
   return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel))
 }
@@ -271,6 +320,9 @@ export function isInsideDirectory(target: string, cwd: string): boolean {
 function scopeViolation(kind: string, req: RequestPermissionRequest, cwd: string | undefined): string | undefined {
   if (!PATH_SCOPED_KINDS.has(kind)) return undefined
   if (cwd === undefined) return 'no session directory to scope the request to'
+  const rawInput = asRecord((req.toolCall as { rawInput?: unknown } | undefined)?.rawInput)
+  const shapeError = rawInput ? vettedShapeError(rawInput) : undefined
+  if (shapeError) return shapeError
   const targets = collectTargets(req)
   const outside = targets.find((target) => !isInsideDirectory(target, cwd))
   if (outside !== undefined) return 'path outside the session directory'
@@ -278,11 +330,11 @@ function scopeViolation(kind: string, req: RequestPermissionRequest, cwd: string
   if (scan.truncated) return 'scan truncated'
   if (scan.strings.some((value) => looseValueEscapes(value, cwd))) return 'path outside the session directory'
   if (kind === 'read' && targets.length === 0) return 'no path determinable for read'
+  if (kind === 'search' && looksRemote(req)) return 'search without a local path (web search)'
   if (kind === 'search' && targets.length === 0) {
     // Grep and Glob default their root to the session cwd, so a pattern with no
     // path searches inside it (an escaping glob already failed above). Anything
     // else must name a local path.
-    if (looksRemote(req)) return 'search without a local path (web search)'
     const input = asRecord((req.toolCall as { rawInput?: unknown } | undefined)?.rawInput)
     if (typeof input?.pattern !== 'string' || input.pattern === '') return 'search names no path inside the session directory'
   }
@@ -298,9 +350,10 @@ export function decidePermission(req: RequestPermissionRequest, policy: Permissi
   if (kind !== undefined && ALLOWED_TOOL_KINDS.has(kind)) {
     reason = scopeViolation(kind, req, policy.cwd)
     if (reason === undefined) {
-      // One-shot grants only for path-scoped kinds: approving a read must never
-      // persist a blanket allow (allow_always), so cancel when allow_once is absent.
-      const allow = pickOption(options, PATH_SCOPED_KINDS.has(kind) ? ['allow_once'] : ['allow_once', 'allow_always'])
+      // One-shot grants only, for every kind: allow_always would persist a
+      // blanket allow (`think` also covers Claude Agent/Task subagent tools),
+      // so cancel when allow_once is absent.
+      const allow = pickOption(options, ['allow_once'])
       if (allow) {
         return { response: { outcome: { outcome: 'selected', optionId: allow.optionId } }, kind, title, decision: 'allow', optionId: allow.optionId }
       }

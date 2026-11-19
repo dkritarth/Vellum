@@ -19,7 +19,7 @@ import type { Database } from 'better-sqlite3'
 import { StdioAcpClient } from '../core/acp/stdio-client.js'
 import type { AskOpenResult, AskStartParams, AskStreamEvent } from '../core/chat/manager.js'
 import { ACP_BACKENDS, isAcpBackend, type AcpBackend } from '../core/acp/client.js'
-import { ChatBusyError, ChatManager } from '../core/chat/manager.js'
+import { ChatBusyError, ChatGoneError, ChatManager } from '../core/chat/manager.js'
 import { getChatSession } from '../core/chat/repo.js'
 import { ingest } from '../core/ingest/index.js'
 import type { IngestResult } from '../core/ingest/index.js'
@@ -474,7 +474,7 @@ ipcMain.handle('vellum:ask-start', (event: IpcMainInvokeEvent, params: unknown):
   // write turns onto another paper's chat history.
   const chatSession = getChatSession(db, parsed.chatSessionId)
   if (!chatSession) {
-    throw new Error('This chat was deleted. Open or start another chat to continue.')
+    throw new ChatGoneError()
   }
   if (chatSession.paperSlug !== parsed.slug) {
     throw new Error(`vellum:ask-start: chat session ${parsed.chatSessionId} does not belong to paper '${parsed.slug}'`)
@@ -497,6 +497,7 @@ ipcMain.handle('vellum:ask-start', (event: IpcMainInvokeEvent, params: unknown):
   getChatManager()
     .runTurn({ requestId, db, chatSessionId: parsed.chatSessionId, paperSlug: parsed.slug, mdPath, text: parsed.text, backend }, send)
     .catch((err: unknown) => {
+      if (!(err instanceof ChatBusyError)) console.error('[vellum:ask-start] turn failed:', err)
       send({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
     })
 

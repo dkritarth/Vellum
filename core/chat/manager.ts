@@ -237,8 +237,10 @@ export class ChatManager {
     this.activeTurns.set(params.paperSlug, activeTurn)
     this.startingPapers.add(params.paperSlug)
     const release = (): void => {
+      // A stale release from an earlier turn must not clear a newer turn's state.
+      if (this.activeTurns.get(params.paperSlug) !== activeTurn) return
       this.startingPapers.delete(params.paperSlug)
-      if (this.activeTurns.get(params.paperSlug) === activeTurn) this.activeTurns.delete(params.paperSlug)
+      this.activeTurns.delete(params.paperSlug)
     }
     return this.runActiveTurn(params, (event) => {
       if (event.kind === 'text') activeTurn.text += event.text
@@ -264,7 +266,7 @@ export class ChatManager {
     }
     const paperSlug = getChatSession(db, chatSessionId)?.paperSlug
     if (paperSlug && this.resettingPapers.has(paperSlug)) {
-      throw new ChatBusyError('This chat is still starting. Wait a moment, then delete it.')
+      throw new ChatBusyError('This paper is starting a new chat. Wait a moment, then delete this one.')
     }
     deleteChatSession(db, chatSessionId)
   }
@@ -286,9 +288,16 @@ export class ChatManager {
     if (this.resettingPapers.has(paperSlug)) {
       throw new ChatBusyError('This paper has a chat starting up. Wait a moment, then delete it permanently.')
     }
-    const purged = purgePaper(db, paperSlug, libraryDir)
-    if (purged) await this.disposePaperSessions(paperSlug)
-    return purged
+    // Hold the paper while its sessions close, so a new chat or turn cannot
+    // insert rows for the purged paper during the await (raw FK error).
+    this.resettingPapers.add(paperSlug)
+    try {
+      const purged = purgePaper(db, paperSlug, libraryDir)
+      if (purged) await this.disposePaperSessions(paperSlug)
+      return purged
+    } finally {
+      this.resettingPapers.delete(paperSlug)
+    }
   }
 
   private requireIdle(paperSlug: string): void {

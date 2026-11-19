@@ -202,7 +202,7 @@ describe('ChatManager', () => {
       await manager.runTurn({ db, chatSessionId: first.id, paperSlug: slug, mdPath, text: 'q' }, () => {})
       const next = manager.newChat({ db, paperSlug: slug })
       try {
-        expect(() => manager.deleteChat(db, first.id)).toThrow('This chat is still starting. Wait a moment, then delete it.')
+        expect(() => manager.deleteChat(db, first.id)).toThrow('This paper is starting a new chat. Wait a moment, then delete this one.')
         await expect(manager.purgePaper(db, slug)).rejects.toThrow('This paper has a chat starting up. Wait a moment, then delete it permanently.')
       } finally {
         release()
@@ -220,6 +220,24 @@ describe('ChatManager', () => {
       expect(session.disposed).toBe(false)
       await expect(manager.purgePaper(db, slug)).resolves.toBe(true)
       expect(session.disposed).toBe(true)
+    })
+
+    it('refuses a new chat for a paper while its purge is closing agent sessions', async () => {
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => { release = resolve })
+      const session = new FakeSession([textUpdate('a'), doneUpdate])
+      const originalDispose = session.dispose.bind(session)
+      session.dispose = async () => { await gate; return originalDispose() }
+      const manager = new ChatManager(new FakeClient([], async () => session))
+      const chat = manager.openChat({ db, paperSlug: slug }).session
+      await manager.runTurn({ db, chatSessionId: chat.id, paperSlug: slug, mdPath, text: 'q' }, () => {})
+      const purge = manager.purgePaper(db, slug)
+      try {
+        await expect(manager.newChat({ db, paperSlug: slug })).rejects.toThrow('A chat operation is already active for this paper.')
+      } finally {
+        release()
+        await expect(purge).resolves.toBe(true)
+      }
     })
 
     it('answers a send to a chat deleted elsewhere with a friendly message and no database error', async () => {

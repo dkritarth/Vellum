@@ -419,6 +419,13 @@ try {
     await answers().filter({ hasText: /Transformer/i }).first().waitFor()
     await original.click()
     await answers().filter({ hasText: /Transformer/i }).first().waitFor()
+    // Clicking the chat Ask already shows keeps the unsent draft.
+    await composer().fill('Unsent draft survives re-click')
+    await original.click()
+    await window.waitForTimeout(500)
+    assert.equal(await composer().inputValue(), 'Unsent draft survives re-click')
+    await answers().filter({ hasText: /Transformer/i }).first().waitFor()
+    await composer().fill('')
   })
   await chapter('Clear note, delete collection, and permanently purge isolated paper', async () => {
     await nav().getByRole('button', { name: 'Library', exact: true }).click()

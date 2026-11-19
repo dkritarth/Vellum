@@ -6,10 +6,10 @@ import type { Database } from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import type { AcpBackend, AcpClient, AcpPromptRequest, AcpSession, AcpUpdate } from '../acp/client.js'
-import { upsertPaper } from '../library/repo.js'
+import { getPaper, upsertPaper } from '../library/repo.js'
 import { openDb } from '../store/db.js'
 import { ChatManager, type AskStreamEvent } from './manager.js'
-import { getChatMessages } from './repo.js'
+import { createChatSession, getChatMessages, getChatSession } from './repo.js'
 import { listUsageRecords, getUsageSummary } from '../usage/repo.js'
 
 class FakeSession implements AcpSession {
@@ -140,6 +140,161 @@ describe('ChatManager', () => {
     expect(manager.openChat({ db, paperSlug: slug }).activeTurn).toBeNull()
     await manager.runTurn({ ...params, text: 'next' }, () => {})
     expect(manager.openChat({ db, paperSlug: slug }).messages.map((m) => m.content)).toEqual(['first', 'answer', 'next', 'answer'])
+  })
+
+  describe('deleting during an active turn (#237)', () => {
+    async function startBlockedTurn(chatSlug = slug) {
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => { release = resolve })
+      // Session is ready; the answer is held open mid-stream, so this is the "answering" phase.
+      const live = new FakeSession([textUpdate('answer'), doneUpdate])
+      const innerPrompt = live.prompt.bind(live)
+      let markStreaming!: () => void
+      const streaming = new Promise<void>((resolve) => { markStreaming = resolve })
+      live.prompt = async function* (req) { markStreaming(); await gate; yield* innerPrompt(req) }
+      const client = new FakeClient([], async () => live)
+      const manager = new ChatManager(client)
+      const { session } = manager.openChat({ db, paperSlug: chatSlug })
+      const turn = manager.runTurn({ db, chatSessionId: session.id, paperSlug: chatSlug, mdPath, text: 'question' }, () => {})
+      await streaming
+      return { manager, session, turn, release }
+    }
+
+    it('refuses to delete the chat that is answering, keeping the conversation intact', async () => {
+      const { manager, session, turn, release } = await startBlockedTurn()
+      try {
+        expect(() => manager.deleteChat(db, session.id)).toThrow('This chat is still answering. Wait for the answer to finish, then delete it.')
+        expect(() => manager.deleteChat(db, session.id)).not.toThrow(/SQLITE|FOREIGN/i)
+        expect(getChatSession(db, session.id)).toBeDefined()
+      } finally {
+        release()
+        await turn
+      }
+      // The turn still completes and persists its reply, with no database error.
+      expect(getChatMessages(db, session.id).map((m) => m.content)).toEqual(['question', 'answer'])
+    })
+
+
+    it('uses a distinct message while the chat session is still starting, and allows delete once it answers', async () => {
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => { release = resolve })
+      const client = new FakeClient([], async () => { await gate; return new FakeSession([textUpdate('answer'), doneUpdate]) })
+      const manager = new ChatManager(client)
+      const { session } = manager.openChat({ db, paperSlug: slug })
+      const turn = manager.runTurn({ db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'q' }, () => {})
+      try {
+        expect(() => manager.deleteChat(db, session.id)).toThrow('This chat is still starting. Wait a moment, then delete it.')
+        await expect(manager.purgePaper(db, slug)).rejects.toThrow('This paper has a chat starting up. Wait a moment, then delete it permanently.')
+      } finally {
+        release()
+        await turn
+      }
+    })
+
+    it('uses the starting message while a new chat is being set up', async () => {
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => { release = resolve })
+      const session = new FakeSession([textUpdate('a'), doneUpdate])
+      const originalDispose = session.dispose.bind(session)
+      session.dispose = async () => { await gate; return originalDispose() }
+      const manager = new ChatManager(new FakeClient([], async () => session))
+      const first = manager.openChat({ db, paperSlug: slug }).session
+      await manager.runTurn({ db, chatSessionId: first.id, paperSlug: slug, mdPath, text: 'q' }, () => {})
+      const next = manager.newChat({ db, paperSlug: slug })
+      try {
+        expect(() => manager.deleteChat(db, first.id)).toThrow('This paper is starting a new chat. Wait a moment, then delete this one.')
+        await expect(manager.purgePaper(db, slug)).rejects.toThrow('This paper has a chat starting up. Wait a moment, then delete it permanently.')
+      } finally {
+        release()
+        await next
+      }
+    })
+
+    it('closes the cached agent session of a paper after a successful purge, but not after a refusal', async () => {
+      const session = new FakeSession([textUpdate('a'), doneUpdate])
+      const manager = new ChatManager(new FakeClient([], async () => session))
+      const chat = manager.openChat({ db, paperSlug: slug }).session
+      await manager.runTurn({ db, chatSessionId: chat.id, paperSlug: slug, mdPath, text: 'q' }, () => {})
+      expect(session.disposed).toBe(false)
+      await manager.purgePaper(db, 'missing-paper')
+      expect(session.disposed).toBe(false)
+      await expect(manager.purgePaper(db, slug)).resolves.toBe(true)
+      expect(session.disposed).toBe(true)
+    })
+
+    it('refuses a new chat for a paper while its purge is closing agent sessions', async () => {
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => { release = resolve })
+      const session = new FakeSession([textUpdate('a'), doneUpdate])
+      const originalDispose = session.dispose.bind(session)
+      session.dispose = async () => { await gate; return originalDispose() }
+      const manager = new ChatManager(new FakeClient([], async () => session))
+      const chat = manager.openChat({ db, paperSlug: slug }).session
+      await manager.runTurn({ db, chatSessionId: chat.id, paperSlug: slug, mdPath, text: 'q' }, () => {})
+      const purge = manager.purgePaper(db, slug)
+      try {
+        await expect(manager.newChat({ db, paperSlug: slug })).rejects.toThrow('A chat operation is already active for this paper.')
+      } finally {
+        release()
+        await expect(purge).resolves.toBe(true)
+      }
+    })
+
+    it('answers a send to a chat deleted elsewhere with a friendly message and no database error', async () => {
+      const manager = new ChatManager(new FakeClient([textUpdate('a'), doneUpdate]))
+      const chat = manager.openChat({ db, paperSlug: slug }).session
+      manager.deleteChat(db, chat.id)
+      expect(() => manager.runTurn({ db, chatSessionId: chat.id, paperSlug: slug, mdPath, text: 'hi' }, () => {}))
+        .toThrow('This chat was deleted. Open or start another chat to continue.')
+      expect(getChatMessages(db, chat.id)).toEqual([])
+    })
+
+    it('deletes the chat once its turn has finished', async () => {
+      const { manager, session, turn, release } = await startBlockedTurn()
+      release()
+      await turn
+      manager.deleteChat(db, session.id)
+      expect(getChatSession(db, session.id)).toBeUndefined()
+    })
+
+    it('still deletes other chats of the same paper while one is answering', async () => {
+      const { manager, session, turn, release } = await startBlockedTurn()
+      const other = createChatSession(db, { paperSlug: slug, backend: 'codex' })
+      try {
+        manager.deleteChat(db, other.id)
+        expect(getChatSession(db, other.id)).toBeUndefined()
+        expect(getChatSession(db, session.id)).toBeDefined()
+      } finally {
+        release()
+        await turn
+      }
+    })
+
+    it('refuses to purge a paper that has an active turn, keeping paper and chat', async () => {
+      const { manager, session, turn, release } = await startBlockedTurn()
+      try {
+        await expect(manager.purgePaper(db, slug)).rejects.toThrow('This paper has an answer in progress. Wait for it to finish, then delete it permanently.')
+        expect(getPaper(db, slug)).toBeDefined()
+        expect(getChatSession(db, session.id)).toBeDefined()
+      } finally {
+        release()
+        await turn
+      }
+      expect(getChatMessages(db, session.id).map((m) => m.content)).toEqual(['question', 'answer'])
+    })
+
+    it('purges a paper with no active turn, and purges an unrelated paper during another paper\'s turn', async () => {
+      upsertPaper(db, { slug: 'other-paper', title: 'Other', authors: [], addedAt: new Date().toISOString() })
+      const { manager, turn, release } = await startBlockedTurn()
+      try {
+        await expect(manager.purgePaper(db, 'other-paper')).resolves.toBe(true)
+      } finally {
+        release()
+        await turn
+      }
+      await expect(manager.purgePaper(db, slug)).resolves.toBe(true)
+      expect(getPaper(db, slug)).toBeUndefined()
+    })
   })
 
   it('streams text chunks then persists the user + assistant messages', async () => {

@@ -5,7 +5,7 @@ import {
   saveSuggestedQuestions,
 } from '../core/questions/repo.js'
 import type { SuggestedQuestionRecord } from '../core/questions/repo.js'
-import { deleteChatSession, listChatSessions, updateChatSessionTitle } from '../core/chat/repo.js'
+import { listChatSessions, updateChatSessionTitle } from '../core/chat/repo.js'
 import type { ChatSessionSummary } from '../core/chat/repo.js'
 import { app, BrowserWindow, ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
@@ -19,11 +19,11 @@ import type { Database } from 'better-sqlite3'
 import { StdioAcpClient } from '../core/acp/stdio-client.js'
 import type { AskOpenResult, AskStartParams, AskStreamEvent } from '../core/chat/manager.js'
 import { ACP_BACKENDS, isAcpBackend, type AcpBackend } from '../core/acp/client.js'
-import { ChatManager } from '../core/chat/manager.js'
+import { ChatBusyError, ChatGoneError, ChatManager } from '../core/chat/manager.js'
 import { getChatSession } from '../core/chat/repo.js'
 import { ingest } from '../core/ingest/index.js'
 import type { IngestResult } from '../core/ingest/index.js'
-import { getPaper, listPapers, trashPaper, restorePaper, purgePaper } from '../core/library/repo.js'
+import { getPaper, listPapers, trashPaper, restorePaper } from '../core/library/repo.js'
 import { getUsageSummary, listUsageRecords, type ListUsageOptions } from '../core/usage/repo.js'
 import type { ListPapersOptions, PaperRecord, PaperSortColumn } from '../core/library/repo.js'
 import { deleteNote, getNote, upsertNote } from '../core/notes/repo.js'
@@ -205,8 +205,20 @@ ipcMain.handle('vellum:paper-restore', (_event, slug: unknown): PaperRecord | nu
   return restorePaper(getDb(), requireSlug(slug, 'vellum:paper-restore')) ?? null
 })
 
-ipcMain.handle('vellum:paper-purge', (_event, slug: unknown): boolean => {
-  return purgePaper(getDb(), requireSlug(slug, 'vellum:paper-purge'), resolveDataRoot())
+// Refusals (ChatBusyError) are expected and shown to the user; any other failure
+// (e.g. a real database error) is logged here before it reaches the renderer.
+function logUnlessBusy(channel: string, err: unknown): never {
+  if (!(err instanceof ChatBusyError)) console.error(`${channel} failed:`, err)
+  throw err
+}
+
+ipcMain.handle('vellum:paper-purge', async (_event, slug: unknown): Promise<boolean> => {
+  const checked = requireSlug(slug, 'vellum:paper-purge')
+  try {
+    return await getChatManager().purgePaper(getDb(), checked, resolveDataRoot())
+  } catch (err) {
+    return logUnlessBusy('vellum:paper-purge', err)
+  }
 })
 
 // [L2-05] Usage & Telemetry operations ---------------------------------------
@@ -385,7 +397,11 @@ ipcMain.handle('vellum:chat-delete-session', (_event, id: unknown): void => {
   if (typeof id !== 'number' || !Number.isInteger(id)) {
     throw new Error('vellum:chat-delete-session: id must be an integer')
   }
-  deleteChatSession(getDb(), id)
+  try {
+    getChatManager().deleteChat(getDb(), id)
+  } catch (err) {
+    logUnlessBusy('vellum:chat-delete-session', err)
+  }
 })
 
 ipcMain.handle('vellum:chat-rename-session', (_event, params: unknown): void => {
@@ -457,7 +473,10 @@ ipcMain.handle('vellum:ask-start', (event: IpcMainInvokeEvent, params: unknown):
   // Without this, a mismatched pair (renderer bug, or a hostile page) could
   // write turns onto another paper's chat history.
   const chatSession = getChatSession(db, parsed.chatSessionId)
-  if (!chatSession || chatSession.paperSlug !== parsed.slug) {
+  if (!chatSession) {
+    throw new ChatGoneError()
+  }
+  if (chatSession.paperSlug !== parsed.slug) {
     throw new Error(`vellum:ask-start: chat session ${parsed.chatSessionId} does not belong to paper '${parsed.slug}'`)
   }
 
@@ -478,6 +497,7 @@ ipcMain.handle('vellum:ask-start', (event: IpcMainInvokeEvent, params: unknown):
   getChatManager()
     .runTurn({ requestId, db, chatSessionId: parsed.chatSessionId, paperSlug: parsed.slug, mdPath, text: parsed.text, backend }, send)
     .catch((err: unknown) => {
+      if (!(err instanceof ChatBusyError)) console.error('[vellum:ask-start] turn failed:', err)
       send({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
     })
 

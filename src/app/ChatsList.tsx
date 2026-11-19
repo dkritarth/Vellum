@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChatSessionSummary } from '../../core/chat/repo'
 import { BACKEND_LABELS, isChatBackend } from './ModelSelector'
+import { friendlyIpcError } from './ipcError'
 import styles from './ChatsList.module.css'
 
 interface ChatsListProps {
@@ -81,7 +82,6 @@ export function ChatsList({ selectedSessionId, onSelectSession, onSessionDeleted
       onSessionDeleted?.(session.id)
       await refreshSessions.current?.()
     } catch (err) {
-      console.error('Failed to delete chat session:', err)
       setActionError(
         `Could not delete chat "${session.title}": ${errorMessage(err)}`,
       )
@@ -212,9 +212,6 @@ export function ChatsList({ selectedSessionId, onSelectSession, onSessionDeleted
   )
 }
 
-// Electron wraps main-process throws as "Error invoking remote method '<channel>': Error: <msg>";
-// show only <msg> to the user.
 function errorMessage(err: unknown): string {
-  const message = err instanceof Error ? err.message : String(err)
-  return message.replace(/^Error invoking remote method '[^']*': (?:Error: )?/, '')
+  return friendlyIpcError(err, 'Unknown error')
 }

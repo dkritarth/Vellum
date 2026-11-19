@@ -80,6 +80,8 @@ export function AskPanel({
   const [stopping, setStopping] = useState(false)
   // Stop pressed before askStart returned the request id to cancel.
   const stopBeforeAck = useRef(false)
+  // The turn that just ended was ended by Stop: return focus to the composer.
+  const focusAfterStop = useRef(false)
   const activeRequestId = useRef<string | null>(null)
   const activeTurnSessionId = useRef<number | null>(null)
   const displayedSessionId = useRef<number | null>(null)
@@ -152,6 +154,10 @@ export function AskPanel({
     if (!sending) {
       setStopping(false)
       stopBeforeAck.current = false
+      // The Stop button unmounts and the textarea was disabled during the
+      // turn, so focus would otherwise fall to <body>.
+      if (focusAfterStop.current) inputRef.current?.focus()
+      focusAfterStop.current = false
     }
   }, [sending])
 
@@ -233,6 +239,7 @@ export function AskPanel({
   const requestStop = useCallback((requestId: string) => {
     window.vellum.askCancel({ slug, requestId }).catch((err: unknown) => {
       setStopping(false)
+      focusAfterStop.current = false
       setError(err instanceof Error ? err.message : String(err))
     })
   }, [slug])
@@ -240,6 +247,7 @@ export function AskPanel({
   const stopTurn = useCallback(() => {
     if (stopping) return
     setStopping(true)
+    focusAfterStop.current = true
     const requestId = activeRequestId.current
     if (requestId) requestStop(requestId)
     else stopBeforeAck.current = true

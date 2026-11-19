@@ -307,12 +307,17 @@ export class ChatManager {
     try {
       ;({ session: acpSession, freshlySpawned } = await this.getOrCreateAcpSession(params.paperSlug, backend, params.chatSessionId))
     } catch (err) {
-      onEvent({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
+      // A start that fails after Stop is a stop, not an error.
+      if (control.cancelRequested) onEvent({ kind: 'cancelled' })
+      else onEvent({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
       return
     }
     control.session = acpSession
     if (control.cancelRequested) {
-      // Stopped while the agent was starting: nothing was sent to it.
+      // Stopped while the agent was starting: nothing was sent to it. A new
+      // session never received the recap of earlier history, so evict it
+      // rather than cache it; the next turn then spawns one and recaps.
+      if (freshlySpawned) await this.disposeSession(params.paperSlug, backend, acpSession)
       onEvent({ kind: 'cancelled' })
       return
     }

@@ -640,6 +640,55 @@ describe('ChatManager', () => {
       expect(getChatMessages(db, session.id).map((m) => m.role)).toEqual(['user'])
       expect(manager.openChat({ db, paperSlug: slug }).activeTurn).toBeNull()
     })
+    it('recaps earlier history on the next turn after a Stop during a cold session start', async () => {
+      // Earlier conversation exists; the process restarted, so the next turn needs a new session.
+      const seedClient = new FakeClient([textUpdate('first answer'), doneUpdate])
+      const seeder = new ChatManager(seedClient)
+      const { session } = seeder.openChat({ db, paperSlug: slug })
+      await seeder.runTurn({ db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'first question' }, () => {})
+
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => { release = resolve })
+      const created: FakeSession[] = []
+      const client = new FakeClient([], async () => {
+        const next = new FakeSession([textUpdate('ok'), doneUpdate])
+        created.push(next)
+        if (created.length === 1) await gate
+        return next
+      })
+      const manager = new ChatManager(client)
+      const events: AskStreamEvent[] = []
+      const turn = manager.runTurn(
+        { requestId: 'req-1', db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'stopped question' },
+        (event) => events.push(event),
+      )
+      expect(manager.cancelTurn({ paperSlug: slug, requestId: 'req-1' })).toBe(true)
+      release()
+      await turn
+      expect(events.at(-1)).toMatchObject({ kind: 'cancelled' })
+      expect(created[0]?.requests).toHaveLength(0)
+
+      await manager.runTurn({ db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'next question' }, () => {})
+
+      const sent = [...created].flatMap((s) => s.requests).map((r) => r.text).join('\n')
+      expect(sent).toContain('first question')
+      expect(sent).toContain('first answer')
+      expect(sent).toContain('next question')
+      // The never-prompted session must not be reused without the recap.
+      expect(created[0]?.requests).toHaveLength(0)
+    })
+
+    it('ends as cancelled, not an error, when Stop precedes a failing session start', async () => {
+      let fail!: () => void
+      const gate = new Promise<void>((_, reject) => { fail = () => reject(new Error('spawn failed')) })
+      const manager = new ChatManager(new FakeClient([], async () => { await gate; return new FakeSession([]) }))
+      const events: AskStreamEvent[] = []
+      const { turn } = start(manager, events)
+      manager.cancelTurn({ paperSlug: slug, requestId: 'req-1' })
+      fail()
+      await turn
+      expect(events.map((e) => e.kind)).toEqual(['cancelled'])
+    })
   })
 
   it('surfaces a mid-stream error update without persisting a partial assistant message', async () => {

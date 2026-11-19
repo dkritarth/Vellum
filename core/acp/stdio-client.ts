@@ -13,9 +13,9 @@
 // third-party harness.
 
 import { spawn, type ChildProcessByStdio } from 'node:child_process'
-import { existsSync, readFileSync, statSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { delimiter, join } from 'node:path'
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
+import { delimiter, isAbsolute, join, resolve } from 'node:path'
 import { Readable, Writable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
 import {
@@ -36,8 +36,10 @@ import type {
   AcpClient,
   AcpPromptRequest,
   AcpSession,
+  AcpSessionOptions,
   AcpUpdate,
 } from './client.js'
+import { decidePermission } from './permission-policy.js'
 
 /** The shape of the adapter subprocess: stdin/stdout piped (ACP transport),
  * stderr inherited (adapter diagnostics go straight to Vellum's own stderr). */
@@ -103,7 +105,7 @@ export function buildAdapterArgs(
  * tests never require a live, signed-in `claude-code-acp` / `codex-acp` on
  * PATH — see stdio-client.test.ts, which substitutes a small local ndjson
  * ACP-agent script in place of the real adapter. */
-export type SpawnAdapter = (backend: AcpBackend) => AdapterChildProcess
+export type SpawnAdapter = (backend: AcpBackend, spawnOptions?: { cwd?: string }) => AdapterChildProcess
 
 /** `claude-code-acp` refuses to launch when it sees `CLAUDECODE` set (the
  * signal a parent process is itself a Claude Code session) — it hard-exits
@@ -126,24 +128,38 @@ export function buildAdapterEnv(
 ): NodeJS.ProcessEnv {
   const { CLAUDECODE, CLAUDE_CODE_SSE_PORT, ...rest } = sourceEnv
   const model = sourceEnv.VELLUM_CODEX_MODEL?.trim()
-  if (backend === 'codex' && model) {
+  if (backend === 'codex') {
+    // Vellum's own session restrictions are not user-overridable: a stale
+    // INITIAL_AGENT_MODE or `web_search = "live"` must not widen them.
+    const subject = model ? 'VELLUM_CODEX_MODEL' : 'Vellum Codex session limits'
     let config: unknown = {}
     if (sourceEnv.CODEX_CONFIG !== undefined) {
       try {
         config = JSON.parse(sourceEnv.CODEX_CONFIG)
       } catch {
         // Parser diagnostics may contain config secrets. Never attach the cause.
-        throw new Error('Cannot apply VELLUM_CODEX_MODEL: CODEX_CONFIG must be a JSON object')
+        throw new Error(`Cannot apply ${subject}: CODEX_CONFIG must be a JSON object`)
       }
     }
     if (config === null || typeof config !== 'object' || Array.isArray(config)) {
-      throw new Error('Cannot apply VELLUM_CODEX_MODEL: CODEX_CONFIG must be a JSON object')
+      throw new Error(`Cannot apply ${subject}: CODEX_CONFIG must be a JSON object`)
     }
-    rest.CODEX_CONFIG = JSON.stringify({ ...config, model })
+    const existingFeatures = (config as { features?: unknown }).features
+    const features = typeof existingFeatures === 'object' && existingFeatures !== null && !Array.isArray(existingFeatures) ? existingFeatures : {}
+    rest.CODEX_CONFIG = JSON.stringify({
+      ...config,
+      ...(model ? { model } : {}),
+      web_search: CODEX_WEB_SEARCH,
+      features: { ...features, ...CODEX_RESTRICTED_FEATURES },
+    })
+    rest.INITIAL_AGENT_MODE = SAFE_SESSION_MODE.codex
   }
   // No raw API-key path for any backend: a key left in the user's shell must
   // never take precedence over the signed-in subscription CLI.
   for (const key of RAW_API_KEY_ENV) delete rest[key]
+  // Env that turns off or loosens permission checks must not reach the adapter
+  // (e.g. CLAUDE_CODE_EVEN_MORE_DANGEROUSLY_SKIP_PERMISSIONS).
+  for (const key of Object.keys(rest)) if (PERMISSION_ENV_PATTERN.test(key)) delete rest[key]
   if (backend === 'antigravity') {
     // Same rule as the other backends: auth comes from the signed-in CLI,
     // never from a raw API key or cloud credential sitting in the env.
@@ -151,6 +167,132 @@ export function buildAdapterEnv(
   }
   return rest
 }
+
+/** Session mode each adapter must be in before any prompt. Both adapters
+ * default to modes that approve workspace writes themselves, without ever
+ * sending `session/request_permission`, which would bypass the permission
+ * policy entirely:
+ *  - claude-agent-acp starts in `auto` (or the user's `defaultMode`, e.g.
+ *    `acceptEdits`): session-mode.js `resolveInitialPermissionMode`.
+ *  - codex-acp starts in `agent` (auto_review + workspace-write):
+ *    AgentMode.DEFAULT_AGENT_MODE.
+ * `default` ("Manual: always ask before making changes") and `read-only`
+ * (read-only sandbox, approval on request) route every write or command
+ * through requestPermission, where it is rejected. */
+export const SAFE_SESSION_MODE: Partial<Record<AcpBackend, string>> = {
+  claude: 'default',
+  codex: 'read-only',
+}
+
+/** Codex tools that reach the network without any `session/request_permission`,
+ * so injected paper text could encode paper content into a query or URL.
+ * Both keys verified against codex-acp 2.2.2 + codex-cli 0.169.1 (#236):
+ *  - `web_search = "disabled"` removes the native web search tool (a `search`
+ *    tool call that never asks permission).
+ *  - Disabling only that is not enough: Codex falls back to the ChatGPT Apps
+ *    MCP connector `codex_apps.search_service.web_run`, which also ran with no
+ *    permission request and returned live results. `features.apps = false`
+ *    removes that connector (4/4 probe turns made no search call, against 3/3
+ *    that did before). User-configured MCP servers in ~/.codex/config.toml are
+ *    not touched and remain a residual risk. */
+const CODEX_WEB_SEARCH = 'disabled'
+/** Codex reads files by running shell commands (`cat`, `rg`) inside codex-cli's
+ * read-only sandbox, whose profile is `root: read`: every file on the machine
+ * is readable and no `session/request_permission` is sent, so the path scoping
+ * in permission-policy.ts never sees those reads. codex-acp 2.2.2 cannot
+ * narrow that profile: it sends `approvalPolicy: on-request` and a
+ * `readOnly` sandboxPolicy on every turn, and a restricted
+ * `default_permissions` profile made session creation fail on this host
+ * (the bwrap fs helper cannot start). So the shell tools are removed instead:
+ * with `shell_tool` and `unified_exec` both off, the model's tool list (read
+ * from the Codex rollout) has no command runner, and a request to read an
+ * absolute path was answered "no file or shell reader exposed". Papers up to
+ * MAX_EMBEDDED_CONTEXT_BYTES are embedded in the prompt, so grounding does not
+ * need the shell; larger papers are only linked and Codex cannot open them.
+ * Other default-on features that can reach a browser, the screen, the network
+ * or other code without a `session/request_permission` are forced off too:
+ * browser_use (+ _external, _full_cdp_access), computer_use, in_app_browser,
+ * image_generation, plugins (+ remote_plugin, plugin_sharing, tool_suggest),
+ * hooks and multi_agent (+ multi_agent_v2). Checked with `codex features list`
+ * (codex-cli 0.170) and tool-list probes under this config.
+ * Still exposed: `apply_patch` (approval-gated, rejected as kind `edit`),
+ * the JavaScript-only `exec` code-mode isolate (no fs, process or network
+ * access per a live probe), the `collaboration.*` sub-agent tools (still
+ * listed with multi_agent off; sub-agents run in the same read-only sandbox)
+ * and user-configured MCP servers. */
+export const CODEX_RESTRICTED_FEATURES = {
+  apps: false,
+  shell_tool: false,
+  unified_exec: false,
+  view_image: false,
+  browser_use: false,
+  browser_use_external: false,
+  browser_use_full_cdp_access: false,
+  computer_use: false,
+  in_app_browser: false,
+  image_generation: false,
+  plugins: false,
+  remote_plugin: false,
+  plugin_sharing: false,
+  tool_suggest: false,
+  hooks: false,
+  multi_agent: false,
+  multi_agent_v2: false,
+  // Can install MCP dependencies or run local automation over the network
+  // with no session/request_permission; Vellum needs none of them.
+  skill_mcp_dependency_install: false,
+  skill_search: false,
+  in_app_local_automation: false,
+  in_app_updates: false,
+} as const
+
+/** Claude Code settings keys that carry sign-in or model choice, not policy.
+ * With no setting sources the CLI cannot find a user's `apiKeyHelper` or
+ * gateway `env`, so these are re-supplied through the programmatic settings tier. */
+const CLAUDE_FORWARDED_SETTING_KEYS = ['apiKeyHelper', 'env', 'model', 'awsAuthRefresh', 'awsCredentialExport', 'forceLoginMethod', 'forceLoginOrgUUID'] as const
+
+/** `session/new` _meta for Claude. claude-agent-acp hard-codes
+ * `settingSources: ["user","project","local"]` but spreads
+ * `_meta.claudeCode.options` over it (v1/acp-agent.js). Claude Code matches
+ * allow rules (`Read(//**)`, `Bash(*)`) in those files before `canUseTool`, so
+ * with them loaded a permissive user setting skips requestPermission and the
+ * policy entirely (live probe: canary read through Read and Bash, 0 permission
+ * lines). An empty `settingSources` drops them, along with user hooks, plugins
+ * and MCP servers. It also drops sign-in config (`apiKeyHelper`, gateway
+ * `env`) which, on a host that signs in that way, makes the session fail with
+ * "OAuth session expired". So only the auth/model keys of the user's
+ * settings.json are re-supplied as programmatic `settings`; permission rules
+ * are never copied. */
+export function buildClaudeSessionMeta(sourceEnv: NodeJS.ProcessEnv = process.env): { claudeCode: { options: { settingSources: string[]; settings?: Record<string, unknown> } } } {
+  const options: { settingSources: string[]; settings?: Record<string, unknown> } = { settingSources: [] }
+  try {
+    const configDir = sourceEnv.CLAUDE_CONFIG_DIR?.trim() || join(sourceEnv.HOME ?? homedir(), '.claude')
+    const parsed: unknown = JSON.parse(readFileSync(join(configDir, 'settings.json'), 'utf8'))
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      const settings: Record<string, unknown> = {}
+      for (const key of CLAUDE_FORWARDED_SETTING_KEYS) {
+        const value = (parsed as Record<string, unknown>)[key]
+        if (value === undefined) continue
+        if (key === 'env' && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          const env = Object.fromEntries(Object.entries(value).filter(([name]) => !PERMISSION_ENV_PATTERN.test(name)))
+          if (Object.keys(env).length > 0) settings.env = env
+        } else if (key !== 'env') {
+          settings[key] = value
+        }
+      }
+      if (Object.keys(settings).length > 0) options.settings = settings
+    }
+  } catch {
+    // No readable settings file: nothing to forward.
+  }
+  return { claudeCode: { options } }
+}
+
+/** Env var names that change or skip the permission mode. Found in the claude
+ * binary: CLAUDE_CODE_EVEN_MORE_DANGEROUSLY_SKIP_PERMISSIONS,
+ * CLAUDE_CHROME_PERMISSION_MODE, CLAUDE_BG_SESSION_PERMISSION_RULES,
+ * CLAUDE_CODE_AUTO_MODE_EXTERNAL_PERMISSIONS; IS_SANDBOX lets bypass mode run as root. */
+const PERMISSION_ENV_PATTERN = /PERMISSION|BYPASS|DANGEROUS|SKIP_PERM|^IS_SANDBOX$/i
 
 const RAW_API_KEY_ENV = ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'OPENAI_API_KEY', 'CODEX_API_KEY']
 
@@ -182,8 +324,11 @@ export function describeSessionError(backend: AcpBackend, err: unknown): Error |
   return new Error(`${ADAPTERS[backend].command} is not signed in. Sign in with its CLI, then try again.`)
 }
 
-const defaultSpawnAdapter: SpawnAdapter = (backend) => {
+const defaultSpawnAdapter: SpawnAdapter = (backend, spawnOptions) => {
   return spawn(resolveAdapterCommand(backend), buildAdapterArgs(backend), {
+    // Session cwd as process cwd too: adapters resolve relative paths and
+    // read project config from it, and the app's own cwd is the source checkout.
+    ...(spawnOptions?.cwd !== undefined ? { cwd: spawnOptions.cwd } : {}),
     stdio: ['pipe', 'pipe', 'inherit'],
     env: buildAdapterEnv(process.env, backend),
     detached: process.platform !== 'win32',
@@ -393,6 +538,9 @@ function childFailure(child: AdapterChildProcess, command: string, tracker: { me
   })
 }
 
+/** The adapter could not be put in Vellum's restricted session mode. */
+class UnsafeSessionError extends Error {}
+
 /** Per-operation timeout budgets. Both are optional constructor args with
  * sane defaults — existing `new StdioAcpClient()` / `new
  * StdioAcpClient(spawnAdapter)` callers are unaffected. */
@@ -464,6 +612,7 @@ class StdioAcpSession implements AcpSession {
     private readonly childFailureMessage: () => string | undefined,
     private readonly embeddedContext = false,
     private readonly readContext: (path: string) => string | null = readEmbeddableContext,
+    private readonly cleanup: () => void = () => undefined,
   ) {}
 
   // Context files whose text this agent conversation already holds.
@@ -498,7 +647,23 @@ class StdioAcpSession implements AcpSession {
     }
   }
 
+  private unsafeMessage: string | undefined
+
+  /** The adapter left its safe session mode: fail the in-flight turn with
+   * the reason, kill the adapter, and make every later prompt fail. */
+  failUnsafe(message: string): void {
+    if (this.unsafeMessage !== undefined) return
+    this.unsafeMessage = message
+    // dispose() pushes a generic 'session disposed'; push the reason first.
+    this.queue?.push({ kind: 'error', data: { message } })
+    void this.dispose().catch(() => undefined)
+  }
+
   async *prompt(req: AcpPromptRequest): AsyncIterable<AcpUpdate> {
+    if (this.unsafeMessage !== undefined) {
+      yield { kind: 'error', data: { message: this.unsafeMessage } }
+      return
+    }
     if (this.disposed) {
       yield { kind: 'error', data: { message: 'session disposed' } }
       return
@@ -596,9 +761,47 @@ class StdioAcpSession implements AcpSession {
     this.queue?.push({ kind: 'error', data: { message: 'session disposed' } })
     this.queue?.close()
     this.queue = undefined
-    this.disposePromise = terminateAdapter(this.child)
+    this.disposePromise = terminateAdapter(this.child).finally(() => this.cleanup())
     return this.disposePromise
   }
+}
+
+/** Optional collaborators for `StdioAcpClient`. */
+export interface StdioAcpClientOptions {
+  /** Called for every `session/request_permission` with the policy outcome.
+   * Defaults to a one-line `console.info` audit entry. */
+  onPermissionDecision?: (entry: PermissionAuditEntry) => void
+}
+
+export interface PermissionAuditEntry {
+  backend: AcpBackend
+  kind: string | undefined
+  title: string | undefined
+  decision: 'allow' | 'reject' | 'cancelled'
+  optionId?: string
+  /** Set when a normally allowed kind was refused (for example a path outside cwd). */
+  reason?: string
+}
+
+function logPermissionDecision(entry: PermissionAuditEntry): void {
+  const reason = entry.reason ? ` reason="${entry.reason}"` : ''
+  console.info(`[vellum:acp] permission backend=${entry.backend} kind=${entry.kind ?? 'unknown'} decision=${entry.decision}${reason}`)
+}
+
+function logSessionMode(backend: AcpBackend, initial: string, enforced: string): void {
+  console.info(`[vellum:acp] session mode backend=${backend} initial=${initial} enforced=${enforced}`)
+}
+
+/** Working directory for `session/new`. Callers pass the paper or data
+ * directory so adapters that sandbox to cwd see only paper content. With no
+ * cwd, a fresh private (0700) temp directory is created for this session and
+ * removed on dispose, never the app's own process cwd (the source checkout in
+ * development) and never the shared OS temp dir. */
+export function resolveSessionCwd(cwd: string | undefined): { cwd: string; ephemeral: boolean } {
+  if (cwd === undefined || cwd.trim() === '') {
+    return { cwd: mkdtempSync(join(tmpdir(), 'vellum-session-')), ephemeral: true }
+  }
+  return { cwd: isAbsolute(cwd) ? cwd : resolve(cwd), ephemeral: false }
 }
 
 /** Real ACP transport: spawns the backend's first-party adapter subprocess
@@ -607,11 +810,16 @@ export class StdioAcpClient implements AcpClient {
   constructor(
     private readonly spawnAdapter: SpawnAdapter = defaultSpawnAdapter,
     private readonly timeouts: StdioAcpClientTimeouts = {},
+    private readonly options: StdioAcpClientOptions = {},
   ) {}
 
-  async newSession(backend: AcpBackend): Promise<AcpSession> {
+  async newSession(backend: AcpBackend, sessionOptions: AcpSessionOptions = {}): Promise<AcpSession> {
+    const { cwd, ephemeral } = resolveSessionCwd(sessionOptions.cwd)
+    const removeEphemeralCwd = (): void => {
+      if (ephemeral) rmSync(cwd, { recursive: true, force: true })
+    }
     const command = ADAPTERS[backend].command
-    const child = this.spawnAdapter(backend)
+    const child = this.spawnAdapter(backend, { cwd })
     const tracker = describeChildFailure(child, command)
     const failure = childFailure(child, command, tracker)
     const handshakeMs = this.timeouts.handshakeMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS
@@ -620,20 +828,36 @@ export class StdioAcpClient implements AcpClient {
     // Set once the session below is created; sessionUpdate notifications
     // that arrive before then (shouldn't happen pre-handshake) are dropped.
     let session: StdioAcpSession | undefined
+    // Last mode the adapter announced through `current_mode_update`, which can
+    // arrive before `session` exists, so it is tracked here.
+    let announcedMode: string | undefined
 
     const toClient = (_agent: Agent): Client => ({
       sessionUpdate: (params: SessionNotification) => {
+        if (params.update.sessionUpdate === 'current_mode_update') {
+          announcedMode = params.update.currentModeId
+          // After the handshake the adapter must stay in the safe mode too:
+          // a later switch (auto, workspace-write, ...) would let it approve
+          // writes without asking this client, so kill the session.
+          const required = SAFE_SESSION_MODE[backend]
+          if (session && required !== undefined && announcedMode !== required) {
+            session.failUnsafe(`${command} switched to the '${announcedMode}' session mode instead of '${required}'; session terminated`)
+            return
+          }
+        }
         session?.route(params.sessionId, mapSessionUpdate(params.update))
       },
       requestPermission: (req: RequestPermissionRequest): RequestPermissionResponse => {
-        // Headless client, no UI wired yet (that's a later card). Auto-allow
-        // so the on-plan smoke test can complete unattended; auto-reject if
-        // the adapter offers no allow option. Revisit once the Ask panel
-        // wires a real permission prompt.
-        const allow = req.options.find((o) => o.kind === 'allow_once' || o.kind === 'allow_always')
-        return {
-          outcome: allow ? { outcome: 'selected', optionId: allow.optionId } : { outcome: 'cancelled' },
+        // No permission prompt UI exists yet and paper text is untrusted, so
+        // only read-only tool kinds are granted. See permission-policy.ts.
+        const decision = decidePermission(req, { cwd })
+        try {
+          const audit = this.options.onPermissionDecision ?? logPermissionDecision
+          audit({ backend, kind: decision.kind, title: decision.title, decision: decision.decision, optionId: decision.optionId, reason: decision.reason })
+        } catch {
+          // Audit logging must never change a permission outcome.
         }
+        return decision.response
       },
     })
 
@@ -661,10 +885,33 @@ export class StdioAcpClient implements AcpClient {
       ])
 
       const newSessionResult = await Promise.race([
-        connection.newSession({ cwd: process.cwd(), mcpServers: [] }),
+        connection.newSession({ cwd, mcpServers: [], ...(backend === 'claude' ? { _meta: buildClaudeSessionMeta() } : {}) }),
         failure,
         handshake.promise,
       ])
+      // Fail closed: a session that cannot be put in the ask-every-time mode
+      // would approve workspace writes without ever asking this client.
+      const safeMode = SAFE_SESSION_MODE[backend]
+      if (safeMode !== undefined) {
+        const modes = newSessionResult.modes
+        if (!modes || !modes.availableModes.some((mode) => mode.id === safeMode)) {
+          throw new UnsafeSessionError(`${command} does not offer the '${safeMode}' session mode; refusing to start an unrestricted session`)
+        }
+        if (modes.currentModeId !== safeMode) {
+          await Promise.race([
+            connection.setSessionMode({ sessionId: newSessionResult.sessionId, modeId: safeMode }).catch((modeError: unknown) => {
+              const detail = modeError instanceof Error ? modeError.message : String(modeError)
+              throw new UnsafeSessionError(`${command} could not enter the '${safeMode}' session mode (${detail}); refusing to start an unrestricted session`)
+            }),
+            failure,
+            handshake.promise,
+          ])
+        }
+        if (announcedMode !== undefined && announcedMode !== safeMode) {
+          throw new UnsafeSessionError(`${command} stayed in the '${announcedMode}' session mode instead of '${safeMode}'; refusing to start an unrestricted session`)
+        }
+        logSessionMode(backend, modes.currentModeId, safeMode)
+      }
       const model = backend === 'antigravity' ? antigravityModelOverride() : undefined
       if (model) {
         await Promise.race([
@@ -687,11 +934,21 @@ export class StdioAcpClient implements AcpClient {
         turnMs,
         tracker.message,
         embeddedContext,
+        readEmbeddableContext,
+        removeEphemeralCwd,
       )
+      const required = SAFE_SESSION_MODE[backend]
+      if (required !== undefined && announcedMode !== undefined && announcedMode !== required) {
+        session.failUnsafe(`${command} switched to the '${announcedMode}' session mode instead of '${required}'; session terminated`)
+      }
       return session
     } catch (err) {
       handshake.cancel()
-      await terminateAdapter(child)
+      try {
+        await terminateAdapter(child)
+      } finally {
+        removeEphemeralCwd()
+      }
       // Whether the transport's generic "connection closed" error or the
       // child's own exit/spawn diagnostic wins the race above is a timing
       // accident. `failure` settles once the child actually exits/errors
@@ -703,6 +960,8 @@ export class StdioAcpClient implements AcpClient {
       if (err instanceof Error && err.message.startsWith('ACP handshake timed out')) {
         throw err
       }
+      // Our own refusal is the diagnostic; the kill signal above is not.
+      if (err instanceof UnsafeSessionError) throw err
       const authError = describeSessionError(backend, err)
       if (authError) throw authError
       await failure.catch(() => undefined)

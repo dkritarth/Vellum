@@ -9,7 +9,7 @@
 //    on PATH. See core/acp/README.md for the separate *live* smoke test.
 
 import { spawn, spawnSync, type ChildProcessByStdio } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Readable, Writable } from 'node:stream'
@@ -21,12 +21,14 @@ import {
   StdioAcpClient,
   buildAdapterArgs,
   buildAdapterEnv,
+  CODEX_RESTRICTED_FEATURES,
   describeSessionError,
   mapSessionUpdate,
   readEmbeddableContext,
   resolveAdapterCommand,
   toPromptBlocks,
   type SpawnAdapter,
+  buildClaudeSessionMeta,
 } from './stdio-client.js'
 
 type AdapterChildProcess = ChildProcessByStdio<Writable, Readable, null>
@@ -40,6 +42,18 @@ const { spawn } = require('node:child_process')
 // argv[0] is the node binary; with \`node -e <script> <extra>\`, the first
 // extra arg lands at argv[1] (there is no "eval" placeholder entry).
 const mode = process.argv[1]
+// Session-mode behaviour of the double, chosen by a second argv entry:
+//   (default)       starts in 'auto', offers default/read-only/auto/plan
+//   start-safe      starts in 'default' (claude) already
+//   no-modes        session/new returns no \`modes\` field at all
+//   no-safe-mode    offers only auto and acceptEdits
+//   set-fails       session/set_mode answers with a JSON-RPC error
+//   drift-mid-turn  after a good handshake, session/prompt announces current_mode_update 'auto' and then stalls
+//   drift-idle      answers the first prompt, then announces current_mode_update 'auto' with no turn in flight
+//   set-ignored     session/set_mode succeeds but the agent announces it stayed in 'auto'
+const modeVariant = process.argv[2] || ''
+const setModeCalls = []
+let currentMode = modeVariant === 'start-safe' ? 'default' : 'auto'
 
 if (mode === 'exit-immediately') {
   process.exit(7)
@@ -56,9 +70,28 @@ function send(msg) {
   process.stdout.write(JSON.stringify(msg) + '\n')
 }
 
+let sessionCwd = null
+let sessionMeta = null
+const permissionReplies = new Map()
+let pendingPrompt = null
+function finishPermissionProbe() {
+  const summary = JSON.stringify({ cwd: sessionCwd, outcomes: Object.fromEntries(permissionReplies) })
+  send({
+    jsonrpc: '2.0',
+    method: 'session/update',
+    params: { sessionId: 'sess-1', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: summary } } },
+  })
+  send({ jsonrpc: '2.0', id: pendingPrompt, result: { stopReason: 'end_turn' } })
+}
+
 rl.on('line', (line) => {
   if (!line.trim()) return
   const msg = JSON.parse(line)
+  if (msg.method === undefined && typeof msg.id === 'string' && msg.id.startsWith('perm-')) {
+    permissionReplies.set(msg.id.slice(5), msg.result.outcome)
+    if (permissionReplies.size === 5) finishPermissionProbe()
+    return
+  }
   if (msg.method === 'initialize') {
     // 'stall-handshake' never answers initialize, simulating a hung adapter
     // before the handshake completes.
@@ -66,8 +99,80 @@ rl.on('line', (line) => {
     const agentCapabilities = mode.startsWith('embed') ? { promptCapabilities: { embeddedContext: true } } : {}
     send({ jsonrpc: '2.0', id: msg.id, result: { protocolVersion: 1, agentCapabilities } })
   } else if (msg.method === 'session/new') {
-    send({ jsonrpc: '2.0', id: msg.id, result: { sessionId: 'sess-1' } })
+    sessionCwd = msg.params.cwd
+    sessionMeta = msg.params._meta ?? null
+    const ids = modeVariant === 'no-safe-mode' ? ['auto', 'acceptEdits'] : ['default', 'read-only', 'auto', 'plan']
+    const result = { sessionId: 'sess-1' }
+    if (modeVariant !== 'no-modes') {
+      result.modes = { currentModeId: currentMode, availableModes: ids.map((id) => ({ id, name: id })) }
+    }
+    send({ jsonrpc: '2.0', id: msg.id, result })
+  } else if (msg.method === 'session/set_mode') {
+    setModeCalls.push(msg.params.modeId)
+    if (modeVariant === 'set-fails') {
+      send({ jsonrpc: '2.0', id: msg.id, error: { code: -32602, message: 'mode not settable' } })
+      return
+    }
+    if (modeVariant === 'set-ignored') {
+      send({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'sess-1', update: { sessionUpdate: 'current_mode_update', currentModeId: 'auto' } } })
+    } else {
+      currentMode = msg.params.modeId
+    }
+    send({ jsonrpc: '2.0', id: msg.id, result: {} })
   } else if (msg.method === 'session/prompt') {
+    if (modeVariant === 'drift-mid-turn') {
+      send({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'sess-1', update: { sessionUpdate: 'current_mode_update', currentModeId: 'auto' } } })
+      return
+    }
+    if (modeVariant === 'drift-idle') {
+      send({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'sess-1', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'ok' } } } })
+      send({ jsonrpc: '2.0', id: msg.id, result: { stopReason: 'end_turn' } })
+      send({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'sess-1', update: { sessionUpdate: 'current_mode_update', currentModeId: 'auto' } } })
+      return
+    }
+    // 'modes-probe' reports what the client did to this session.
+    if (mode === 'modes-probe') {
+      const summary = JSON.stringify({
+        cwd: sessionCwd,
+        meta: sessionMeta,
+        processCwd: process.cwd(),
+        currentMode,
+        setModeCalls,
+        env: { INITIAL_AGENT_MODE: process.env.INITIAL_AGENT_MODE ?? null, CODEX_CONFIG: process.env.CODEX_CONFIG ?? null },
+      })
+      send({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'sess-1', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: summary } } } })
+      send({ jsonrpc: '2.0', id: msg.id, result: { stopReason: 'end_turn' } })
+      return
+    }
+    // 'permission-probe' asks for permission on five tool kinds, then reports
+    // the outcomes it received together with the cwd given to session/new.
+    if (mode === 'permission-probe') {
+      pendingPrompt = msg.id
+      const options = [
+        { optionId: 'allow', name: 'Allow', kind: 'allow_once' },
+        { optionId: 'reject', name: 'Reject', kind: 'reject_once' },
+      ]
+      for (const kind of ['read', 'search', 'execute', 'edit', 'fetch']) {
+        send({
+          jsonrpc: '2.0',
+          id: 'perm-' + kind,
+          method: 'session/request_permission',
+          params: {
+            sessionId: 'sess-1',
+            toolCall: {
+              toolCallId: 't-' + kind,
+              title: kind,
+              kind,
+              // read/search are scoped to the session cwd, so they name a path inside it.
+              ...(kind === 'read' ? { locations: [{ path: sessionCwd + '/paper.md' }] } : {}),
+              ...(kind === 'search' ? { rawInput: { pattern: 'attention', path: sessionCwd } } : {}),
+            },
+            options,
+          },
+        })
+      }
+      return
+    }
     // 'slow-stream' answers with chunks spaced 30ms apart (total ~180ms) so
     // a test can set an idle budget well under the total turn duration:
     // every gap stays under the idle bound while the total exceeds it.
@@ -149,11 +254,13 @@ rl.on('line', (line) => {
 })
 `
 
-function spawnFakeAgent(mode: string): SpawnAdapter {
-  return (_backend: AcpBackend): AdapterChildProcess =>
-    spawn(process.execPath, ['-e', FAKE_AGENT_SCRIPT, mode], {
+function spawnFakeAgent(mode: string, variant = '', useAdapterEnv = false): SpawnAdapter {
+  return (backend: AcpBackend, spawnOptions?: { cwd?: string }): AdapterChildProcess =>
+    spawn(process.execPath, ['-e', FAKE_AGENT_SCRIPT, mode, variant], {
       stdio: ['pipe', 'pipe', 'inherit'],
+      ...(spawnOptions?.cwd !== undefined ? { cwd: spawnOptions.cwd } : {}),
       detached: process.platform !== 'win32',
+      ...(useAdapterEnv ? { env: buildAdapterEnv(process.env, backend) } : {}),
     }) as AdapterChildProcess
 }
 
@@ -206,6 +313,245 @@ describe('mapSessionUpdate', () => {
   it('falls back to tool_result for update kinds with no dedicated AcpUpdate kind', () => {
     const raw = { sessionUpdate: 'plan', entries: [] }
     expect(mapSessionUpdate(raw as never)).toEqual({ kind: 'tool_result', data: raw })
+  })
+})
+
+describe('StdioAcpClient permission policy and cwd', () => {
+  async function probe(client: StdioAcpClient, cwd?: string): Promise<{ cwd: string; outcomes: Record<string, { outcome: string; optionId?: string }> }> {
+    const session = await client.newSession('codex', cwd === undefined ? undefined : { cwd })
+    try {
+      const updates = await collect(session.prompt({ text: 'probe' }))
+      const text = updates.filter((u) => u.kind === 'text').map((u) => (u.data as { text: string }).text).join('')
+      return JSON.parse(text)
+    } finally {
+      await session.dispose()
+    }
+  }
+
+  it('grants read-only tool kinds and rejects edit, execute and fetch', async () => {
+    const log: Array<{ kind: string | undefined; decision: string }> = []
+    const client = new StdioAcpClient(spawnFakeAgent('permission-probe'), {}, {
+      onPermissionDecision: (entry) => log.push({ kind: entry.kind, decision: entry.decision }),
+    })
+    const result = await probe(client)
+    expect(result.outcomes).toEqual({
+      read: { outcome: 'selected', optionId: 'allow' },
+      search: { outcome: 'selected', optionId: 'allow' },
+      execute: { outcome: 'selected', optionId: 'reject' },
+      edit: { outcome: 'selected', optionId: 'reject' },
+      fetch: { outcome: 'selected', optionId: 'reject' },
+    })
+    expect(log.map((entry) => `${entry.kind}:${entry.decision}`).sort()).toEqual([
+      'edit:reject', 'execute:reject', 'fetch:reject', 'read:allow', 'search:allow',
+    ])
+  })
+
+  it('passes the requested cwd to session/new', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vellum-cwd-'))
+    try {
+      const result = await probe(new StdioAcpClient(spawnFakeAgent('permission-probe'), {}, { onPermissionDecision: () => {} }), dir)
+      expect(result.cwd).toBe(dir)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('uses a private per-session temp dir when no cwd is given, and removes it on dispose', async () => {
+    const client = new StdioAcpClient(spawnFakeAgent('modes-probe'), {}, { onPermissionDecision: () => {} })
+    const session = await client.newSession('codex')
+    const updates = await collect(session.prompt({ text: 'probe' }))
+    const { cwd } = JSON.parse(updates.filter((u) => u.kind === 'text').map((u) => (u.data as { text: string }).text).join(''))
+    expect(cwd).not.toBe(process.cwd())
+    expect(cwd).not.toBe(tmpdir())
+    expect(cwd.startsWith(join(tmpdir(), 'vellum-session-'))).toBe(true)
+    expect(statSync(cwd).mode & 0o777).toBe(0o700)
+    await session.dispose()
+    expect(existsSync(cwd)).toBe(false)
+  })
+
+  it('removes the private temp dir when the handshake fails', async () => {
+    const before = new Set(readdirSync(tmpdir()).filter((name) => name.startsWith('vellum-session-')))
+    const client = new StdioAcpClient(spawnFakeAgent('exit-immediately'), {}, { onPermissionDecision: () => {} })
+    await expect(client.newSession('claude')).rejects.toThrow()
+    const leaked = readdirSync(tmpdir()).filter((name) => name.startsWith('vellum-session-') && !before.has(name))
+    expect(leaked).toEqual([])
+  })
+})
+
+describe('StdioAcpClient session mode enforcement', () => {
+  interface ModesReport {
+    currentMode: string
+    cwd: string
+    processCwd: string
+    meta: { claudeCode?: { options?: { settingSources?: string[] } } } | null
+    setModeCalls: string[]
+    env: { INITIAL_AGENT_MODE: string | null; CODEX_CONFIG: string | null }
+  }
+  async function modes(backend: AcpBackend, variant = '', useAdapterEnv = false): Promise<ModesReport> {
+    const client = new StdioAcpClient(spawnFakeAgent('modes-probe', variant, useAdapterEnv), {}, { onPermissionDecision: () => {} })
+    const session = await client.newSession(backend, { cwd: tmpdir() })
+    try {
+      const updates = await collect(session.prompt({ text: 'probe' }))
+      return JSON.parse(updates.filter((u) => u.kind === 'text').map((u) => (u.data as { text: string }).text).join(''))
+    } finally {
+      await session.dispose()
+    }
+  }
+
+  it('moves a Claude session out of auto into default with session/set_mode', async () => {
+    const report = await modes('claude')
+    expect(report.setModeCalls).toEqual(['default'])
+    expect(report.currentMode).toBe('default')
+  })
+
+  it('moves a Codex session into read-only with session/set_mode', async () => {
+    const report = await modes('codex')
+    expect(report.setModeCalls).toEqual(['read-only'])
+    expect(report.currentMode).toBe('read-only')
+  })
+
+  it('does not call set_mode when the session already starts in the safe mode', async () => {
+    expect((await modes('claude', 'start-safe')).setModeCalls).toEqual([])
+  })
+
+  it('starts the Codex adapter with INITIAL_AGENT_MODE=read-only and web search disabled', async () => {
+    const report = await modes('codex', '', true)
+    expect(report.env.INITIAL_AGENT_MODE).toBe('read-only')
+    expect(JSON.parse(report.env.CODEX_CONFIG ?? '{}')).toMatchObject({ web_search: 'disabled', features: { ...CODEX_RESTRICTED_FEATURES } })
+  })
+
+  it('disables Claude settings sources through session/new _meta and forwards only auth/model keys', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vellum-claude-cfg-test-'))
+    const previous = process.env.CLAUDE_CONFIG_DIR
+    writeFileSync(join(dir, 'settings.json'), JSON.stringify({
+      apiKeyHelper: '/bin/helper', env: { ANTHROPIC_BASE_URL: 'https://gw' }, model: 'm',
+      permissions: { allow: ['Read(//**)', 'Bash(*)'], defaultMode: 'bypassPermissions' }, hooks: { Stop: [] }, enabledPlugins: { p: true }, mcpServers: { x: {} },
+    }))
+    process.env.CLAUDE_CONFIG_DIR = dir
+    try {
+      const report = await modes('claude')
+      expect(report.meta).toEqual({ claudeCode: { options: { settingSources: [], settings: { apiKeyHelper: '/bin/helper', env: { ANTHROPIC_BASE_URL: 'https://gw' }, model: 'm' } } } })
+    } finally {
+      if (previous === undefined) delete process.env.CLAUDE_CONFIG_DIR
+      else process.env.CLAUDE_CONFIG_DIR = previous
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('buildClaudeSessionMeta never forwards permission rules and tolerates a missing or invalid settings file', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vellum-claude-cfg-test-'))
+    try {
+      expect(buildClaudeSessionMeta({ CLAUDE_CONFIG_DIR: dir })).toEqual({ claudeCode: { options: { settingSources: [] } } })
+      writeFileSync(join(dir, 'settings.json'), '{not json')
+      expect(buildClaudeSessionMeta({ CLAUDE_CONFIG_DIR: dir })).toEqual({ claudeCode: { options: { settingSources: [] } } })
+      writeFileSync(join(dir, 'settings.json'), JSON.stringify({ permissions: { allow: ['Bash'] }, theme: 'dark' }))
+      expect(buildClaudeSessionMeta({ CLAUDE_CONFIG_DIR: dir })).toEqual({ claudeCode: { options: { settingSources: [] } } })
+      writeFileSync(join(dir, 'settings.json'), '[1]')
+      expect(buildClaudeSessionMeta({ CLAUDE_CONFIG_DIR: dir })).toEqual({ claudeCode: { options: { settingSources: [] } } })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('buildClaudeSessionMeta strips permission-changing keys from forwarded settings env', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vellum-claude-cfg-test-'))
+    try {
+      writeFileSync(join(dir, 'settings.json'), JSON.stringify({
+        env: {
+          ANTHROPIC_BASE_URL: 'https://gw',
+          CLAUDE_CODE_EVEN_MORE_DANGEROUSLY_SKIP_PERMISSIONS: '1',
+          claude_chrome_permission_mode: 'skip_all_permission_checks',
+          CLAUDE_BG_SESSION_PERMISSION_RULES: '[]',
+          IS_SANDBOX: '1',
+          SOME_BYPASS_FLAG: '1',
+        },
+      }))
+      expect(buildClaudeSessionMeta({ CLAUDE_CONFIG_DIR: dir })).toEqual({
+        claudeCode: { options: { settingSources: [], settings: { env: { ANTHROPIC_BASE_URL: 'https://gw' } } } },
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('sends no Claude _meta to Codex or Antigravity', async () => {
+    expect((await modes('codex')).meta).toBeNull()
+    expect((await modes('antigravity')).meta).toBeNull()
+  })
+
+  it('spawns the adapter process in the session cwd', async () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'vellum-spawn-cwd-')))
+    try {
+      const client = new StdioAcpClient(spawnFakeAgent('modes-probe'), {}, { onPermissionDecision: () => {} })
+      const session = await client.newSession('codex', { cwd: dir })
+      const updates = await collect(session.prompt({ text: 'probe' }))
+      await session.dispose()
+      const report = JSON.parse(updates.filter((u) => u.kind === 'text').map((u) => (u.data as { text: string }).text).join(''))
+      expect(report.cwd).toBe(dir)
+      expect(report.processCwd).toBe(dir)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('does not touch the mode of an Antigravity session', async () => {
+    expect((await modes('antigravity')).setModeCalls).toEqual([])
+  })
+
+  it.each([
+    ['no modes announced', 'no-modes', /does not offer the 'default' session mode/],
+    ['safe mode not offered', 'no-safe-mode', /does not offer the 'default' session mode/],
+    ['set_mode rejected', 'set-fails', /could not enter the 'default' session mode \(mode not settable\)/],
+    ['agent stays in auto after set_mode', 'set-ignored', /stayed in the 'auto' session mode/],
+  ])('fails closed and kills the adapter when %s', async (_name, variant, message) => {
+    const children: AdapterChildProcess[] = []
+    const spawnTracked: SpawnAdapter = (backend) => {
+      const child = spawnFakeAgent('modes-probe', variant)(backend)
+      children.push(child)
+      return child
+    }
+    const client = new StdioAcpClient(spawnTracked, {}, { onPermissionDecision: () => {} })
+    await expect(client.newSession('claude', { cwd: tmpdir() })).rejects.toThrow(message)
+    expect(children).toHaveLength(1)
+    expect(children[0].exitCode !== null || children[0].signalCode !== null).toBe(true)
+  })
+})
+
+describe('mode drift after the handshake', () => {
+  function tracked(variant: string): { client: StdioAcpClient; children: AdapterChildProcess[] } {
+    const children: AdapterChildProcess[] = []
+    const spawnTracked: SpawnAdapter = (backend) => {
+      const child = spawnFakeAgent('modes-probe', variant)(backend)
+      children.push(child)
+      return child
+    }
+    return { client: new StdioAcpClient(spawnTracked, {}, { onPermissionDecision: () => {} }), children }
+  }
+  const exited = async (child: AdapterChildProcess): Promise<boolean> => {
+    for (let i = 0; i < 50 && child.exitCode === null && child.signalCode === null; i++) await new Promise((r) => setTimeout(r, 100))
+    return child.exitCode !== null || child.signalCode !== null
+  }
+
+  it('fails the in-flight turn, kills the adapter and fails later prompts when it leaves the safe mode', async () => {
+    const { client, children } = tracked('drift-mid-turn')
+    const session = await client.newSession('claude', { cwd: tmpdir() })
+    const updates = await collect(session.prompt({ text: 'hi' }))
+    expect(updates[0]).toMatchObject({ kind: 'error', data: { message: expect.stringMatching(/switched to the 'auto' session mode instead of 'default'/) } })
+    expect(await exited(children[0]!)).toBe(true)
+    const later = await collect(session.prompt({ text: 'again' }))
+    expect(later[0]).toMatchObject({ kind: 'error', data: { message: expect.stringMatching(/switched to the 'auto'/) } })
+    await session.dispose()
+  })
+
+  it('also catches a drift announced while no turn is in flight', async () => {
+    const { client, children } = tracked('drift-idle')
+    const session = await client.newSession('claude', { cwd: tmpdir() })
+    const first = await collect(session.prompt({ text: 'hi' }))
+    expect(first.at(-1)).toMatchObject({ kind: 'done' })
+    expect(await exited(children[0]!)).toBe(true)
+    const second = await collect(session.prompt({ text: 'again' }))
+    expect(second[0]).toMatchObject({ kind: 'error', data: { message: expect.stringMatching(/switched to the 'auto'/) } })
+    await session.dispose()
   })
 })
 
@@ -473,6 +819,11 @@ describe('paper context embedding (#101)', () => {
 })
 
 describe('buildAdapterEnv', () => {
+  it.each(['shell_tool','unified_exec','view_image','apps','browser_use','browser_use_external','browser_use_full_cdp_access','computer_use','in_app_browser','image_generation','plugins','remote_plugin','plugin_sharing','tool_suggest','hooks','multi_agent','multi_agent_v2'])('forces Codex feature %s off even when the user config enables it', (feature) => {
+    const env = buildAdapterEnv({ CODEX_CONFIG: JSON.stringify({ features: { [feature]: true } }) }, 'codex')
+    expect(JSON.parse(env.CODEX_CONFIG ?? '').features[feature]).toBe(false)
+  })
+
   it('delivers a trimmed Codex model and existing config to a real subprocess without mutating source', () => {
     const sourceEnv = Object.freeze({
       VELLUM_CODEX_MODEL: '  model "quoted" \n name  ',
@@ -487,6 +838,8 @@ describe('buildAdapterEnv', () => {
       model: 'model "quoted" \n name',
       service_tier: 'default',
       nested: { keep: true },
+      web_search: 'disabled',
+      features: { ...CODEX_RESTRICTED_FEATURES },
     })
     expect(sourceEnv.CODEX_CONFIG).toBe('{"model":"old","service_tier":"default","nested":{"keep":true}}')
   })
@@ -495,15 +848,33 @@ describe('buildAdapterEnv', () => {
     const sourceEnv = Object.freeze({ VELLUM_CODEX_MODEL: '  gpt-6.1-sol  ' })
     expect(buildAdapterEnv(sourceEnv, 'codex')).toEqual({
       ...sourceEnv,
-      CODEX_CONFIG: '{"model":"gpt-6.1-sol"}',
+      CODEX_CONFIG: `{"model":"gpt-6.1-sol","web_search":"disabled","features":${JSON.stringify(CODEX_RESTRICTED_FEATURES)}}`,
+      INITIAL_AGENT_MODE: 'read-only',
     })
     expect(sourceEnv).not.toHaveProperty('CODEX_CONFIG')
   })
 
-  it.each([undefined, '', ' \n '])('preserves raw config with no override (%j)', (model) => {
-    const sourceEnv = { VELLUM_CODEX_MODEL: model, CODEX_CONFIG: 'invalid but untouched' }
-    expect(buildAdapterEnv(sourceEnv, 'codex')).toEqual(sourceEnv)
+  it.each([undefined, '', ' \n '])('adds only Vellum session limits to Codex config with no model override (%j)', (model) => {
+    const sourceEnv = { VELLUM_CODEX_MODEL: model, CODEX_CONFIG: '{"service_tier":"default"}' }
+    const env = buildAdapterEnv(sourceEnv, 'codex')
+    expect(JSON.parse(env.CODEX_CONFIG ?? '')).toEqual({ service_tier: 'default', web_search: 'disabled', features: { ...CODEX_RESTRICTED_FEATURES } })
+    expect(env.INITIAL_AGENT_MODE).toBe('read-only')
     expect(buildAdapterArgs('codex', sourceEnv)).toEqual([])
+  })
+
+  it('forces web search off and read-only mode over contrary user settings', () => {
+    const env = buildAdapterEnv(
+      { INITIAL_AGENT_MODE: 'agent-full-access', CODEX_CONFIG: '{"web_search":"live","model":"m","features":{"apps":true,"keep":true}}' },
+      'codex',
+    )
+    expect(env.INITIAL_AGENT_MODE).toBe('read-only')
+    expect(JSON.parse(env.CODEX_CONFIG ?? '')).toEqual({ model: 'm', web_search: 'disabled', features: { ...CODEX_RESTRICTED_FEATURES, keep: true } })
+  })
+
+  it('rejects invalid config without a model override using a fixed message', () => {
+    expect(() => buildAdapterEnv({ CODEX_CONFIG: '{"secret":"do-not-echo"' }, 'codex')).toThrow(
+      'Cannot apply Vellum Codex session limits: CODEX_CONFIG must be a JSON object',
+    )
   })
 
   it.each(['{"secret":"do-not-echo"', 'null', '[]', '"do-not-echo"', '42', 'true', ''])(
@@ -530,6 +901,25 @@ describe('buildAdapterEnv', () => {
     const sourceEnv = Object.freeze({ VELLUM_CODEX_MODEL: 'gpt-6.1-sol', CODEX_CONFIG: 'invalid' })
     expect(buildAdapterEnv(sourceEnv, 'claude')).toEqual(sourceEnv)
     expect(buildAdapterArgs('claude', sourceEnv)).toEqual([])
+  })
+
+  it.each(['claude', 'codex', undefined] as const)('strips permission-changing env vars from the %s adapter env', (backend) => {
+    const env = buildAdapterEnv(
+      {
+        PATH: '/usr/bin',
+        CLAUDE_CODE_EVEN_MORE_DANGEROUSLY_SKIP_PERMISSIONS: '1',
+        CLAUDE_CHROME_PERMISSION_MODE: 'skip_all_permission_checks',
+        IS_SANDBOX: '1',
+        MY_BYPASS: '1',
+        DANGEROUS_THING: '1',
+        SKIP_PERMS: '1',
+      },
+      backend,
+    )
+    expect(env.PATH).toBe('/usr/bin')
+    for (const key of ['CLAUDE_CODE_EVEN_MORE_DANGEROUSLY_SKIP_PERMISSIONS', 'CLAUDE_CHROME_PERMISSION_MODE', 'IS_SANDBOX', 'MY_BYPASS', 'DANGEROUS_THING', 'SKIP_PERMS']) {
+      expect(env, key).not.toHaveProperty(key)
+    }
   })
 
   it('strips CLAUDECODE and CLAUDE_CODE_SSE_PORT from the adapter child env', () => {
@@ -581,7 +971,10 @@ describe('antigravity backend', () => {
   it('strips raw Anthropic and OpenAI API keys for every backend', () => {
     const keys = { ANTHROPIC_API_KEY: 'a', ANTHROPIC_AUTH_TOKEN: 't', OPENAI_API_KEY: 'o', CODEX_API_KEY: 'c' }
     for (const backend of ['claude', 'codex', 'antigravity'] as const) {
-      expect(buildAdapterEnv({ PATH: '/usr/bin', ...keys }, backend)).toEqual({ PATH: '/usr/bin' })
+      const env = buildAdapterEnv({ PATH: '/usr/bin', ...keys }, backend)
+      expect(env).not.toHaveProperty('ANTHROPIC_API_KEY')
+      expect(env).not.toHaveProperty('OPENAI_API_KEY')
+      expect(env.PATH).toBe('/usr/bin')
     }
   })
 
@@ -591,7 +984,7 @@ describe('antigravity backend', () => {
   })
 
   it('leaves Google env alone for other backends', () => {
-    expect(buildAdapterEnv({ GEMINI_API_KEY: 'k' }, 'codex')).toEqual({ GEMINI_API_KEY: 'k' })
+    expect(buildAdapterEnv({ GEMINI_API_KEY: 'k' }, 'codex')).toMatchObject({ GEMINI_API_KEY: 'k' })
   })
 
   it('resolves agy from VELLUM_AGY_PATH, then PATH, then ~/.local/bin', () => {

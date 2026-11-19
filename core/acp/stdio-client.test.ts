@@ -452,6 +452,27 @@ describe('StdioAcpClient session mode enforcement', () => {
     }
   })
 
+  it('buildClaudeSessionMeta strips permission-changing keys from forwarded settings env', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vellum-claude-cfg-test-'))
+    try {
+      writeFileSync(join(dir, 'settings.json'), JSON.stringify({
+        env: {
+          ANTHROPIC_BASE_URL: 'https://gw',
+          CLAUDE_CODE_EVEN_MORE_DANGEROUSLY_SKIP_PERMISSIONS: '1',
+          claude_chrome_permission_mode: 'skip_all_permission_checks',
+          CLAUDE_BG_SESSION_PERMISSION_RULES: '[]',
+          IS_SANDBOX: '1',
+          SOME_BYPASS_FLAG: '1',
+        },
+      }))
+      expect(buildClaudeSessionMeta({ CLAUDE_CONFIG_DIR: dir })).toEqual({
+        claudeCode: { options: { settingSources: [], settings: { env: { ANTHROPIC_BASE_URL: 'https://gw' } } } },
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('sends no Claude _meta to Codex or Antigravity', async () => {
     expect((await modes('codex')).meta).toBeNull()
     expect((await modes('antigravity')).meta).toBeNull()
@@ -874,6 +895,25 @@ describe('buildAdapterEnv', () => {
     const sourceEnv = Object.freeze({ VELLUM_CODEX_MODEL: 'gpt-6.1-sol', CODEX_CONFIG: 'invalid' })
     expect(buildAdapterEnv(sourceEnv, 'claude')).toEqual(sourceEnv)
     expect(buildAdapterArgs('claude', sourceEnv)).toEqual([])
+  })
+
+  it.each(['claude', 'codex', undefined] as const)('strips permission-changing env vars from the %s adapter env', (backend) => {
+    const env = buildAdapterEnv(
+      {
+        PATH: '/usr/bin',
+        CLAUDE_CODE_EVEN_MORE_DANGEROUSLY_SKIP_PERMISSIONS: '1',
+        CLAUDE_CHROME_PERMISSION_MODE: 'skip_all_permission_checks',
+        IS_SANDBOX: '1',
+        MY_BYPASS: '1',
+        DANGEROUS_THING: '1',
+        SKIP_PERMS: '1',
+      },
+      backend,
+    )
+    expect(env.PATH).toBe('/usr/bin')
+    for (const key of ['CLAUDE_CODE_EVEN_MORE_DANGEROUSLY_SKIP_PERMISSIONS', 'CLAUDE_CHROME_PERMISSION_MODE', 'IS_SANDBOX', 'MY_BYPASS', 'DANGEROUS_THING', 'SKIP_PERMS']) {
+      expect(env, key).not.toHaveProperty(key)
+    }
   })
 
   it('strips CLAUDECODE and CLAUDE_CODE_SSE_PORT from the adapter child env', () => {

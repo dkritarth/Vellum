@@ -157,6 +157,9 @@ export function buildAdapterEnv(
   // No raw API-key path for any backend: a key left in the user's shell must
   // never take precedence over the signed-in subscription CLI.
   for (const key of RAW_API_KEY_ENV) delete rest[key]
+  // Env that turns off or loosens permission checks must not reach the adapter
+  // (e.g. CLAUDE_CODE_EVEN_MORE_DANGEROUSLY_SKIP_PERMISSIONS).
+  for (const key of Object.keys(rest)) if (PERMISSION_ENV_PATTERN.test(key)) delete rest[key]
   if (backend === 'antigravity') {
     // Same rule as the other backends: auth comes from the signed-in CLI,
     // never from a raw API key or cloud credential sitting in the env.
@@ -235,7 +238,14 @@ export function buildClaudeSessionMeta(sourceEnv: NodeJS.ProcessEnv = process.en
     if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
       const settings: Record<string, unknown> = {}
       for (const key of CLAUDE_FORWARDED_SETTING_KEYS) {
-        if ((parsed as Record<string, unknown>)[key] !== undefined) settings[key] = (parsed as Record<string, unknown>)[key]
+        const value = (parsed as Record<string, unknown>)[key]
+        if (value === undefined) continue
+        if (key === 'env' && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          const env = Object.fromEntries(Object.entries(value).filter(([name]) => !PERMISSION_ENV_PATTERN.test(name)))
+          if (Object.keys(env).length > 0) settings.env = env
+        } else if (key !== 'env') {
+          settings[key] = value
+        }
       }
       if (Object.keys(settings).length > 0) options.settings = settings
     }
@@ -244,6 +254,12 @@ export function buildClaudeSessionMeta(sourceEnv: NodeJS.ProcessEnv = process.en
   }
   return { claudeCode: { options } }
 }
+
+/** Env var names that change or skip the permission mode. Found in the claude
+ * binary: CLAUDE_CODE_EVEN_MORE_DANGEROUSLY_SKIP_PERMISSIONS,
+ * CLAUDE_CHROME_PERMISSION_MODE, CLAUDE_BG_SESSION_PERMISSION_RULES,
+ * CLAUDE_CODE_AUTO_MODE_EXTERNAL_PERMISSIONS; IS_SANDBOX lets bypass mode run as root. */
+const PERMISSION_ENV_PATTERN = /PERMISSION|BYPASS|DANGEROUS|SKIP_PERM|^IS_SANDBOX$/i
 
 const RAW_API_KEY_ENV = ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'OPENAI_API_KEY', 'CODEX_API_KEY']
 

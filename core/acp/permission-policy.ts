@@ -77,6 +77,23 @@ function nonEmptyString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() !== '' ? value : undefined
 }
 
+/** Keys only Claude's Grep tool takes; their presence marks `pattern` as a regex. */
+const GREP_ONLY_KEYS = ['output_mode', 'head_limit', 'multiline', '-i', '-n', '-A', '-B', '-C']
+
+/** True when `pattern` is a regex, not a glob. Claude's Grep reports the
+ * title `grep …` and takes `pattern` (regex) plus an optional `glob` file
+ * filter; Glob reports `Find …` and takes `pattern` as a glob. A regex cannot
+ * name a path, so only globs need the escape check. */
+function patternIsRegex(req: RequestPermissionRequest, input: Record<string, unknown>): boolean {
+  const title = (req.toolCall as { title?: unknown } | undefined)?.title
+  if (typeof title === 'string' && /^grep\b/.test(title)) return true
+  return GREP_ONLY_KEYS.some((key) => input[key] !== undefined)
+}
+
+function globEscapes(value: string): boolean {
+  return isAbsolute(value) || value.startsWith('~') || value.includes('..') || GLOB_DOT_CLASS.test(value) || hasLeadingDotWildcard(value)
+}
+
 /** Every filesystem target the request names. */
 function collectTargets(req: RequestPermissionRequest): string[] {
   const targets: string[] = []
@@ -100,10 +117,12 @@ function collectTargets(req: RequestPermissionRequest): string[] {
         if (value) targets.push(value)
       }
     }
+    const regex = patternIsRegex(req, input)
     for (const key of GLOB_KEYS) {
+      if (key === 'pattern' && regex) continue
       // A glob only needs checking when it can leave the search root.
       const value = nonEmptyString(input[key])
-      if (value && (isAbsolute(value) || value.startsWith('~') || value.includes('..') || GLOB_DOT_CLASS.test(value) || hasLeadingDotWildcard(value))) targets.push(value)
+      if (value && globEscapes(value)) targets.push(value)
     }
   }
   return targets
@@ -112,24 +131,63 @@ function collectTargets(req: RequestPermissionRequest): string[] {
 const MAX_LOOSE_STRINGS = 500
 const MAX_LOOSE_DEPTH = 8
 
-/** Every string anywhere in `rawInput`, under any key, bounded in depth and count. */
-function collectStrings(value: unknown, out: string[], depth = 0): void {
-  if (out.length >= MAX_LOOSE_STRINGS || depth > MAX_LOOSE_DEPTH) return
-  if (typeof value === 'string') out.push(value)
-  else if (Array.isArray(value)) for (const item of value) collectStrings(item, out, depth + 1)
-  else if (typeof value === 'object' && value !== null) for (const item of Object.values(value)) collectStrings(item, out, depth + 1)
+interface StringScan {
+  strings: string[]
+  /** A bound was hit, so strings were left unexamined. */
+  truncated: boolean
 }
 
-/** True when a string, or any whitespace-separated token of it, looks like a
- * path or URL that leaves the session directory. Applied to every rawInput
- * value so a key the allow-list does not know (`source`, `target`, ...) cannot
- * smuggle a path past the scoping. */
+/** Strings in `rawInput` under keys the allow-lists do not already vet, bounded
+ * in depth and count. Hitting a bound sets `truncated` so the caller fails closed. */
+function collectStrings(value: unknown, scan: StringScan, depth = 0): void {
+  if (typeof value === 'string') {
+    if (scan.strings.length >= MAX_LOOSE_STRINGS) scan.truncated = true
+    else scan.strings.push(value)
+    return
+  }
+  if (typeof value !== 'object' || value === null) return
+  if (depth >= MAX_LOOSE_DEPTH) {
+    scan.truncated = true
+    return
+  }
+  for (const item of Array.isArray(value) ? value : Object.values(value)) collectStrings(item, scan, depth + 1)
+}
+
+/** Top-level keys already vetted precisely (path keys) or that hold regex or
+ * glob text (`pattern`, `glob`; globs are checked by `collectTargets`). */
+const VETTED_KEYS: ReadonlySet<string> = new Set([...PATH_KEYS, ...PATH_LIST_KEYS, ...GLOB_KEYS])
+
+function scanLooseStrings(rawInput: unknown): StringScan {
+  const scan: StringScan = { strings: [], truncated: false }
+  const input = asRecord(rawInput)
+  if (!input) {
+    collectStrings(rawInput, scan)
+    return scan
+  }
+  for (const [key, value] of Object.entries(input)) {
+    if (VETTED_KEYS.has(key) && (typeof value === 'string' || (Array.isArray(value) && value.every((item) => typeof item === 'string')))) continue
+    collectStrings(value, scan, 1)
+  }
+  return scan
+}
+
+/** Delimiters that can sit between prose and a path: whitespace, commas,
+ * semicolons, quotes, brackets, `=`, `|`, `&`, `<`, `>`. */
+const TOKEN_DELIMITERS = /[\s,;"'`()[\]{}<>=|&]+/
+/** A `~` that names a home directory (`~`, `~/x`, `~user/x`), not `~5%`. */
+const HOME_TOKEN = /^~([\\/]|$|[A-Za-z_][\w.-]*([\\/]|$))/
+
+/** True when a string, or any delimiter-separated token of it, is an absolute
+ * path, home path, URL or `..` path that leaves the session directory. Prose
+ * (`e.g. ~5%`, `3.2/4`, `so..`) is left alone. Applied to keys the policy does
+ * not know (`source`, `note`, ...) so they cannot smuggle a path past the scoping. */
 function looseValueEscapes(value: string, cwd: string): boolean {
-  const candidates = [value, ...value.split(/\s+/)]
-  return candidates.some((candidate) => {
+  // A second split on `:` catches `key:/etc/passwd` without breaking `https://`.
+  const tokens = value.split(TOKEN_DELIMITERS).flatMap((token) => [token, ...token.split(':')])
+  return [value, ...tokens].some((candidate) => {
     if (candidate === '') return false
-    if (candidate.split(/[\\/]/).includes('..')) return true
-    if (candidate.startsWith('~') || /^file:/i.test(candidate) || /^[a-z][a-z0-9+.-]*:\/\//i.test(candidate) || isAbsolute(candidate)) {
+    if (candidate.split(/[\\/]/).includes('..') && (/[\\/]/.test(candidate) || candidate === value)) return true
+    if (HOME_TOKEN.test(candidate) || /^file:/i.test(candidate) || /^[a-z][a-z0-9+.-]*:\/\//i.test(candidate) || isAbsolute(candidate)) {
       return !isInsideDirectory(candidate, cwd)
     }
     return false
@@ -216,13 +274,17 @@ function scopeViolation(kind: string, req: RequestPermissionRequest, cwd: string
   const targets = collectTargets(req)
   const outside = targets.find((target) => !isInsideDirectory(target, cwd))
   if (outside !== undefined) return 'path outside the session directory'
-  const strings: string[] = []
-  collectStrings((req.toolCall as { rawInput?: unknown } | undefined)?.rawInput, strings)
-  if (strings.some((value) => looseValueEscapes(value, cwd))) return 'path outside the session directory'
+  const scan = scanLooseStrings((req.toolCall as { rawInput?: unknown } | undefined)?.rawInput)
+  if (scan.truncated) return 'scan truncated'
+  if (scan.strings.some((value) => looseValueEscapes(value, cwd))) return 'path outside the session directory'
   if (kind === 'read' && targets.length === 0) return 'no path determinable for read'
   if (kind === 'search' && targets.length === 0) {
-    // Default-deny: a search must name a path inside the session directory.
-    return looksRemote(req) ? 'search without a local path (web search)' : 'search names no path inside the session directory'
+    // Grep and Glob default their root to the session cwd, so a pattern with no
+    // path searches inside it (an escaping glob already failed above). Anything
+    // else must name a local path.
+    if (looksRemote(req)) return 'search without a local path (web search)'
+    const input = asRecord((req.toolCall as { rawInput?: unknown } | undefined)?.rawInput)
+    if (typeof input?.pattern !== 'string' || input.pattern === '') return 'search names no path inside the session directory'
   }
   return undefined
 }

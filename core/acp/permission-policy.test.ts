@@ -163,7 +163,7 @@ describe('decidePermission', () => {
     })
 
     it('default-denies a search that names no path inside the directory', () => {
-      for (const rawInput of [{ q: 'secret' }, { pattern: 'attention' }, { term: 'x' }, {}, { text: 'a b' }]) {
+      for (const rawInput of [{ q: 'secret' }, { term: 'x' }, {}, { text: 'a b' }]) {
         const result = decide(request('search', ALL_OPTIONS, { rawInput }))
         expect(result.decision, JSON.stringify(rawInput)).toBe('reject')
       }
@@ -200,6 +200,72 @@ describe('decidePermission', () => {
         expect(decide(request('read', ALL_OPTIONS, { locations: [{ path: `${cwd}/${pattern}` }] })).decision, `location ${pattern}`).toBe('reject')
       }
       expect(decide(request('search', ALL_OPTIONS, { rawInput: { pattern: '.*foo', path: cwd } })).decision).toBe('allow')
+    })
+
+    describe('round 4', () => {
+      const grep = (rawInput: Record<string, unknown>, title = 'grep "x"') => request('search', ALL_OPTIONS, { title, rawInput })
+      const glob = (rawInput: Record<string, unknown>) => request('search', ALL_OPTIONS, { title: 'Find `x`', rawInput })
+
+      it('rejects (fails closed) when the string scan hits its depth bound', () => {
+        let deep: unknown = '/etc/passwd'
+        for (let i = 0; i < 9; i++) deep = { n: deep }
+        const result = decide(request('read', ALL_OPTIONS, { rawInput: { file_path: 'paper.md', d: deep } }))
+        expect(result.decision).toBe('reject')
+        expect(result.reason).toBe('scan truncated')
+      })
+
+      it('rejects (fails closed) when the string scan hits its count bound', () => {
+        const wide = Array.from({ length: 501 }, (_, i) => (i === 500 ? '/etc/passwd' : 'x'))
+        const result = decide(request('read', ALL_OPTIONS, { rawInput: { file_path: 'paper.md', w: wide } }))
+        expect(result.decision).toBe('reject')
+        expect(result.reason).toBe('scan truncated')
+      })
+
+      it('allows nesting and counts just under the bounds', () => {
+        let ok: unknown = 'x'
+        for (let i = 0; i < 7; i++) ok = { n: ok }
+        expect(decide(request('read', ALL_OPTIONS, { rawInput: { file_path: 'paper.md', d: ok, w: Array.from({ length: 400 }, () => 'x') } })).decision).toBe('allow')
+      })
+
+      it.each(['https://arxiv.org', '/Introduction/', 'a/b', '..', '\\.\\./', 'Section 3.2', 'e.g. ~5%', '~', 'x,/etc/passwd', '/etc/passwd'])(
+        'allows Grep regex %s as pattern',
+        (pattern) => {
+          expect(decide(grep({ pattern, path: cwd })).decision, pattern).toBe('allow')
+          expect(decide(grep({ pattern })).decision, `no path ${pattern}`).toBe('allow')
+        },
+      )
+
+      it('still rejects a Grep glob filter that escapes', () => {
+        expect(decide(grep({ pattern: 'x', glob: '../../**/*.pem', path: cwd })).decision).toBe('reject')
+        expect(decide(grep({ pattern: 'x', glob: '*.md', path: cwd })).decision).toBe('allow')
+      })
+
+      it('treats a Grep/Glob with no path as the session directory', () => {
+        expect(decide(grep({ pattern: 'Attention' })).decision).toBe('allow')
+        expect(decide(glob({ pattern: '**/*.md' })).decision).toBe('allow')
+        expect(decide(glob({ pattern: '../../**/*.pem' })).decision).toBe('reject')
+        expect(decide(glob({ pattern: '/home/**/id_rsa' })).decision).toBe('reject')
+        expect(decide(glob({ pattern: '*/../../etc/*' })).decision).toBe('reject')
+        expect(decide(grep({ pattern: 'x', path: '/etc' })).decision).toBe('reject')
+      })
+
+      it('does not allow a path-less search that looks remote', () => {
+        expect(decide(grep({ pattern: 'x', query: 'y' })).decision).toBe('reject')
+        expect(decide(request('search', ALL_OPTIONS, { rawInput: { type: 'webSearch', pattern: 'x' } })).decision).toBe('reject')
+      })
+
+      it.each(['x,/etc/passwd', 'a;/etc/passwd', 'k:/etc/passwd', 'k=/etc/passwd', '"/etc/passwd"', "'/etc/passwd'", '(/etc/passwd)', '[/etc/passwd]', '{/etc/passwd}', 'a|/etc/passwd', 'x,~/.ssh/id_rsa', 'x,../secret', '..', 'x,https://e.com/a'])(
+        'rejects an outside path hidden in an unknown key via %s',
+        (note) => {
+          expect(decide(request('read', ALL_OPTIONS, { locations: [{ path: join(cwd, 'paper.md') }], rawInput: { note } })).decision, note).toBe('reject')
+        },
+      )
+
+      it('does not reject ordinary prose in unknown keys', () => {
+        for (const note of ['e.g. ~5% of 3.2/4 and so..', 'see Section 3, p. 4; ok: yes', 'a/b and c/d', 'x ... y']) {
+          expect(decide(request('read', ALL_OPTIONS, { locations: [{ path: join(cwd, 'paper.md') }], rawInput: { note } })).decision, note).toBe('allow')
+        }
+      })
     })
 
     it('rejects read and search when the policy has no session directory', () => {

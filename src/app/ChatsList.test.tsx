@@ -124,7 +124,7 @@ describe('ChatsList [L2-02]', () => {
 
   it('shows the friendly refusal, without IPC wrapper text, when the chat is still answering', async () => {
     window.vellum.chatDeleteSession = vi.fn().mockRejectedValue(new Error(
-      "Error invoking remote method 'vellum:chat-delete-session': Error: This chat is still answering. Wait for the answer to finish, then delete it.",
+      "Error invoking remote method 'vellum:chat-delete-session': ChatBusyError: This chat is still answering. Wait for the answer to finish, then delete it.",
     )) as any
     render(<ChatsList selectedSessionId={null} onSelectSession={vi.fn()} />)
 
@@ -134,7 +134,7 @@ describe('ChatsList [L2-02]', () => {
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('This chat is still answering. Wait for the answer to finish, then delete it.')
-    expect(alert).not.toHaveTextContent(/Error invoking|SQLITE/)
+    expect(alert).not.toHaveTextContent(/Error invoking|ChatBusyError|SQLITE/)
     expect(screen.getByText('Explain Transformer architecture')).toBeInTheDocument()
   })
 

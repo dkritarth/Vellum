@@ -541,6 +541,16 @@ describe('AskPanel', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/db locked/i)
   })
 
+  it('shows a friendly message, not IPC noise, when sending to a chat deleted elsewhere', async () => {
+    askStart.mockRejectedValueOnce(new Error("Error invoking remote method 'vellum:ask-start': Error: This chat was deleted. Open or start another chat to continue."))
+
+    render(<AskPanel slug="p1" injectedPrompt={{ text: 'hello', autoSend: true, nonce: 1 }} />)
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('This chat was deleted. Open or start another chat to continue.')
+    expect(alert).not.toHaveTextContent(/Error invoking/)
+  })
+
   it('pre-populates input when injectedPrompt has autoSend false [R1-05]', async () => {
     render(
       <AskPanel

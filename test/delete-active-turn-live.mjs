@@ -57,7 +57,7 @@ try {
   await alert.waitFor()
   const message = await alert.innerText()
   console.log(`DELETE RESULT: ${message.replace(/\s+/g, ' ')}`)
-  assert.match(message, /answer/i)
+  assert.match(message, /still (answering|starting)\. Wait/i)
   assert.doesNotMatch(message, /SQLITE|FOREIGN KEY|CONSTRAINT|Error invoking/i)
   assert(await row.isVisible(), 'Conversation must remain listed after a refused delete')
   await window.screenshot({ path: path.join(evidence, 'refused.png') })

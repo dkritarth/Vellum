@@ -177,6 +177,16 @@ describe('main process startup and preload contract', () => {
     }
   })
 
+  it('answers a send to a deleted chat with a friendly message', async () => {
+    electron.runHandlers = true
+    try {
+      await expect(electron.api['askStart']!({ chatSessionId: 999, slug: 'p1', text: 'hi' }))
+        .rejects.toThrow('This chat was deleted. Open or start another chat to continue.')
+    } finally {
+      electron.runHandlers = false
+    }
+  })
+
   it('preserves valid usage filters and collection operations through preload', async () => {
     electron.runHandlers = true
     try {

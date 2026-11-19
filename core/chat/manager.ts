@@ -27,6 +27,22 @@ import type { AcpBackend, AcpClient, AcpSession, AcpUpdate } from '../acp/client
 import type { ChatMessage, ChatSession } from './repo.js'
 import { addChatMessage, createChatSession, deleteChatSession, getChatMessages, getChatSession, getLatestChatSession } from './repo.js'
 import { purgePaper } from '../library/repo.js'
+
+/** A delete was refused because the chat or paper is busy. Expected, not a fault. */
+export class ChatBusyError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ChatBusyError'
+  }
+}
+
+/** The chat was deleted (for example from another window) before the send. */
+export class ChatGoneError extends Error {
+  constructor() {
+    super('This chat was deleted. Open or start another chat to continue.')
+    this.name = 'ChatGoneError'
+  }
+}
 import { recordTurnUsage } from '../usage/repo.js'
 
 const DEFAULT_BACKEND: AcpBackend = 'claude'
@@ -156,6 +172,8 @@ export class ChatManager {
   // including session creation, and keep ownership outside the renderer.
   private readonly activeTurns = new Map<string, AskActiveTurn>()
   private readonly resettingPapers = new Set<string>()
+  // Papers whose turn has locked but not yet got an ACP session (still spawning).
+  private readonly startingPapers = new Set<string>()
 
   constructor(private readonly client: AcpClient) {}
 
@@ -209,6 +227,7 @@ export class ChatManager {
     // Synchronous rejection lets ask-start reject its invoke before returning
     // a request ID. No rejected prompt is persisted or sent to ACP.
     this.requireIdle(params.paperSlug)
+    if (!getChatSession(params.db, params.chatSessionId)) throw new ChatGoneError()
     const activeTurn: AskActiveTurn = {
       requestId: params.requestId ?? randomUUID(),
       chatSessionId: params.chatSessionId,
@@ -216,7 +235,9 @@ export class ChatManager {
       sequence: 0,
     }
     this.activeTurns.set(params.paperSlug, activeTurn)
+    this.startingPapers.add(params.paperSlug)
     const release = (): void => {
+      this.startingPapers.delete(params.paperSlug)
       if (this.activeTurns.get(params.paperSlug) === activeTurn) this.activeTurns.delete(params.paperSlug)
     }
     return this.runActiveTurn(params, (event) => {
@@ -233,23 +254,41 @@ export class ChatManager {
    * chats of the same paper are unaffected.
    */
   deleteChat(db: Database, chatSessionId: number): void {
-    for (const turn of this.activeTurns.values()) {
-      if (turn.chatSessionId === chatSessionId) {
-        throw new Error('This chat is still answering. Wait for the answer to finish, then delete it.')
-      }
+    for (const [paperSlug, turn] of this.activeTurns) {
+      if (turn.chatSessionId !== chatSessionId) continue
+      throw new ChatBusyError(
+        this.startingPapers.has(paperSlug)
+          ? 'This chat is still starting. Wait a moment, then delete it.'
+          : 'This chat is still answering. Wait for the answer to finish, then delete it.',
+      )
+    }
+    const paperSlug = getChatSession(db, chatSessionId)?.paperSlug
+    if (paperSlug && this.resettingPapers.has(paperSlug)) {
+      throw new ChatBusyError('This chat is still starting. Wait a moment, then delete it.')
     }
     deleteChatSession(db, chatSessionId)
   }
 
   /**
    * Permanently delete a paper. Refused while any chat of that paper has an
-   * active turn or is being reset, because purge cascades to its chats.
+   * active turn or is being reset, because purge cascades to its chats. After
+   * a successful purge, cached agent sessions for the paper are closed so none
+   * points at deleted files.
    */
-  purgePaper(db: Database, paperSlug: string, libraryDir?: string): boolean {
-    if (this.activeTurns.has(paperSlug) || this.resettingPapers.has(paperSlug)) {
-      throw new Error('This paper has an answer in progress. Wait for it to finish, then delete it permanently.')
+  async purgePaper(db: Database, paperSlug: string, libraryDir?: string): Promise<boolean> {
+    if (this.activeTurns.has(paperSlug)) {
+      throw new ChatBusyError(
+        this.startingPapers.has(paperSlug)
+          ? 'This paper has a chat starting up. Wait a moment, then delete it permanently.'
+          : 'This paper has an answer in progress. Wait for it to finish, then delete it permanently.',
+      )
     }
-    return purgePaper(db, paperSlug, libraryDir)
+    if (this.resettingPapers.has(paperSlug)) {
+      throw new ChatBusyError('This paper has a chat starting up. Wait a moment, then delete it permanently.')
+    }
+    const purged = purgePaper(db, paperSlug, libraryDir)
+    if (purged) await this.disposePaperSessions(paperSlug)
+    return purged
   }
 
   private requireIdle(paperSlug: string): void {
@@ -271,6 +310,7 @@ export class ChatManager {
     let freshlySpawned: boolean
     try {
       ;({ session: acpSession, freshlySpawned } = await this.getOrCreateAcpSession(params.paperSlug, backend, params.chatSessionId))
+      this.startingPapers.delete(params.paperSlug)
     } catch (err) {
       onEvent({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
       return

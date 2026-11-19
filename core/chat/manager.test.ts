@@ -678,6 +678,83 @@ describe('ChatManager', () => {
       expect(created[0]?.requests).toHaveLength(0)
     })
 
+    it('ends a Stop during a slow session start after the grace period, without waiting for the spawn', async () => {
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => { release = resolve })
+      const created: FakeSession[] = []
+      const client = new FakeClient([], async () => {
+        const next = new FakeSession([textUpdate('never sent'), doneUpdate])
+        created.push(next)
+        if (created.length === 1) await gate
+        return next
+      })
+      const manager = new ChatManager(client, { cancelGraceMs: 30 })
+      const events: AskStreamEvent[] = []
+      const { session, turn } = start(manager, events)
+
+      expect(manager.cancelTurn({ paperSlug: slug, requestId: 'req-1' })).toBe(true)
+      // The spawn is still pending; the turn must end on the grace timer anyway.
+      await until(() => events.some((e) => e.kind === 'cancelled'))
+      expect(manager.openChat({ db, paperSlug: slug }).activeTurn).toBeNull()
+      expect(getChatMessages(db, session.id).map((m) => m.role)).toEqual(['user'])
+
+      release()
+      await turn
+      expect(events.map((e) => e.kind)).toEqual(['cancelled'])
+      expect(created[0].requests).toHaveLength(0)
+      expect(created[0].disposed).toBe(true)
+
+      // The late session was not cached: the next turn spawns a new one and recaps.
+      await manager.runTurn({ db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'next question' }, () => {})
+      expect(client.newSessionCalls).toBe(2)
+      expect(created[1].requests).toHaveLength(1)
+      // The stopped question is kept in history and recapped; no answer text was produced.
+      expect(created[1].requests[0].text).toContain('User: Explain everything')
+      expect(created[1].requests[0].text).not.toContain('never sent')
+      await manager.disposeAll()
+    })
+
+    it('stays silent when a slow session start fails after the grace period ended the turn', async () => {
+      let fail!: () => void
+      const gate = new Promise<void>((_, reject) => { fail = () => reject(new Error('spawn failed')) })
+      const manager = new ChatManager(new FakeClient([], async () => { await gate; return new FakeSession([]) }), { cancelGraceMs: 30 })
+      const events: AskStreamEvent[] = []
+      const { turn } = start(manager, events)
+      manager.cancelTurn({ paperSlug: slug, requestId: 'req-1' })
+      await until(() => events.some((e) => e.kind === 'cancelled'))
+      fail()
+      await turn
+      expect(events.map((e) => e.kind)).toEqual(['cancelled'])
+    })
+
+    it('surfaces a real adapter error that arrives after Stop as an error, not a stop', async () => {
+      // Adapter answers Stop by crashing, not by ending the turn with 'cancelled'.
+      class CrashOnCancel implements AcpSession {
+        disposed = false
+        private release!: () => void
+        private readonly ended = new Promise<void>((resolve) => { this.release = resolve })
+        async *prompt(): AsyncIterable<AcpUpdate> {
+          yield textUpdate('partial')
+          await this.ended
+          yield { kind: 'error', data: { message: 'adapter crashed' } }
+        }
+        async cancel(): Promise<void> { this.release() }
+        async dispose(): Promise<void> { this.disposed = true; this.release() }
+      }
+      const adapter = new CrashOnCancel()
+      const manager = new ChatManager(new FakeClient([], async () => adapter))
+      const events: AskStreamEvent[] = []
+      const { session, turn } = start(manager, events)
+      await until(() => events.some((e) => e.kind === 'text'))
+
+      manager.cancelTurn({ paperSlug: slug, requestId: 'req-1' })
+      await turn
+
+      expect(events.at(-1)).toEqual({ kind: 'error', message: 'adapter crashed', sequence: expect.any(Number) })
+      expect(events.some((e) => e.kind === 'cancelled')).toBe(false)
+      expect(getChatMessages(db, session.id).map((m) => m.role)).toEqual(['user'])
+    })
+
     it('ends as cancelled, not an error, when Stop precedes a failing session start', async () => {
       let fail!: () => void
       const gate = new Promise<void>((_, reject) => { fail = () => reject(new Error('spawn failed')) })

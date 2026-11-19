@@ -690,16 +690,53 @@ describe('Stop control (#254)', () => {
 
   it('is reachable and activatable from the keyboard', async () => {
     const user = userEvent.setup()
-    render(<AskPanel slug="p1" />)
+    render(
+      <>
+        <button type="button">Before panel</button>
+        <AskPanel slug="p1" />
+      </>,
+    )
     await startTurn(user)
     const stop = await screen.findByRole('button', { name: 'Stop' })
     // A native button in the tab order: focusable and activated by Enter.
     expect(stop.tagName).toBe('BUTTON')
     expect(stop).not.toHaveAttribute('tabindex', '-1')
-    stop.focus()
+    // Tab from the neighbouring control: the disabled controls in between are skipped.
+    await user.click(screen.getByRole('button', { name: 'Before panel' }))
+    await user.tab()
     expect(stop).toHaveFocus()
     await user.keyboard('{Enter}')
     expect(askCancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('clears a failed-cancel banner once a retried Stop ends the turn', async () => {
+    askCancel.mockRejectedValueOnce(new Error('ipc down'))
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    await startTurn(user)
+    await user.click(await screen.findByRole('button', { name: 'Stop' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('ipc down')
+    await user.click(await screen.findByRole('button', { name: 'Stop' }))
+    await act(async () => emit({ requestId: 'req-1', event: { kind: 'cancelled', sequence: 1 } }))
+    await waitFor(() => expect(screen.getByLabelText(/ask a question/i)).toBeEnabled())
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('leaves focus where the user moved it when a Stop ends the turn', async () => {
+    const user = userEvent.setup()
+    render(
+      <>
+        <AskPanel slug="p1" />
+        <button type="button">Elsewhere</button>
+      </>,
+    )
+    await startTurn(user)
+    await user.click(await screen.findByRole('button', { name: 'Stop' }))
+    const elsewhere = screen.getByRole('button', { name: 'Elsewhere' })
+    await user.click(elsewhere)
+    await act(async () => emit({ requestId: 'req-1', event: { kind: 'cancelled', sequence: 1 } }))
+    await waitFor(() => expect(screen.getByLabelText(/ask a question/i)).toBeEnabled())
+    expect(elsewhere).toHaveFocus()
   })
 
   it('sends a Stop pressed before the request id is acknowledged once it arrives', async () => {

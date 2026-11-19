@@ -61,9 +61,18 @@ export interface ChatManagerOptions {
 interface TurnControl {
   backend: AcpBackend
   cancelRequested: boolean
+  /** Set once the turn emitted its terminal event; later events are dropped. */
+  ended: boolean
+  /** Set when the grace period disposed the session, so the resulting error is a stop. */
+  graceDisposed?: boolean
   session?: AcpSession
   graceTimer?: ReturnType<typeof setTimeout>
+  /** Emits an event through the turn's guarded sink (see runTurn). */
+  emit?: (event: AskStreamEvent) => void
 }
+
+/** Message of the error an AcpSession yields when it is disposed mid-turn. */
+const SESSION_DISPOSED = 'session disposed'
 
 /** Pulls plain text out of an AcpUpdate whose kind is 'text' (a raw ACP
  * ContentBlock in `data`). Mirrors core/ingest/extract.ts's textFromUpdate —
@@ -243,7 +252,7 @@ export class ChatManager {
       sequence: 0,
     }
     this.activeTurns.set(params.paperSlug, activeTurn)
-    const control: TurnControl = { backend: params.backend ?? DEFAULT_BACKEND, cancelRequested: false }
+    const control: TurnControl = { backend: params.backend ?? DEFAULT_BACKEND, cancelRequested: false, ended: false }
     this.turnControls.set(params.paperSlug, control)
     const release = (): void => {
       if (this.activeTurns.get(params.paperSlug) !== activeTurn) return
@@ -251,11 +260,19 @@ export class ChatManager {
       this.turnControls.delete(params.paperSlug)
       clearTimeout(control.graceTimer)
     }
-    return this.runActiveTurn(params, control, (event) => {
+    // Single sink for the turn: the first terminal event wins, so a grace
+    // timer and a late session start can never end the same turn twice.
+    const emit = (event: AskStreamEvent): void => {
+      if (control.ended) return
       if (event.kind === 'text') activeTurn.text += event.text
-      if (event.kind === 'done' || event.kind === 'cancelled' || event.kind === 'error') release()
+      if (event.kind === 'done' || event.kind === 'cancelled' || event.kind === 'error') {
+        control.ended = true
+        release()
+      }
       onEvent({ ...event, sequence: ++activeTurn.sequence })
-    }).finally(release)
+    }
+    control.emit = emit
+    return this.runActiveTurn(params, control, emit).finally(release)
   }
 
   /**
@@ -271,15 +288,25 @@ export class ChatManager {
     if (!turn || !control || turn.requestId !== params.requestId) return false
     if (control.cancelRequested) return true
     control.cancelRequested = true
-    // No agent session yet: runActiveTurn ends the turn when it starts.
     if (control.session) this.cancelSession(params.paperSlug, control, control.session)
+    else this.armStartGrace(control)
     return true
   }
 
   private cancelSession(paperSlug: string, control: TurnControl, session: AcpSession): void {
     session.cancel().catch(() => undefined)
     control.graceTimer = setTimeout(() => {
+      control.graceDisposed = true
       void this.disposeSession(paperSlug, control.backend, session)
+    }, this.cancelGraceMs)
+  }
+
+  /** The agent session is still starting, so there is nothing to cancel yet.
+   * End the turn when the grace period runs out rather than waiting for the
+   * spawn (cold start can take up to 60 s). runActiveTurn disposes the late session. */
+  private armStartGrace(control: TurnControl): void {
+    control.graceTimer = setTimeout(() => {
+      control.emit?.({ kind: 'cancelled' })
     }, this.cancelGraceMs)
   }
 
@@ -305,11 +332,17 @@ export class ChatManager {
     let acpSession: AcpSession
     let freshlySpawned: boolean
     try {
-      ;({ session: acpSession, freshlySpawned } = await this.getOrCreateAcpSession(params.paperSlug, backend, params.chatSessionId))
+      ;({ session: acpSession, freshlySpawned } = await this.getOrCreateAcpSession(params.paperSlug, backend, params.chatSessionId, control))
     } catch (err) {
-      // A start that fails after Stop is a stop, not an error.
+      // A start that fails after Stop is a stop, not an error. onEvent drops it
+      // when the grace timer already ended the turn.
       if (control.cancelRequested) onEvent({ kind: 'cancelled' })
       else onEvent({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
+      return
+    }
+    if (control.ended) {
+      // The grace timer ended the turn while the session spawned. Never reuse it.
+      await this.disposeSession(params.paperSlug, backend, acpSession)
       return
     }
     control.session = acpSession
@@ -374,8 +407,9 @@ export class ChatManager {
           // A broken turn likely means a broken session — evict the cache
           // so the next turn spawns fresh rather than reusing a dead one.
           await this.disposeSession(params.paperSlug, backend)
-          // After Stop, an adapter that died or was disposed ends the turn: that is a stop.
-          if (control.cancelRequested) {
+          // After Stop, only the dispose that the grace period caused ends the turn
+          // as a stop. Any other adapter failure is a real error and stays one.
+          if (control.cancelRequested && (control.graceDisposed || errorMessageFromUpdate(update) === SESSION_DISPOSED)) {
             stopped = true
             break
           }
@@ -470,11 +504,14 @@ export class ChatManager {
     paperSlug: string,
     backend: AcpBackend,
     chatSessionId: number,
+    control: TurnControl,
   ): Promise<{ session: AcpSession; freshlySpawned: boolean }> {
     const cached = this.acpSessions.get(backend)?.get(paperSlug)
     if (cached?.chatSessionId === chatSessionId) return { session: cached.session, freshlySpawned: false }
     if (cached) await this.disposeSession(paperSlug, backend)
     const session = await this.client.newSession(backend)
+    // The turn already ended: the caller disposes this session, so do not cache it.
+    if (control.ended) return { session, freshlySpawned: true }
     const sessions = this.acpSessions.get(backend)
     const entry = { chatSessionId, session }
     if (sessions) sessions.set(paperSlug, entry)

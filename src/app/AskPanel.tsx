@@ -92,6 +92,7 @@ export function AskPanel({
   const queuedUpdates = useRef<AskUpdatePayload[]>([])
   const lastSequence = useRef(0)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const composing = useRef(false)
   const lastHandledNonce = useRef<number | null>(null)
 
@@ -122,6 +123,7 @@ export function AskPanel({
         ])
       }
       setSending(false)
+      setError(null)
       activeRequestId.current = null
     } else if (event.kind === 'cancelled') {
       // A stopped turn saved its partial answer (marked) only when it had text.
@@ -133,6 +135,8 @@ export function AskPanel({
         ])
       }
       setSending(false)
+      // A retried Stop that succeeded clears any earlier failed-cancel banner.
+      setError(null)
       activeRequestId.current = null
     } else if (event.kind === 'error') {
       setMessages((current) => current.filter((m) => m.id !== STREAMING_ID))
@@ -155,8 +159,12 @@ export function AskPanel({
       setStopping(false)
       stopBeforeAck.current = false
       // The Stop button unmounts and the textarea was disabled during the
-      // turn, so focus would otherwise fall to <body>.
-      if (focusAfterStop.current) inputRef.current?.focus()
+      // turn, so focus would otherwise fall to <body>. Restore it to the
+      // composer only when focus was lost or still sits in this panel; a
+      // focus the user moved elsewhere stays put.
+      const active = document.activeElement
+      const focusLost = !active || active === document.body
+      if (focusAfterStop.current && (focusLost || panelRef.current?.contains(active))) inputRef.current?.focus()
       focusAfterStop.current = false
     }
   }, [sending])
@@ -338,7 +346,7 @@ export function AskPanel({
   const disabled = sessionId === null || sending || switchingSession
 
   return (
-    <div className={styles.askPanel}>
+    <div className={styles.askPanel} ref={panelRef}>
       <div className={styles.header}>
         <ModelSelector backend={backend} disabled={disabled} onChange={selectBackend} />
         <button type="button" className={styles.newChatButton} disabled={disabled} onClick={() => startNewChat()}>

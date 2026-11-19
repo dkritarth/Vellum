@@ -1,0 +1,8 @@
+{
+  "passed": true,
+  "head": "8023b7aed57c3558d501428fb22407baf6188617",
+  "pdf": "/tmp/vellum-papers/1706.03762.pdf",
+  "timings": {
+    "stopToComposerMs": 36
+  }
+}

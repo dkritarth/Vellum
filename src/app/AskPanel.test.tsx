@@ -10,6 +10,7 @@ type UpdateListener = (payload: { requestId: string; event: unknown }) => void
 let askOpen: ReturnType<typeof vi.fn>
 let askNewChat: ReturnType<typeof vi.fn>
 let askStart: ReturnType<typeof vi.fn>
+let askCancel: ReturnType<typeof vi.fn>
 let onAskUpdate: ReturnType<typeof vi.fn>
 let updateListeners: UpdateListener[]
 
@@ -22,6 +23,7 @@ beforeEach(() => {
   askOpen = vi.fn().mockResolvedValue({ session: { id: 1, paperSlug: 'p1', backend: 'claude', title: null, createdAt: 't' }, messages: [] })
   askNewChat = vi.fn().mockResolvedValue({ session: { id: 2, paperSlug: 'p1', backend: 'claude', title: null, createdAt: 't2' }, messages: [] })
   askStart = vi.fn().mockResolvedValue({ requestId: 'req-1' })
+  askCancel = vi.fn().mockResolvedValue(true)
   onAskUpdate = vi.fn((listener: UpdateListener) => {
     updateListeners.push(listener)
     return () => {
@@ -31,7 +33,7 @@ beforeEach(() => {
 
   Object.defineProperty(window, 'vellum', {
     configurable: true,
-    value: { askOpen, askNewChat, askStart, onAskUpdate, questionsGet: vi.fn().mockResolvedValue([]), questionsRegenerate: vi.fn().mockResolvedValue([]) },
+    value: { askOpen, askNewChat, askStart, askCancel, onAskUpdate, questionsGet: vi.fn().mockResolvedValue([]), questionsRegenerate: vi.fn().mockResolvedValue([]) },
   })
 })
 
@@ -628,6 +630,199 @@ describe('AskPanel', () => {
         text: 'How does attention scale with sequence length?',
       })
     })
+  })
+})
+
+describe('Stop control (#254)', () => {
+  async function startTurn(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+    await waitFor(() => expect(screen.getByLabelText(/ask a question/i)).toBeEnabled())
+    await user.type(screen.getByLabelText(/ask a question/i), 'Explain everything')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(askStart).toHaveBeenCalled())
+  }
+
+  it('offers Stop only while a turn is active', async () => {
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    await waitFor(() => expect(screen.getByLabelText(/ask a question/i)).toBeEnabled())
+    expect(screen.queryByRole('button', { name: 'Stop' })).not.toBeInTheDocument()
+
+    await startTurn(user)
+    expect(await screen.findByRole('button', { name: 'Stop' })).toBeEnabled()
+    await act(async () => emit({ requestId: 'req-1', event: { kind: 'done', sequence: 1, message: { id: 5, role: 'assistant', content: 'Done' } } }))
+    expect(screen.queryByRole('button', { name: 'Stop' })).not.toBeInTheDocument()
+  })
+
+  it('hides Stop while the paper answers in another of its chats', async () => {
+    askOpen.mockResolvedValue({
+      session: { id: 2, paperSlug: 'p1', backend: 'codex', title: null, createdAt: 't' },
+      messages: [],
+      activeTurn: { requestId: 'other-chat', chatSessionId: 1, text: 'Other chat partial', sequence: 1 },
+    })
+    render(<AskPanel slug="p1" />)
+    expect(await screen.findByRole('button', { name: 'Sending…' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Stop' })).not.toBeInTheDocument()
+  })
+
+  it('cancels the active request, keeps the marked partial answer, and re-enables the composer', async () => {
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    await startTurn(user)
+    await act(async () => emit({ requestId: 'req-1', event: { kind: 'text', sequence: 1, text: 'Partial answer' } }))
+    expect(await screen.findByText('Partial answer')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Stop' }))
+    expect(askCancel).toHaveBeenCalledWith({ slug: 'p1', requestId: 'req-1' })
+    // Stop is acknowledged but the turn is still ending: no double cancel.
+    expect(screen.getByRole('button', { name: 'Stopping…' })).toBeDisabled()
+    expect(screen.getByLabelText(/ask a question/i)).toBeDisabled()
+
+    await act(async () => emit({
+      requestId: 'req-1',
+      event: { kind: 'cancelled', sequence: 2, message: { id: 6, role: 'assistant', content: 'Partial answer\n\n*(stopped)*' } },
+    }))
+    expect(await screen.findByText('(stopped)')).toBeInTheDocument()
+    expect(screen.getByText('Partial answer')).toBeInTheDocument()
+    expect(screen.getByLabelText(/ask a question/i)).toBeEnabled()
+    expect(screen.queryByRole('button', { name: /^Stop/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('drops the streaming bubble when a stopped turn had produced no answer', async () => {
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    await startTurn(user)
+    await user.click(await screen.findByRole('button', { name: 'Stop' }))
+    await act(async () => emit({ requestId: 'req-1', event: { kind: 'cancelled', sequence: 1 } }))
+    await waitFor(() => expect(screen.getByLabelText(/ask a question/i)).toBeEnabled())
+    expect(screen.getByText('Explain everything')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('is reachable and activatable from the keyboard', async () => {
+    const user = userEvent.setup()
+    render(
+      <>
+        <button type="button">Before panel</button>
+        <AskPanel slug="p1" />
+      </>,
+    )
+    await startTurn(user)
+    const stop = await screen.findByRole('button', { name: 'Stop' })
+    // A native button in the tab order: focusable and activated by Enter.
+    expect(stop.tagName).toBe('BUTTON')
+    expect(stop).not.toHaveAttribute('tabindex', '-1')
+    // Tab from the neighbouring control: the disabled controls in between are skipped.
+    await user.click(screen.getByRole('button', { name: 'Before panel' }))
+    await user.tab()
+    expect(stop).toHaveFocus()
+    await user.keyboard('{Enter}')
+    expect(askCancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('clears a failed-cancel banner once a retried Stop ends the turn', async () => {
+    askCancel.mockRejectedValueOnce(new Error('ipc down'))
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    await startTurn(user)
+    await user.click(await screen.findByRole('button', { name: 'Stop' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('ipc down')
+    await user.click(await screen.findByRole('button', { name: 'Stop' }))
+    await act(async () => emit({ requestId: 'req-1', event: { kind: 'cancelled', sequence: 1 } }))
+    await waitFor(() => expect(screen.getByLabelText(/ask a question/i)).toBeEnabled())
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('leaves focus where the user moved it when a Stop ends the turn', async () => {
+    const user = userEvent.setup()
+    render(
+      <>
+        <AskPanel slug="p1" />
+        <button type="button">Elsewhere</button>
+      </>,
+    )
+    await startTurn(user)
+    await user.click(await screen.findByRole('button', { name: 'Stop' }))
+    const elsewhere = screen.getByRole('button', { name: 'Elsewhere' })
+    await user.click(elsewhere)
+    await act(async () => emit({ requestId: 'req-1', event: { kind: 'cancelled', sequence: 1 } }))
+    await waitFor(() => expect(screen.getByLabelText(/ask a question/i)).toBeEnabled())
+    expect(elsewhere).toHaveFocus()
+  })
+
+  it('sends a Stop pressed before the request id is acknowledged once it arrives', async () => {
+    let resolveStart!: (result: { requestId: string }) => void
+    askStart.mockReturnValueOnce(new Promise((resolve) => { resolveStart = resolve }))
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    await startTurn(user)
+    await user.click(await screen.findByRole('button', { name: 'Stop' }))
+    expect(askCancel).not.toHaveBeenCalled()
+    await act(async () => resolveStart({ requestId: 'late' }))
+    await waitFor(() => expect(askCancel).toHaveBeenCalledWith({ slug: 'p1', requestId: 'late' }))
+  })
+
+  it('surfaces a failed cancel and lets the user retry Stop', async () => {
+    askCancel.mockRejectedValueOnce(new Error('ipc down'))
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    await startTurn(user)
+    await user.click(await screen.findByRole('button', { name: 'Stop' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('ipc down')
+    expect(await screen.findByRole('button', { name: 'Stop' })).toBeEnabled()
+  })
+  it('returns focus to the composer when a Stop ends the turn, but not after a normal finish', async () => {
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    await startTurn(user)
+    await user.click(await screen.findByRole('button', { name: 'Stop' }))
+    await act(async () => emit({ requestId: 'req-1', event: { kind: 'cancelled', sequence: 1 } }))
+    await waitFor(() => expect(screen.getByLabelText(/ask a question/i)).toHaveFocus())
+
+    askStart.mockResolvedValueOnce({ requestId: 'req-2' })
+    await user.type(screen.getByLabelText(/ask a question/i), 'again')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    await screen.findByRole('button', { name: 'Stop' })
+    await act(async () => emit({ requestId: 'req-2', event: { kind: 'done', sequence: 1, message: { id: 9, role: 'assistant', content: 'ok' } } }))
+    await waitFor(() => expect(screen.getByLabelText(/ask a question/i)).toBeEnabled())
+    expect(screen.getByLabelText(/ask a question/i)).not.toHaveFocus()
+  })
+
+  it('resets "Stopping…" when the stopped turn ends in an error, and cancels the next turn by its own id', async () => {
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    await startTurn(user)
+    await user.click(await screen.findByRole('button', { name: 'Stop' }))
+    expect(screen.getByRole('button', { name: 'Stopping…' })).toBeDisabled()
+    await act(async () => emit({ requestId: 'req-1', event: { kind: 'error', sequence: 1, message: 'adapter died' } }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('adapter died')
+    expect(screen.queryByRole('button', { name: /^Stop/ })).not.toBeInTheDocument()
+
+    askStart.mockResolvedValueOnce({ requestId: 'req-2' })
+    await user.type(screen.getByLabelText(/ask a question/i), 'retry')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    const stop = await screen.findByRole('button', { name: 'Stop' })
+    expect(stop).toBeEnabled()
+    await user.click(stop)
+    expect(askCancel).toHaveBeenLastCalledWith({ slug: 'p1', requestId: 'req-2' })
+  })
+
+  it('does not carry a pre-ack Stop into the next turn when askStart fails', async () => {
+    let rejectStart!: (err: Error) => void
+    askStart.mockReturnValueOnce(new Promise((_, reject) => { rejectStart = reject }))
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    await startTurn(user)
+    await user.click(await screen.findByRole('button', { name: 'Stop' }))
+    await act(async () => rejectStart(new Error('start failed')))
+    expect(await screen.findByRole('alert')).toHaveTextContent('start failed')
+
+    askStart.mockResolvedValueOnce({ requestId: 'req-2' })
+    await waitFor(() => expect(screen.getByLabelText(/ask a question/i)).toBeEnabled())
+    await user.type(screen.getByLabelText(/ask a question/i), 'again')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    await screen.findByRole('button', { name: 'Stop' })
+    expect(askCancel).not.toHaveBeenCalled()
   })
 })
 

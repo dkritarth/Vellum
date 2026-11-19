@@ -55,6 +55,9 @@ const rl = readline.createInterface({ input: process.stdin, terminal: false })
 function send(msg) {
   process.stdout.write(JSON.stringify(msg) + '\n')
 }
+// Request id of the in-flight 'cancellable' prompt, answered by session/cancel.
+let pendingPrompt = null
+let promptCount = 0
 
 rl.on('line', (line) => {
   if (!line.trim()) return
@@ -67,7 +70,41 @@ rl.on('line', (line) => {
     send({ jsonrpc: '2.0', id: msg.id, result: { protocolVersion: 1, agentCapabilities } })
   } else if (msg.method === 'session/new') {
     send({ jsonrpc: '2.0', id: msg.id, result: { sessionId: 'sess-1' } })
+  } else if (msg.method === 'session/cancel') {
+    // A cancellable agent reports the cancelled session, then ends its turn
+    // with stopReason 'cancelled' as the ACP spec requires.
+    if (mode === 'cancellable' && pendingPrompt !== null) {
+      send({
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: {
+          sessionId: msg.params.sessionId,
+          update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'cancel:' + msg.params.sessionId } },
+        },
+      })
+      send({ jsonrpc: '2.0', id: pendingPrompt, result: { stopReason: 'cancelled' } })
+      pendingPrompt = null
+    }
   } else if (msg.method === 'session/prompt') {
+    // 'cancellable' streams a chunk every 20ms until session/cancel arrives;
+    // only its first prompt streams, later prompts end normally.
+    if (mode === 'cancellable' && ++promptCount === 1) {
+      pendingPrompt = msg.id
+      const tick = () => {
+        if (pendingPrompt === null) return
+        send({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: msg.params.sessionId,
+            update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'tick' } },
+          },
+        })
+        setTimeout(tick, 20)
+      }
+      tick()
+      return
+    }
     // 'slow-stream' answers with chunks spaced 30ms apart (total ~180ms) so
     // a test can set an idle budget well under the total turn duration:
     // every gap stays under the idle bound while the total exceeds it.
@@ -395,6 +432,34 @@ describe('StdioAcpClient', () => {
 
     expect(await updates).toEqual([{ kind: 'error', data: { message: 'session disposed' } }])
   }, 10_000)
+
+  it('cancel() sends session/cancel and the turn ends with stopReason cancelled', async () => {
+    const client = new StdioAcpClient(spawnFakeAgent('cancellable'))
+    const session = await client.newSession('codex')
+    const updates: AcpUpdate[] = []
+    const consume = (async () => {
+      for await (const update of session.prompt({ text: 'write a very long answer' })) {
+        updates.push(update)
+        if (updates.length === 2) await session.cancel()
+      }
+    })()
+    await consume
+
+    expect(updates.some((u) => u.kind === 'text' && JSON.stringify(u.data).includes('cancel:sess-1'))).toBe(true)
+    expect(updates.at(-1)).toEqual({ kind: 'done', data: { stopReason: 'cancelled' } })
+    // The session survives a cancel and accepts another turn.
+    const next = await collect(session.prompt({ text: 'again' }))
+    expect(next.at(-1)?.kind).toBe('done')
+    await session.dispose()
+  })
+
+  it('cancel() is a no-op when no turn is in flight or the session is disposed', async () => {
+    const client = new StdioAcpClient(spawnFakeAgent('cancellable'))
+    const session = await client.newSession('codex')
+    await expect(session.cancel()).resolves.toBeUndefined()
+    await session.dispose()
+    await expect(session.cancel()).resolves.toBeUndefined()
+  })
 
   it('reports the adapter exit diagnostic when the adapter dies mid-turn', async () => {
     // Idle budget far above the test's patience: the error must come from

@@ -108,6 +108,10 @@ const api = {
   // *started* (not once it's done) — the reply streams over `onAskUpdate`.
   askStart: (params: AskStartParams): Promise<{ requestId: string }> =>
     ipcRenderer.invoke('vellum:ask-start', params),
+  // Stops the streaming turn `requestId` for `slug` (ACP session/cancel).
+  // Resolves false when that turn is no longer active.
+  askCancel: (params: { slug: string; requestId: string }): Promise<boolean> =>
+    ipcRenderer.invoke('vellum:ask-cancel', params),
   // Subscribes to every streamed Ask update; the renderer filters by
   // `requestId` (the one `askStart` returned) to route events to the right
   // in-flight turn. Returns an unsubscribe function.

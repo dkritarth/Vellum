@@ -119,3 +119,34 @@
   background: transparent;
   color: var(--vellum-text-dim, #8a8a8a);
 }
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.stopButton {
+  padding: 6px 12px;
+  border: 1px solid var(--vellum-border, #2a2a2a);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vellum-text, #eaeaea);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.stopButton:hover:not(:disabled) {
+  border-color: var(--vellum-accent, #6d8cff);
+}
+
+.stopButton:focus-visible {
+  outline: 2px solid var(--vellum-accent, #6d8cff);
+  outline-offset: 2px;
+}
+
+.stopButton:disabled {
+  cursor: not-allowed;
+  color: var(--vellum-text-dim, #8a8a8a);
+}

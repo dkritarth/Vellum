@@ -20,6 +20,8 @@ class FakeSession implements AcpSession {
     for (const update of this.updates) yield update
   }
 
+  async cancel(): Promise<void> {}
+
   async dispose(): Promise<void> {
     this.disposed = true
   }
@@ -94,6 +96,7 @@ describe('extractPaper', () => {
             if (failure === 'throw') throw new Error('stream broke')
             if (failure === 'error') yield { kind: 'error', data: { message: 'adapter failed' } }
           },
+          async cancel() {},
           async dispose() { disposed = true },
         }
       },
@@ -254,6 +257,8 @@ describe('extractPaper', () => {
         yield textUpdate('{"sections":[]')
         throw new Error('stream broke')
       }
+      async cancel(): Promise<void> {}
+
       async dispose(): Promise<void> {
         this.disposed = true
       }

@@ -76,6 +76,12 @@ export function AskPanel({
   const [loadError, setLoadError] = useState<string | null>(null)
   const [backend, setBackend] = useState<ChatBackend>('claude')
   const [switchingSession, setSwitchingSession] = useState(false)
+  // Stop was pressed; the turn is ending (ACP session/cancel is async).
+  const [stopping, setStopping] = useState(false)
+  // Stop pressed before askStart returned the request id to cancel.
+  const stopBeforeAck = useRef(false)
+  // The turn that just ended was ended by Stop: return focus to the composer.
+  const focusAfterStop = useRef(false)
   const activeRequestId = useRef<string | null>(null)
   const activeTurnSessionId = useRef<number | null>(null)
   const displayedSessionId = useRef<number | null>(null)
@@ -86,6 +92,7 @@ export function AskPanel({
   const queuedUpdates = useRef<AskUpdatePayload[]>([])
   const lastSequence = useRef(0)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const composing = useRef(false)
   const lastHandledNonce = useRef<number | null>(null)
 
@@ -116,6 +123,20 @@ export function AskPanel({
         ])
       }
       setSending(false)
+      setError(null)
+      activeRequestId.current = null
+    } else if (event.kind === 'cancelled') {
+      // A stopped turn saved its partial answer (marked) only when it had text.
+      const persisted = event.message
+      if (activeTurnSessionId.current === displayedSessionId.current) {
+        setMessages((current) => [
+          ...current.filter((m) => m.id !== STREAMING_ID),
+          ...(persisted ? [{ id: persisted.id, role: persisted.role, content: persisted.content }] : []),
+        ])
+      }
+      setSending(false)
+      // A retried Stop that succeeded clears any earlier failed-cancel banner.
+      setError(null)
       activeRequestId.current = null
     } else if (event.kind === 'error') {
       setMessages((current) => current.filter((m) => m.id !== STREAMING_ID))
@@ -132,6 +153,21 @@ export function AskPanel({
     queuedUpdates.current = []
     for (const payload of queued) applyUpdate(payload)
   }, [applyUpdate])
+
+  useEffect(() => {
+    if (!sending) {
+      setStopping(false)
+      stopBeforeAck.current = false
+      // The Stop button unmounts and the textarea was disabled during the
+      // turn, so focus would otherwise fall to <body>. Restore it to the
+      // composer only when focus was lost or still sits in this panel; a
+      // focus the user moved elsewhere stays put.
+      const active = document.activeElement
+      const focusLost = !active || active === document.body
+      if (focusAfterStop.current && (focusLost || panelRef.current?.contains(active))) inputRef.current?.focus()
+      focusAfterStop.current = false
+    }
+  }, [sending])
 
   useEffect(() => window.vellum.onAskUpdate((payload) => {
     if (awaitingRequest.current) queuedUpdates.current.push(payload)
@@ -208,6 +244,23 @@ export function AskPanel({
     }
   }, [slug, targetSessionId, deletionRevision, loadRevision, replayUpdates])
 
+  const requestStop = useCallback((requestId: string) => {
+    window.vellum.askCancel({ slug, requestId }).catch((err: unknown) => {
+      setStopping(false)
+      focusAfterStop.current = false
+      setError(err instanceof Error ? err.message : String(err))
+    })
+  }, [slug])
+
+  const stopTurn = useCallback(() => {
+    if (stopping) return
+    setStopping(true)
+    focusAfterStop.current = true
+    const requestId = activeRequestId.current
+    if (requestId) requestStop(requestId)
+    else stopBeforeAck.current = true
+  }, [stopping, requestStop])
+
   const sendTurn = useCallback(async (prompt?: string) => {
     const text = (prompt ?? input).trim()
     if (!text || sessionId === null || sending || awaitingRequest.current || activeRequestId.current) return
@@ -227,6 +280,10 @@ export function AskPanel({
       activeRequestId.current = requestId
       activeTurnSessionId.current = sessionId
       replayUpdates()
+      if (stopBeforeAck.current) {
+        stopBeforeAck.current = false
+        requestStop(requestId)
+      }
     } catch (err) {
       if (generation !== contextGeneration.current) return
       awaitingRequest.current = false
@@ -234,7 +291,7 @@ export function AskPanel({
       setError(err instanceof Error ? err.message : String(err))
       setSending(false)
     }
-  }, [input, sessionId, sending, slug, replayUpdates])
+  }, [input, sessionId, sending, slug, replayUpdates, requestStop])
 
   // [R1-05] Process injected prompt from PDF text selection actions
   useEffect(() => {
@@ -289,7 +346,7 @@ export function AskPanel({
   const disabled = sessionId === null || sending || switchingSession
 
   return (
-    <div className={styles.askPanel}>
+    <div className={styles.askPanel} ref={panelRef}>
       <div className={styles.header}>
         <ModelSelector backend={backend} disabled={disabled} onChange={selectBackend} />
         <button type="button" className={styles.newChatButton} disabled={disabled} onClick={() => startNewChat()}>
@@ -363,9 +420,17 @@ export function AskPanel({
           }}
           disabled={disabled}
         />
-        <button type="submit" className={styles.sendButton} disabled={disabled || !input.trim()}>
-          {sending ? 'Sending…' : 'Send'}
-        </button>
+        <div className={styles.actions}>
+          <button type="submit" className={styles.sendButton} disabled={disabled || !input.trim()}>
+            {sending ? 'Sending…' : 'Send'}
+          </button>
+          {/* The paper's turn may belong to another of its chats: Stop only the one shown. */}
+          {sending && (activeTurnSessionId.current === null || activeTurnSessionId.current === sessionId) ? (
+            <button type="button" className={styles.stopButton} disabled={stopping} onClick={stopTurn}>
+              {stopping ? 'Stopping…' : 'Stop'}
+            </button>
+          ) : null}
+        </div>
       </form>
     </div>
   )

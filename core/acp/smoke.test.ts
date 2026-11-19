@@ -9,6 +9,7 @@ const originalExitCode = process.exitCode
 function adapter(updates: AcpUpdate[]) {
   const session: AcpSession = {
     prompt: vi.fn(async function* () { yield* updates }),
+    cancel: vi.fn(async () => {}),
     dispose: vi.fn(async () => {}),
   }
   const client: AcpClient = { newSession: vi.fn(async () => session) }

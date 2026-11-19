@@ -43,6 +43,10 @@ interface RightPanelProps {
   deletedSessionIds?: readonly number[]
   /** [L2-02] Target chat session to open in AskPanel */
   targetSessionId?: number | null
+  /** Changes on every Chats-list click so re-selecting a chat reloads it. */
+  targetSessionNonce?: number
+  /** AskPanel reports the conversation it shows. */
+  onSessionDisplayed?: (sessionId: number) => void
 }
 
 export function RightPanel({
@@ -56,6 +60,8 @@ export function RightPanel({
   injectedPrompt,
   onInjectedPromptHandled,
   targetSessionId,
+  targetSessionNonce,
+  onSessionDisplayed,
   deletedSessionIds,
 }: RightPanelProps): JSX.Element {
   const [internalTab, setInternalTab] = useState<RightPanelTab>(defaultTab)
@@ -87,7 +93,7 @@ export function RightPanel({
       </div>
 
       <div className={styles.tabPanel} role="tabpanel">
-        {renderTabContent(activeTab, slug, onJumpToHighlight, injectedPrompt, targetSessionId, deletedSessionIds, highlightsRevision, onHighlightDeleted, onInjectedPromptHandled)}
+        {renderTabContent(activeTab, slug, onJumpToHighlight, injectedPrompt, { targetSessionId, targetSessionNonce, onSessionDisplayed }, deletedSessionIds, highlightsRevision, onHighlightDeleted, onInjectedPromptHandled)}
       </div>
     </aside>
   )
@@ -98,7 +104,7 @@ function renderTabContent(
   slug: string | undefined,
   onJumpToHighlight: ((highlight: HighlightRecord) => void) | undefined,
   injectedPrompt: InjectedPrompt | null | undefined,
-  targetSessionId?: number | null,
+  target: { targetSessionId?: number | null; targetSessionNonce?: number; onSessionDisplayed?: (sessionId: number) => void },
   deletedSessionIds?: readonly number[],
   highlightsRevision?: number,
   onHighlightDeleted?: (paperSlug: string) => void,
@@ -106,7 +112,7 @@ function renderTabContent(
 ): JSX.Element {
   switch (tab) {
     case 'Ask':
-      if (slug) return <AskPanel slug={slug} injectedPrompt={injectedPrompt} onInjectedPromptHandled={onInjectedPromptHandled} targetSessionId={targetSessionId} deletedSessionIds={deletedSessionIds} />
+      if (slug) return <AskPanel slug={slug} injectedPrompt={injectedPrompt} onInjectedPromptHandled={onInjectedPromptHandled} targetSessionId={target.targetSessionId} targetSessionNonce={target.targetSessionNonce} onSessionDisplayed={target.onSessionDisplayed} deletedSessionIds={deletedSessionIds} />
       return (
         <div className={styles.askTab}>
           <p className={styles.placeholder}>Open a paper to start asking questions.</p>

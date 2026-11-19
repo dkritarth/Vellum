@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
@@ -406,6 +406,22 @@ describe('chat navigation ownership', () => {
     expect(window.vellum.askOpen).toHaveBeenCalledTimes(1)
     expect(window.vellum.askOpen).toHaveBeenLastCalledWith({ slug: 'paper-b', sessionId: 2 })
   })
+  it('reopens the selected chat after New chat moved Ask away from it', async () => {
+    const { user, chat } = await setup()
+    window.vellum.askNewChat = vi.fn().mockResolvedValue({
+      session: { id: 9, paperSlug: 'paper-a', backend: 'codex', title: null, createdAt: 't' },
+    })
+    await user.click(chat(1))
+    await waitFor(() => expect(window.vellum.askOpen).toHaveBeenCalledTimes(1))
+    await user.click(screen.getByRole('button', { name: 'New chat' }))
+    // The list highlights the conversation Ask shows, not the stale click.
+    await waitFor(() => expect(chat(1)).toHaveAttribute('aria-selected', 'false'))
+    await user.click(chat(1))
+    await waitFor(() => expect(window.vellum.askOpen).toHaveBeenCalledTimes(2))
+    expect(window.vellum.askOpen).toHaveBeenLastCalledWith({ slug: 'paper-a', sessionId: 1 })
+    await waitFor(() => expect(chat(1)).toHaveAttribute('aria-selected', 'true'))
+  })
+
   it('keeps displayed chat and draft until associated paper resolves, then commits both', async () => {
     const { user, chat } = await setup()
     await user.click(chat(1))

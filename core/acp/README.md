@@ -85,7 +85,7 @@ permission prompt UI yet. `requestPermission` therefore decides from
 | `toolCall.kind` | Outcome |
 | --- | --- |
 | `think` | Allow: selects `allow_once`, else `allow_always`; cancels if neither is offered |
-| `read`, `search` | Allow only when every path named in `toolCall.locations[].path` and path-like `rawInput` fields (`path`, `file_path`, `paths`, `uri`, escaping globs, …) resolves inside the session cwd after `..` and symlinks (including dangling ones) are resolved. A glob that can expand to `..` (a `..` after the first wildcard, or a bracket/brace group containing a dot) is rejected. A `read` that names no path is rejected. A `search` that names no local path but carries a `query`/`url` (a web search) is rejected. |
+| `read`, `search` | Allow (selecting only `allow_once`; cancel when it is not offered, never `allow_always`) only when every path named in `toolCall.locations[].path` and path-like `rawInput` fields (`path`, `file_path`, `paths`, `uri`, escaping globs, …) resolves inside the session cwd after `..` and symlinks (including dangling ones) are resolved, and no other `rawInput` string value, under any key and at any depth (or whitespace-separated token of one), is an absolute path outside cwd, `~…`, any `file:` URI (single slash too), a URL, or has a `..` segment. A glob that can expand to `..` (a `..` after the first wildcard, a bracket/brace group containing a dot, or a leading-dot wildcard component such as `.*/x` or `.?/x`) is rejected. A `read` that names no path is rejected. A `search` is default-denied unless it names a path inside cwd (a `{q: …}` or `{pattern: …}` search with no path is rejected). |
 | `edit`, `delete`, `move`, `execute`, `switch_mode`, `other`, `fetch`, absent, `null` or unknown | Reject: selects `reject_once`, else `reject_always`; cancels if neither is offered |
 
 `fetch` is denied on purpose. It reaches the network, so injected paper text
@@ -129,9 +129,9 @@ codex-acp 2.2.2 sends `approvalPolicy: on-request` and a `readOnly`
 and a restricted `default_permissions` filesystem profile in `CODEX_CONFIG` made
 Codex session creation fail on the development host (the bwrap fs helper cannot
 start there). Neither was shipped. Instead `buildAdapterEnv` sets
-`features.shell_tool = false` and `features.unified_exec = false`. With both off
+`features.shell_tool = false`, `features.unified_exec = false` and `features.view_image = false`. With both off
 the tool list reported by Codex has no command runner (`apply_patch`,
-`view_image`, MCP resource tools, goals, clock, image generation), and a
+MCP resource tools, goals, clock, image generation), and a
 request to read an absolute path was answered "no file or shell reader exposed".
 
 Consequences and residual risk:
@@ -139,12 +139,30 @@ Consequences and residual risk:
 - Codex grounding relies on the paper text Vellum embeds in the prompt
   (`MAX_EMBEDDED_CONTEXT_BYTES`, 512 KiB). A larger `paper.md` is only linked
   and Codex can no longer open it.
-- `view_image` can still read image files by absolute path. `apply_patch` still
+- `view_image` is disabled (`features.view_image = false`). Live probe: with it on, Codex
+  read a canary PNG outside cwd with 0 permission requests; with it off the model
+  has no such tool. `apply_patch` still
   exists but needs approval, which the policy rejects as kind `edit`.
 - Reads by user-configured MCP servers are not scoped by Vellum.
 - This was verified from the tool list and one model answer on a host where the
   Codex shell cannot run anyway (bwrap). It was not verified on a host with a
   working Codex sandbox.
+
+### Claude settings sources
+
+claude-agent-acp loads the user's, project and local Claude settings. Claude Code
+matches their allow rules (`Read(//**)`, `Bash(*)`) before `canUseTool`, so such a
+rule skipped `session/request_permission` entirely (live probe: Read and Bash
+read a canary outside cwd, 0 permission lines). `session/new` now carries
+`_meta.claudeCode.options.settingSources = []`, which claude-agent-acp spreads over
+its default. Because sign-in on some hosts lives in the user's settings
+(`apiKeyHelper`, gateway `env`) and `settingSources: []` alone made the session
+fail with "OAuth session expired", `buildClaudeSessionMeta` re-supplies only
+`apiKeyHelper`, `env`, `model`, `awsAuthRefresh`, `awsCredentialExport`,
+`forceLoginMethod` and `forceLoginOrgUUID` from `$CLAUDE_CONFIG_DIR/settings.json`
+(or `~/.claude/settings.json`) as programmatic settings. Permission rules, hooks,
+plugins and MCP servers from user settings are no longer loaded. Managed (enterprise)
+policy still applies.
 
 ### Session working directory
 
@@ -154,7 +172,10 @@ manager, ingest extract and ingest summary pass the paper directory
 `paper.md` but not the Vellum source tree, and the permission policy scopes
 `read`/`search` to it. With no `cwd` the client creates a private `0700`
 `mkdtemp` directory for that session and removes it on dispose (or on a failed
-handshake). It never uses `process.cwd()` or the shared OS temp dir.
+handshake). It never uses `process.cwd()` or the shared OS temp dir. The adapter
+process is also spawned with the session cwd as its process cwd (sessions are one
+process each), so relative paths resolve there and project config is not read from
+the app's checkout.
 
 `SpawnAdapter` is an injectable seam: unit tests substitute a small
 dependency-free ndjson JSON-RPC script in place of the real adapter binary,

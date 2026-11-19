@@ -55,9 +55,8 @@ describe('decidePermission', () => {
     expect(result.response.outcome).toEqual({ outcome: 'selected', optionId: 'ao' })
   })
 
-  it('allows a search whose path is the session directory, and a path-less local search', () => {
+  it('allows a search that names a path inside the session directory', () => {
     expect(decide(request('search', ALL_OPTIONS, { rawInput: { pattern: 'attention', path: cwd } })).decision).toBe('allow')
-    expect(decide(request('search', ALL_OPTIONS, { rawInput: { pattern: 'attention' } })).decision).toBe('allow')
     expect(decide(request('search', ALL_OPTIONS, { locations: [{ path: join(cwd, 'paper.md') }] })).decision).toBe('allow')
   })
 
@@ -163,6 +162,46 @@ describe('decidePermission', () => {
       expect(decide(request('search', ALL_OPTIONS, { rawInput: { query: 'x' } })).decision).toBe('reject')
     })
 
+    it('default-denies a search that names no path inside the directory', () => {
+      for (const rawInput of [{ q: 'secret' }, { pattern: 'attention' }, { term: 'x' }, {}, { text: 'a b' }]) {
+        const result = decide(request('search', ALL_OPTIONS, { rawInput }))
+        expect(result.decision, JSON.stringify(rawInput)).toBe('reject')
+      }
+      expect(decide(request('search', ALL_OPTIONS)).decision).toBe('reject')
+    })
+
+    it('rejects any rawInput string value that looks like a path outside the directory, under any key', () => {
+      const bad = ['/etc/passwd', '~/.ssh/id_rsa', 'file:///etc/passwd', 'file:/etc/passwd', 'FILE:/etc/passwd', '../secret/key.txt', 'a/../../secret', '..\\secret', outside, 'https://example.com/x']
+      for (const value of bad) {
+        for (const kind of ['read', 'search'] as const) {
+          const locations = [{ path: join(cwd, 'paper.md') }]
+          expect(decide(request(kind, ALL_OPTIONS, { locations, rawInput: { source: value } })).decision, `${kind} source ${value}`).toBe('reject')
+          expect(decide(request(kind, ALL_OPTIONS, { locations, rawInput: { nested: { deep: [{ x: value }] } } })).decision, `${kind} nested ${value}`).toBe('reject')
+          expect(decide(request(kind, ALL_OPTIONS, { locations, rawInput: { cmd: `cat ${value}` } })).decision, `${kind} token ${value}`).toBe('reject')
+        }
+      }
+    })
+
+    it('still allows in-directory strings under unknown keys', () => {
+      const locations = [{ path: join(cwd, 'paper.md') }]
+      expect(decide(request('read', ALL_OPTIONS, { locations, rawInput: { source: join(cwd, 'paper.md'), note: 'attention is all', n: 3 } })).decision).toBe('allow')
+      expect(decide(request('search', ALL_OPTIONS, { locations, rawInput: { pattern: 'a..b', other: 'file.name' } })).decision).toBe('allow')
+    })
+
+    it('treats a single-slash file: path as a URI', () => {
+      expect(decide(readOf('file:/etc/passwd')).decision).toBe('reject')
+      expect(decide(readOf(`file:${join(outside, 'key.txt')}`)).decision).toBe('reject')
+      expect(isInsideDirectory('file:/etc/passwd', cwd)).toBe(false)
+    })
+
+    it('rejects globs with a leading-dot wildcard component', () => {
+      for (const pattern of ['.*/x', '.?/x', '.*/../x', 'a/.*/b', '.?*/etc']) {
+        expect(decide(request('search', ALL_OPTIONS, { rawInput: { glob: pattern, path: cwd } })).decision, `glob ${pattern}`).toBe('reject')
+        expect(decide(request('read', ALL_OPTIONS, { locations: [{ path: `${cwd}/${pattern}` }] })).decision, `location ${pattern}`).toBe('reject')
+      }
+      expect(decide(request('search', ALL_OPTIONS, { rawInput: { pattern: '.*foo', path: cwd } })).decision).toBe('allow')
+    })
+
     it('rejects read and search when the policy has no session directory', () => {
       expect(decidePermission(readOf(join(cwd, 'paper.md')), {}).decision).toBe('reject')
       expect(decidePermission(request('think'), {}).decision).toBe('allow')
@@ -220,9 +259,17 @@ describe('decidePermission', () => {
     expect(decide(request('execute', [])).response.outcome).toEqual({ outcome: 'cancelled' })
   })
 
-  it('uses allow_always for an allowed kind when allow_once is missing', () => {
+  it('uses allow_always for think when allow_once is missing', () => {
     const options = ALL_OPTIONS.filter((o) => o.kind !== 'allow_once')
-    expect(decide(readOf(join(cwd, 'paper.md'), options)).response.outcome).toEqual({ outcome: 'selected', optionId: 'aa' })
+    expect(decide(request('think', options)).response.outcome).toEqual({ outcome: 'selected', optionId: 'aa' })
+  })
+
+  it('never selects allow_always for read or search: cancels when allow_once is missing', () => {
+    const options = ALL_OPTIONS.filter((o) => o.kind !== 'allow_once')
+    expect(decide(readOf(join(cwd, 'paper.md'), options)).response.outcome).toEqual({ outcome: 'cancelled' })
+    const search = request('search', options, { rawInput: { pattern: 'x', path: cwd } })
+    expect(decide(search).response.outcome).toEqual({ outcome: 'cancelled' })
+    expect(decide(search).decision).toBe('cancelled')
   })
 
   it('cancels an allowed kind when the adapter offers no allow option', () => {

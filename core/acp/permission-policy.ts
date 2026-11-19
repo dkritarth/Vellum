@@ -58,6 +58,14 @@ const PATH_LIST_KEYS = ['paths', 'files', 'file_paths', 'filePaths', 'directorie
 const GLOB_KEYS = ['pattern', 'glob']
 /** A bracket or brace group containing a dot can expand to `.` or `..`. */
 const GLOB_DOT_CLASS = /\[[^\]]*\.|\{[^}]*\./
+/** A path component that starts with a dot and a wildcard (`.*`, `.?`) can match `..`. */
+const LEADING_DOT_WILDCARD = /^\.[*?]/
+/** True when a multi-component path has such a component. A bare `.*` is left
+ * alone: it is a common regex and, with no further component, only names entries. */
+function hasLeadingDotWildcard(path: string): boolean {
+  const parts = path.split(/[\\/]/)
+  return parts.length > 1 && parts.some((part) => LEADING_DOT_WILDCARD.test(part))
+}
 /** `rawInput` keys that mean the request is not a local file search. */
 const REMOTE_KEYS = ['query', 'queries', 'url']
 
@@ -95,10 +103,37 @@ function collectTargets(req: RequestPermissionRequest): string[] {
     for (const key of GLOB_KEYS) {
       // A glob only needs checking when it can leave the search root.
       const value = nonEmptyString(input[key])
-      if (value && (isAbsolute(value) || value.startsWith('~') || value.includes('..') || GLOB_DOT_CLASS.test(value))) targets.push(value)
+      if (value && (isAbsolute(value) || value.startsWith('~') || value.includes('..') || GLOB_DOT_CLASS.test(value) || hasLeadingDotWildcard(value))) targets.push(value)
     }
   }
   return targets
+}
+
+const MAX_LOOSE_STRINGS = 500
+const MAX_LOOSE_DEPTH = 8
+
+/** Every string anywhere in `rawInput`, under any key, bounded in depth and count. */
+function collectStrings(value: unknown, out: string[], depth = 0): void {
+  if (out.length >= MAX_LOOSE_STRINGS || depth > MAX_LOOSE_DEPTH) return
+  if (typeof value === 'string') out.push(value)
+  else if (Array.isArray(value)) for (const item of value) collectStrings(item, out, depth + 1)
+  else if (typeof value === 'object' && value !== null) for (const item of Object.values(value)) collectStrings(item, out, depth + 1)
+}
+
+/** True when a string, or any whitespace-separated token of it, looks like a
+ * path or URL that leaves the session directory. Applied to every rawInput
+ * value so a key the allow-list does not know (`source`, `target`, ...) cannot
+ * smuggle a path past the scoping. */
+function looseValueEscapes(value: string, cwd: string): boolean {
+  const candidates = [value, ...value.split(/\s+/)]
+  return candidates.some((candidate) => {
+    if (candidate === '') return false
+    if (candidate.split(/[\\/]/).includes('..')) return true
+    if (candidate.startsWith('~') || /^file:/i.test(candidate) || /^[a-z][a-z0-9+.-]*:\/\//i.test(candidate) || isAbsolute(candidate)) {
+      return !isInsideDirectory(candidate, cwd)
+    }
+    return false
+  })
 }
 
 function looksRemote(req: RequestPermissionRequest): boolean {
@@ -148,7 +183,7 @@ function resolveComponents(abs: string, depth: number): string {
  * inside `cwd` after symlinks and `..` are resolved. */
 export function isInsideDirectory(target: string, cwd: string): boolean {
   let path = target
-  if (/^file:\/\//i.test(path)) {
+  if (/^file:/i.test(path)) {
     try {
       path = fileURLToPath(path)
     } catch {
@@ -161,6 +196,7 @@ export function isInsideDirectory(target: string, cwd: string): boolean {
   // The glob part must never be able to climb: truncating `*/../../etc/*` to
   // `*` would hide the `..` segments, so refuse any glob that can expand to
   // `..` (a `..` anywhere, or a bracket/brace group containing a dot).
+  if (hasLeadingDotWildcard(path)) return false
   const globAt = path.search(/[*?[{]/)
   if (globAt >= 0) {
     const globPart = path.slice(globAt)
@@ -180,8 +216,14 @@ function scopeViolation(kind: string, req: RequestPermissionRequest, cwd: string
   const targets = collectTargets(req)
   const outside = targets.find((target) => !isInsideDirectory(target, cwd))
   if (outside !== undefined) return 'path outside the session directory'
+  const strings: string[] = []
+  collectStrings((req.toolCall as { rawInput?: unknown } | undefined)?.rawInput, strings)
+  if (strings.some((value) => looseValueEscapes(value, cwd))) return 'path outside the session directory'
   if (kind === 'read' && targets.length === 0) return 'no path determinable for read'
-  if (kind === 'search' && targets.length === 0 && looksRemote(req)) return 'search without a local path (web search)'
+  if (kind === 'search' && targets.length === 0) {
+    // Default-deny: a search must name a path inside the session directory.
+    return looksRemote(req) ? 'search without a local path (web search)' : 'search names no path inside the session directory'
+  }
   return undefined
 }
 
@@ -194,8 +236,9 @@ export function decidePermission(req: RequestPermissionRequest, policy: Permissi
   if (kind !== undefined && ALLOWED_TOOL_KINDS.has(kind)) {
     reason = scopeViolation(kind, req, policy.cwd)
     if (reason === undefined) {
-      // Prefer one-shot grants so approving a read never persists a blanket allow.
-      const allow = pickOption(options, ['allow_once', 'allow_always'])
+      // One-shot grants only for path-scoped kinds: approving a read must never
+      // persist a blanket allow (allow_always), so cancel when allow_once is absent.
+      const allow = pickOption(options, PATH_SCOPED_KINDS.has(kind) ? ['allow_once'] : ['allow_once', 'allow_always'])
       if (allow) {
         return { response: { outcome: { outcome: 'selected', optionId: allow.optionId } }, kind, title, decision: 'allow', optionId: allow.optionId }
       }

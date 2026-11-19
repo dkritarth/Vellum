@@ -9,7 +9,7 @@
 //    on PATH. See core/acp/README.md for the separate *live* smoke test.
 
 import { spawn, spawnSync, type ChildProcessByStdio } from 'node:child_process'
-import { existsSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Readable, Writable } from 'node:stream'
@@ -27,6 +27,7 @@ import {
   resolveAdapterCommand,
   toPromptBlocks,
   type SpawnAdapter,
+  buildClaudeSessionMeta,
 } from './stdio-client.js'
 
 type AdapterChildProcess = ChildProcessByStdio<Writable, Readable, null>
@@ -69,6 +70,7 @@ function send(msg) {
 }
 
 let sessionCwd = null
+let sessionMeta = null
 const permissionReplies = new Map()
 let pendingPrompt = null
 function finishPermissionProbe() {
@@ -97,6 +99,7 @@ rl.on('line', (line) => {
     send({ jsonrpc: '2.0', id: msg.id, result: { protocolVersion: 1, agentCapabilities } })
   } else if (msg.method === 'session/new') {
     sessionCwd = msg.params.cwd
+    sessionMeta = msg.params._meta ?? null
     const ids = modeVariant === 'no-safe-mode' ? ['auto', 'acceptEdits'] : ['default', 'read-only', 'auto', 'plan']
     const result = { sessionId: 'sess-1' }
     if (modeVariant !== 'no-modes') {
@@ -130,6 +133,8 @@ rl.on('line', (line) => {
     if (mode === 'modes-probe') {
       const summary = JSON.stringify({
         cwd: sessionCwd,
+        meta: sessionMeta,
+        processCwd: process.cwd(),
         currentMode,
         setModeCalls,
         env: { INITIAL_AGENT_MODE: process.env.INITIAL_AGENT_MODE ?? null, CODEX_CONFIG: process.env.CODEX_CONFIG ?? null },
@@ -249,9 +254,10 @@ rl.on('line', (line) => {
 `
 
 function spawnFakeAgent(mode: string, variant = '', useAdapterEnv = false): SpawnAdapter {
-  return (backend: AcpBackend): AdapterChildProcess =>
+  return (backend: AcpBackend, spawnOptions?: { cwd?: string }): AdapterChildProcess =>
     spawn(process.execPath, ['-e', FAKE_AGENT_SCRIPT, mode, variant], {
       stdio: ['pipe', 'pipe', 'inherit'],
+      ...(spawnOptions?.cwd !== undefined ? { cwd: spawnOptions.cwd } : {}),
       detached: process.platform !== 'win32',
       ...(useAdapterEnv ? { env: buildAdapterEnv(process.env, backend) } : {}),
     }) as AdapterChildProcess
@@ -374,6 +380,9 @@ describe('StdioAcpClient permission policy and cwd', () => {
 describe('StdioAcpClient session mode enforcement', () => {
   interface ModesReport {
     currentMode: string
+    cwd: string
+    processCwd: string
+    meta: { claudeCode?: { options?: { settingSources?: string[] } } } | null
     setModeCalls: string[]
     env: { INITIAL_AGENT_MODE: string | null; CODEX_CONFIG: string | null }
   }
@@ -407,7 +416,60 @@ describe('StdioAcpClient session mode enforcement', () => {
   it('starts the Codex adapter with INITIAL_AGENT_MODE=read-only and web search disabled', async () => {
     const report = await modes('codex', '', true)
     expect(report.env.INITIAL_AGENT_MODE).toBe('read-only')
-    expect(JSON.parse(report.env.CODEX_CONFIG ?? '{}')).toMatchObject({ web_search: 'disabled', features: { apps: false, shell_tool: false, unified_exec: false } })
+    expect(JSON.parse(report.env.CODEX_CONFIG ?? '{}')).toMatchObject({ web_search: 'disabled', features: { apps: false, shell_tool: false, unified_exec: false, view_image: false } })
+  })
+
+  it('disables Claude settings sources through session/new _meta and forwards only auth/model keys', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vellum-claude-cfg-test-'))
+    const previous = process.env.CLAUDE_CONFIG_DIR
+    writeFileSync(join(dir, 'settings.json'), JSON.stringify({
+      apiKeyHelper: '/bin/helper', env: { ANTHROPIC_BASE_URL: 'https://gw' }, model: 'm',
+      permissions: { allow: ['Read(//**)', 'Bash(*)'], defaultMode: 'bypassPermissions' }, hooks: { Stop: [] }, enabledPlugins: { p: true }, mcpServers: { x: {} },
+    }))
+    process.env.CLAUDE_CONFIG_DIR = dir
+    try {
+      const report = await modes('claude')
+      expect(report.meta).toEqual({ claudeCode: { options: { settingSources: [], settings: { apiKeyHelper: '/bin/helper', env: { ANTHROPIC_BASE_URL: 'https://gw' }, model: 'm' } } } })
+    } finally {
+      if (previous === undefined) delete process.env.CLAUDE_CONFIG_DIR
+      else process.env.CLAUDE_CONFIG_DIR = previous
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('buildClaudeSessionMeta never forwards permission rules and tolerates a missing or invalid settings file', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vellum-claude-cfg-test-'))
+    try {
+      expect(buildClaudeSessionMeta({ CLAUDE_CONFIG_DIR: dir })).toEqual({ claudeCode: { options: { settingSources: [] } } })
+      writeFileSync(join(dir, 'settings.json'), '{not json')
+      expect(buildClaudeSessionMeta({ CLAUDE_CONFIG_DIR: dir })).toEqual({ claudeCode: { options: { settingSources: [] } } })
+      writeFileSync(join(dir, 'settings.json'), JSON.stringify({ permissions: { allow: ['Bash'] }, theme: 'dark' }))
+      expect(buildClaudeSessionMeta({ CLAUDE_CONFIG_DIR: dir })).toEqual({ claudeCode: { options: { settingSources: [] } } })
+      writeFileSync(join(dir, 'settings.json'), '[1]')
+      expect(buildClaudeSessionMeta({ CLAUDE_CONFIG_DIR: dir })).toEqual({ claudeCode: { options: { settingSources: [] } } })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('sends no Claude _meta to Codex or Antigravity', async () => {
+    expect((await modes('codex')).meta).toBeNull()
+    expect((await modes('antigravity')).meta).toBeNull()
+  })
+
+  it('spawns the adapter process in the session cwd', async () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'vellum-spawn-cwd-')))
+    try {
+      const client = new StdioAcpClient(spawnFakeAgent('modes-probe'), {}, { onPermissionDecision: () => {} })
+      const session = await client.newSession('codex', { cwd: dir })
+      const updates = await collect(session.prompt({ text: 'probe' }))
+      await session.dispose()
+      const report = JSON.parse(updates.filter((u) => u.kind === 'text').map((u) => (u.data as { text: string }).text).join(''))
+      expect(report.cwd).toBe(dir)
+      expect(report.processCwd).toBe(dir)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   it('does not touch the mode of an Antigravity session', async () => {
@@ -750,7 +812,7 @@ describe('buildAdapterEnv', () => {
       service_tier: 'default',
       nested: { keep: true },
       web_search: 'disabled',
-      features: { apps: false, shell_tool: false, unified_exec: false },
+      features: { apps: false, shell_tool: false, unified_exec: false, view_image: false },
     })
     expect(sourceEnv.CODEX_CONFIG).toBe('{"model":"old","service_tier":"default","nested":{"keep":true}}')
   })
@@ -759,7 +821,7 @@ describe('buildAdapterEnv', () => {
     const sourceEnv = Object.freeze({ VELLUM_CODEX_MODEL: '  gpt-6.1-sol  ' })
     expect(buildAdapterEnv(sourceEnv, 'codex')).toEqual({
       ...sourceEnv,
-      CODEX_CONFIG: '{"model":"gpt-6.1-sol","web_search":"disabled","features":{"apps":false,"shell_tool":false,"unified_exec":false}}',
+      CODEX_CONFIG: '{"model":"gpt-6.1-sol","web_search":"disabled","features":{"apps":false,"shell_tool":false,"unified_exec":false,"view_image":false}}',
       INITIAL_AGENT_MODE: 'read-only',
     })
     expect(sourceEnv).not.toHaveProperty('CODEX_CONFIG')
@@ -768,7 +830,7 @@ describe('buildAdapterEnv', () => {
   it.each([undefined, '', ' \n '])('adds only Vellum session limits to Codex config with no model override (%j)', (model) => {
     const sourceEnv = { VELLUM_CODEX_MODEL: model, CODEX_CONFIG: '{"service_tier":"default"}' }
     const env = buildAdapterEnv(sourceEnv, 'codex')
-    expect(JSON.parse(env.CODEX_CONFIG ?? '')).toEqual({ service_tier: 'default', web_search: 'disabled', features: { apps: false, shell_tool: false, unified_exec: false } })
+    expect(JSON.parse(env.CODEX_CONFIG ?? '')).toEqual({ service_tier: 'default', web_search: 'disabled', features: { apps: false, shell_tool: false, unified_exec: false, view_image: false } })
     expect(env.INITIAL_AGENT_MODE).toBe('read-only')
     expect(buildAdapterArgs('codex', sourceEnv)).toEqual([])
   })
@@ -779,7 +841,7 @@ describe('buildAdapterEnv', () => {
       'codex',
     )
     expect(env.INITIAL_AGENT_MODE).toBe('read-only')
-    expect(JSON.parse(env.CODEX_CONFIG ?? '')).toEqual({ model: 'm', web_search: 'disabled', features: { apps: false, shell_tool: false, unified_exec: false, keep: true } })
+    expect(JSON.parse(env.CODEX_CONFIG ?? '')).toEqual({ model: 'm', web_search: 'disabled', features: { apps: false, shell_tool: false, unified_exec: false, view_image: false, keep: true } })
   })
 
   it('rejects invalid config without a model override using a fixed message', () => {

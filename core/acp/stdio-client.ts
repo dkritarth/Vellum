@@ -105,7 +105,7 @@ export function buildAdapterArgs(
  * tests never require a live, signed-in `claude-code-acp` / `codex-acp` on
  * PATH — see stdio-client.test.ts, which substitutes a small local ndjson
  * ACP-agent script in place of the real adapter. */
-export type SpawnAdapter = (backend: AcpBackend) => AdapterChildProcess
+export type SpawnAdapter = (backend: AcpBackend, spawnOptions?: { cwd?: string }) => AdapterChildProcess
 
 /** `claude-code-acp` refuses to launch when it sees `CLAUDECODE` set (the
  * signal a parent process is itself a Claude Code session) — it hard-exits
@@ -208,7 +208,42 @@ const CODEX_WEB_SEARCH = 'disabled'
  * need the shell; larger papers are only linked and Codex cannot open them.
  * Still exposed: `view_image` (reads image files by path), `apply_patch`
  * (approval-gated, rejected as kind `edit`) and user-configured MCP servers. */
-const CODEX_RESTRICTED_FEATURES = { apps: false, shell_tool: false, unified_exec: false } as const
+const CODEX_RESTRICTED_FEATURES = { apps: false, shell_tool: false, unified_exec: false, view_image: false } as const
+
+/** Claude Code settings keys that carry sign-in or model choice, not policy.
+ * With no setting sources the CLI cannot find a user's `apiKeyHelper` or
+ * gateway `env`, so these are re-supplied through the programmatic settings tier. */
+const CLAUDE_FORWARDED_SETTING_KEYS = ['apiKeyHelper', 'env', 'model', 'awsAuthRefresh', 'awsCredentialExport', 'forceLoginMethod', 'forceLoginOrgUUID'] as const
+
+/** `session/new` _meta for Claude. claude-agent-acp hard-codes
+ * `settingSources: ["user","project","local"]` but spreads
+ * `_meta.claudeCode.options` over it (v1/acp-agent.js). Claude Code matches
+ * allow rules (`Read(//**)`, `Bash(*)`) in those files before `canUseTool`, so
+ * with them loaded a permissive user setting skips requestPermission and the
+ * policy entirely (live probe: canary read through Read and Bash, 0 permission
+ * lines). An empty `settingSources` drops them, along with user hooks, plugins
+ * and MCP servers. It also drops sign-in config (`apiKeyHelper`, gateway
+ * `env`) which, on a host that signs in that way, makes the session fail with
+ * "OAuth session expired". So only the auth/model keys of the user's
+ * settings.json are re-supplied as programmatic `settings`; permission rules
+ * are never copied. */
+export function buildClaudeSessionMeta(sourceEnv: NodeJS.ProcessEnv = process.env): { claudeCode: { options: { settingSources: string[]; settings?: Record<string, unknown> } } } {
+  const options: { settingSources: string[]; settings?: Record<string, unknown> } = { settingSources: [] }
+  try {
+    const configDir = sourceEnv.CLAUDE_CONFIG_DIR?.trim() || join(sourceEnv.HOME ?? homedir(), '.claude')
+    const parsed: unknown = JSON.parse(readFileSync(join(configDir, 'settings.json'), 'utf8'))
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      const settings: Record<string, unknown> = {}
+      for (const key of CLAUDE_FORWARDED_SETTING_KEYS) {
+        if ((parsed as Record<string, unknown>)[key] !== undefined) settings[key] = (parsed as Record<string, unknown>)[key]
+      }
+      if (Object.keys(settings).length > 0) options.settings = settings
+    }
+  } catch {
+    // No readable settings file: nothing to forward.
+  }
+  return { claudeCode: { options } }
+}
 
 const RAW_API_KEY_ENV = ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'OPENAI_API_KEY', 'CODEX_API_KEY']
 
@@ -240,8 +275,11 @@ export function describeSessionError(backend: AcpBackend, err: unknown): Error |
   return new Error(`${ADAPTERS[backend].command} is not signed in. Sign in with its CLI, then try again.`)
 }
 
-const defaultSpawnAdapter: SpawnAdapter = (backend) => {
+const defaultSpawnAdapter: SpawnAdapter = (backend, spawnOptions) => {
   return spawn(resolveAdapterCommand(backend), buildAdapterArgs(backend), {
+    // Session cwd as process cwd too: adapters resolve relative paths and
+    // read project config from it, and the app's own cwd is the source checkout.
+    ...(spawnOptions?.cwd !== undefined ? { cwd: spawnOptions.cwd } : {}),
     stdio: ['pipe', 'pipe', 'inherit'],
     env: buildAdapterEnv(process.env, backend),
     detached: process.platform !== 'win32',
@@ -732,7 +770,7 @@ export class StdioAcpClient implements AcpClient {
       if (ephemeral) rmSync(cwd, { recursive: true, force: true })
     }
     const command = ADAPTERS[backend].command
-    const child = this.spawnAdapter(backend)
+    const child = this.spawnAdapter(backend, { cwd })
     const tracker = describeChildFailure(child, command)
     const failure = childFailure(child, command, tracker)
     const handshakeMs = this.timeouts.handshakeMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS
@@ -798,7 +836,7 @@ export class StdioAcpClient implements AcpClient {
       ])
 
       const newSessionResult = await Promise.race([
-        connection.newSession({ cwd, mcpServers: [] }),
+        connection.newSession({ cwd, mcpServers: [], ...(backend === 'claude' ? { _meta: buildClaudeSessionMeta() } : {}) }),
         failure,
         handshake.promise,
       ])

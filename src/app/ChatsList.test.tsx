@@ -183,6 +183,13 @@ describe('ChatsList [L2-02]', () => {
     expect(screen.getByText('No chats matching "new"')).toBeVisible()
   })
 
+  it('shows a list load failure without the IPC wrapper (#272)', async () => {
+    vi.mocked(window.vellum.chatListSessions).mockRejectedValueOnce(new Error("Error invoking remote method 'vellum:chat-list-sessions': Error: listChatSessions: database is locked"))
+    render(<ChatsList selectedSessionId={null} onSelectSession={vi.fn()} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Database is locked')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('invoking remote method')
+  })
+
   it('clears the previous query error and results while the new query loads', async () => {
     const current = deferred<ChatSessionSummary[]>()
     vi.mocked(window.vellum.chatListSessions)

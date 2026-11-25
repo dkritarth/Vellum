@@ -6,7 +6,9 @@
 // only need <message>.
 const IPC_WRAPPER = /^Error invoking remote method '[^']*':\s*/
 const ERROR_PREFIX = /^(?:[A-Z][A-Za-z]*Error|Error):\s*/
-const FUNCTION_PREFIX = /^[a-z][A-Za-z0-9]*:\s+/
+// Core function names (`openChat: `) and main-process channel names
+// (`vellum:ask-start: `) that prefix messages thrown in the main process.
+const FUNCTION_PREFIX = /^(?:vellum:[a-z-]+|[a-z][A-Za-z0-9]*):\s+/
 
 export function friendlyIpcError(err: unknown, fallback = 'Something went wrong.'): string {
   let message = err instanceof Error ? err.message : typeof err === 'string' ? err : ''

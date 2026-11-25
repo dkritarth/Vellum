@@ -56,7 +56,7 @@ export function ChatsList({ selectedSessionId, onSelectSession, onSessionDeleted
         setError(null)
       } catch (err: unknown) {
         if (!isCurrent()) return
-        setError(err instanceof Error ? err.message : String(err))
+        setError(friendlyIpcError(err))
       } finally {
         if (isCurrent()) setLoading(false)
       }

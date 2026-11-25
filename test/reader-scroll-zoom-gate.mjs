@@ -284,6 +284,86 @@ async function run() {
     await window.press('input[aria-label="Search in document"]', 'Escape')
     assert.strictEqual(await window.locator('[data-search-hit]').count(), 0, 'Escape clears hits')
 
+    // 8b. (#259) Several hits on one page. The counter counts hits, and
+    // Next/Previous (buttons and Enter/Shift+Enter) step through every hit on
+    // a page, scrolling each into view, before moving on; both ends wrap.
+    // Zoomed in so a page is taller than the pane and stepping must scroll.
+    await window.locator(VIEWPORT).focus()
+    for (let i = 0; i < 4; i += 1) await window.keyboard.press('Control+=')
+    await window.waitForTimeout(600)
+    const SEARCH = 'input[aria-label="Search in document"]'
+    const current = () =>
+      window.evaluate((sel) => {
+        const vp = document.querySelector(sel)
+        const view = vp.getBoundingClientRect()
+        const inView = (el) => {
+          const r = el.getBoundingClientRect()
+          return r.top >= view.top && r.bottom <= view.top + vp.clientHeight && r.left >= view.left && r.right <= view.left + vp.clientWidth
+        }
+        const hits = [...document.querySelectorAll('[data-search-current]')]
+        const pageOf = (el) => Number(el.closest('[data-page-number]').dataset.pageNumber)
+        const page1Hits = new Set([...document.querySelectorAll('[data-page-number="1"] [data-search-hit]')].map((el) => el.dataset.searchHit))
+        return {
+          counter: document.querySelector('[aria-label="Search matches"]')?.textContent ?? '',
+          hits: hits.map((el) => ({ page: pageOf(el), hit: Number(el.dataset.searchHit), inView: inView(el) })),
+          page1Marked: page1Hits.size,
+          scrollTop: vp.scrollTop,
+        }
+      }, VIEWPORT)
+    // Wait until the counter reads `k / total` and hit `hit` on `page` is
+    // the current hit and fully in view. `page` null means any page after 1.
+    async function expectCurrent(k, page, hit, label) {
+      const deadline = Date.now() + 10000
+      let c
+      do {
+        c = await current()
+        const ok = c.counter.startsWith(`${k} / `) && c.hits.length > 0 && c.hits.every((h) => (page === null ? h.page > 1 : h.page === page) && h.hit === hit) && c.hits[0].inView
+        if (ok) return c
+        await window.waitForTimeout(100)
+      } while (Date.now() < deadline)
+      throw new Error(`${label}: expected hit ${k} = page ${page} hit ${hit} current and in view, got ${JSON.stringify(c)}`)
+    }
+    await window.fill(SEARCH, 'attention')
+    await window.press(SEARCH, 'Enter')
+    let c = await expectCurrent(1, 1, 0, 'search')
+    const total = Number(c.counter.split(' / ')[1])
+    const onPage1 = c.page1Marked
+    console.log(`8b. search "attention": ${c.counter}, ${onPage1} hits marked on page 1`)
+    assert(onPage1 >= 2, 'page 1 has several hits')
+    assert(total > onPage1, 'counter totals hits across pages')
+    let scrolledToSamePageHit = false
+    for (let k = 1; k < onPage1; k += 1) {
+      const before = c.scrollTop
+      if (k % 2) await window.click('button[aria-label="Next match"]')
+      else await window.press(SEARCH, 'Enter')
+      c = await expectCurrent(k + 1, 1, k, `next to page-1 hit ${k}`)
+      if (c.scrollTop !== before) scrolledToSamePageHit = true
+    }
+    console.log(`    stepped through all ${onPage1} page-1 hits; scrolled within page 1: ${scrolledToSamePageHit}`)
+    assert(scrolledToSamePageHit, 'stepping to a later hit on the same page scrolls it into view')
+    await window.click('button[aria-label="Next match"]')
+    c = await expectCurrent(onPage1 + 1, null, 0, 'next leaves page 1 for the next page with a hit')
+    await window.press(SEARCH, 'Shift+Enter')
+    c = await expectCurrent(onPage1, 1, onPage1 - 1, 'shift+enter back to last page-1 hit')
+    for (let k = onPage1 - 1; k >= 1; k -= 1) await window.click('button[aria-label="Previous match"]')
+    c = await expectCurrent(1, 1, 0, 'previous back to first hit')
+    await window.click('button[aria-label="Previous match"]')
+    // The last hit's index on its page isn't known up front; read it once the counter wraps.
+    await window.getByLabel('Search matches', { exact: true }).filter({ hasText: `${total} / ${total}` }).waitFor()
+    // The jump mounts that page; its hit marks follow once its text layer is built.
+    await window.waitForSelector('[data-search-current]')
+    c = await current()
+    assert(c.hits.length > 0 && c.hits[0].page > 1, `previous from the first hit wraps to the last: ${JSON.stringify(c)}`)
+    c = await expectCurrent(total, c.hits[0].page, c.hits[0].hit, 'previous from the first hit wraps to the last')
+    await window.click('button[aria-label="Next match"]')
+    await expectCurrent(1, 1, 0, 'next from the last hit wraps to the first')
+    console.log(`    wrapped both ways (${total} / ${total} on page ${c.hits[0].page})`)
+    await shot('08b-search-hits')
+    await window.press(SEARCH, 'Escape')
+    await window.locator(VIEWPORT).focus()
+    await window.keyboard.press('Control+0')
+    await window.waitForTimeout(400)
+
     // 9. Position + zoom survive switching to another paper's tab and back;
     // tabs close.
     await window.locator(VIEWPORT).focus()

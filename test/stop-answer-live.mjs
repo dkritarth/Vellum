@@ -156,6 +156,27 @@ try {
   await shot('04-after-restart.png')
   console.log(`PASS restart shows identical conversation (${title})`)
 
+  // 8. After a finished turn, New chat, then a cold-start turn: Stop is on
+  // screen before any answer text arrives, and ends the turn (#254 review).
+  await composer().fill('Reply with exactly the single word OK.')
+  await button('Send').click()
+  await window.waitForFunction(() => ![...document.querySelectorAll('button')].some((element) => element.textContent === 'Sending…'),
+    undefined, { timeout: 180_000 })
+  await waitForIdleComposer(30_000)
+  await button('New chat').click()
+  await window.waitForFunction(() => document.querySelectorAll('[class*=assistantMessage]').length === 0)
+  await waitForIdleComposer(30_000)
+  await composer().fill('Explain every section of this paper in detail, at least 1500 words.')
+  await button('Send').click()
+  const coldStop = window.getByRole('button', { name: 'Stop', exact: true })
+  await coldStop.waitFor({ timeout: 3_000 })
+  const answerTextAtStop = await window.evaluate(() => [...document.querySelectorAll('[class*=assistantMessage]')].map((element) => element.innerText).join('').trim())
+  await shot('05-new-chat-cold-start-stop.png')
+  await coldStop.click()
+  await waitForIdleComposer(STOP_DEADLINE_MS + 10_000)
+  assert.equal(await window.getByRole('alert').count(), 0, 'a Stop during session start is not an error')
+  console.log(`PASS Stop visible during New chat cold start (answer text then: ${answerTextAtStop.length} chars) and ends the turn`)
+
   await close()
   assertNoConsoleErrors(consoleLogs)
   console.log('PASS console clean')

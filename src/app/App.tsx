@@ -54,6 +54,14 @@ export function App(): JSX.Element {
   const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null)
   const [selectedCollectionName, setSelectedCollectionName] = useState<string | null>(null)
   const [selectedChatSessionId, setSelectedChatSessionId] = useState<number | null>(null)
+  // Bumped per Chats-list click: re-selecting the same chat must reload Ask.
+  const [chatNavigationNonce, setChatNavigationNonce] = useState(0)
+  // Conversation Ask shows (New chat can move it away from the selection).
+  const [displayedChatSessionId, setDisplayedChatSessionId] = useState<number | null>(null)
+  // Latest committed value, read after awaits where the click-time closure
+  // would be stale (a load may have started or finished meanwhile).
+  const displayedChatRef = useRef(displayedChatSessionId)
+  displayedChatRef.current = displayedChatSessionId
   const [deletedSessionIds, setDeletedSessionIds] = useState<readonly number[]>([])
   const [chatBanner, setChatBanner] = useState<string | null>(null)
   // Library reached via the Search nav item: highlight Search and focus the
@@ -97,8 +105,13 @@ export function App(): JSX.Element {
       }
       if (paper) {
         setChatBanner(null)
+        // Ask already shows this chat: reloading would wipe the unsent draft.
+        const alreadyShown = session.id === displayedChatRef.current && paper.slug === activeTabId && rightPanelTab === 'Ask'
         openPaper({ slug: paper.slug, title: paper.title })
-        setSelectedChatSessionId(session.id)
+        if (!alreadyShown) {
+          setSelectedChatSessionId(session.id)
+          setChatNavigationNonce((nonce) => nonce + 1)
+        }
         setRightPanelTab('Ask')
       } else {
         setChatBanner(`Chat "${session.title}" references paper "${session.paperSlug}" which was not found in your library.`)
@@ -116,6 +129,7 @@ export function App(): JSX.Element {
 
   function handleSessionDeleted(id: number): void {
     if (chatNavigation.current?.sessionId === id) chatNavigation.current = null
+    setDisplayedChatSessionId((displayed) => (displayed === id ? null : displayed))
     setDeletedSessionIds((ids) => [...ids, id])
   }
 
@@ -162,13 +176,19 @@ export function App(): JSX.Element {
 
   function openPaper(paper: { slug: string; title: string }): void {
     setTabs((current) => (current.some((tab) => tab.id === paper.slug) ? current : [...current, { id: paper.slug, title: paper.title }]))
-    if (paper.slug !== activeTabId) setSelectedChatSessionId(null)
+    if (paper.slug !== activeTabId) {
+      setSelectedChatSessionId(null)
+      setDisplayedChatSessionId(null)
+    }
     setActiveTabId(paper.slug)
     navigateView('reader')
   }
 
   function selectTab(id: string): void {
-    if (id !== activeTabId) setSelectedChatSessionId(null)
+    if (id !== activeTabId) {
+      setSelectedChatSessionId(null)
+      setDisplayedChatSessionId(null)
+    }
     setActiveTabId(id)
     navigateView('reader')
   }
@@ -242,7 +262,7 @@ export function App(): JSX.Element {
           onNavChange={handleNavChange}
           selectedCollectionId={selectedCollectionId}
           onSelectCollection={handleSelectCollection}
-          selectedSessionId={selectedChatSessionId}
+          selectedSessionId={displayedChatSessionId ?? selectedChatSessionId}
           onSelectSession={handleSelectChatSession}
           onSessionDeleted={handleSessionDeleted}
           onSelectTrash={() => navigateView('trash')}
@@ -346,6 +366,8 @@ export function App(): JSX.Element {
           injectedPrompt={injectedPrompt}
           onInjectedPromptHandled={handleInjectedPromptHandled}
           targetSessionId={selectedChatSessionId}
+          targetSessionNonce={chatNavigationNonce}
+          onSessionDisplayed={setDisplayedChatSessionId}
           deletedSessionIds={deletedSessionIds}
         />
         </div>

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
@@ -351,7 +351,7 @@ describe('chat navigation ownership', () => {
     slug: `paper-${name.toLowerCase()}`, title: `Paper ${name}`, authors: [],
     addedAt: '2026-01-01', pdfPath: 'paper.pdf', mdPath: 'paper.md',
   }))
-  async function setup() {
+  async function setup(extraSessions: Array<{ id: number; paperSlug: string; title: string }> = []) {
     const user = userEvent.setup()
     const deleted = new Set<number>()
     Object.assign(window.vellum, {
@@ -362,7 +362,10 @@ describe('chat navigation ownership', () => {
       chatListSessions: vi.fn().mockResolvedValue(papers.map((paper, i) => ({
         id: i + 1, paperSlug: paper.slug, paperTitle: paper.title, title: `Chat ${i + 1}`,
         backend: 'codex', messageCount: 1, lastActiveAt: '2026-01-01',
-      }))),
+      })).concat(extraSessions.map((extra) => ({
+        ...extra, paperTitle: papers.find((paper) => paper.slug === extra.paperSlug)!.title,
+        backend: 'codex', messageCount: 1, lastActiveAt: '2026-01-01',
+      })))),
       askOpen: vi.fn().mockImplementation(async (target: string | { slug: string; sessionId?: number }) => {
         const slug = typeof target === 'string' ? target : target.slug
         const requestedId = typeof target === 'string' ? (slug === 'paper-a' ? 1 : 2) : target.sessionId
@@ -406,6 +409,53 @@ describe('chat navigation ownership', () => {
     expect(window.vellum.askOpen).toHaveBeenCalledTimes(1)
     expect(window.vellum.askOpen).toHaveBeenLastCalledWith({ slug: 'paper-b', sessionId: 2 })
   })
+  it('reopens the selected chat after New chat moved Ask away from it', async () => {
+    const { user, chat } = await setup()
+    window.vellum.askNewChat = vi.fn().mockResolvedValue({
+      session: { id: 9, paperSlug: 'paper-a', backend: 'codex', title: null, createdAt: 't' },
+    })
+    await user.click(chat(1))
+    await waitFor(() => expect(window.vellum.askOpen).toHaveBeenCalledTimes(1))
+    await user.click(screen.getByRole('button', { name: 'New chat' }))
+    // The list highlights the conversation Ask shows, not the stale click.
+    await waitFor(() => expect(chat(1)).toHaveAttribute('aria-selected', 'false'))
+    await user.click(chat(1))
+    await waitFor(() => expect(window.vellum.askOpen).toHaveBeenCalledTimes(2))
+    expect(window.vellum.askOpen).toHaveBeenLastCalledWith({ slug: 'paper-a', sessionId: 1 })
+    await waitFor(() => expect(chat(1)).toHaveAttribute('aria-selected', 'true'))
+  })
+
+  it('keeps the draft when the chat Ask already shows is clicked again', async () => {
+    const { user, chat } = await setup()
+    await user.click(chat(1))
+    await waitFor(() => expect(window.vellum.askOpen).toHaveBeenCalledTimes(1))
+    await user.type(screen.getByLabelText('Ask a question'), 'Unsent draft')
+    await user.click(chat(1))
+    await waitFor(() => expect(window.vellum.getPaper).toHaveBeenCalledTimes(2))
+    expect(window.vellum.askOpen).toHaveBeenCalledTimes(1)
+    expect(screen.getByLabelText('Ask a question')).toHaveValue('Unsent draft')
+    expect(chat(1)).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('ends on the last clicked chat when the shown chat is re-clicked while another of its paper loads', async () => {
+    const { user, chat } = await setup([{ id: 4, paperSlug: 'paper-a', title: 'Chat 4' }])
+    await user.click(chat(1))
+    await waitFor(() => expect(window.vellum.askOpen).toHaveBeenCalledTimes(1))
+    let finishChat4!: () => void
+    const askOpen = vi.mocked(window.vellum.askOpen)
+    const respond = askOpen.getMockImplementation()!
+    askOpen.mockImplementationOnce((target) => new Promise((resolve) => { finishChat4 = () => resolve(respond(target)) }))
+    await user.click(chat(4))
+    await waitFor(() => expect(askOpen).toHaveBeenLastCalledWith({ slug: 'paper-a', sessionId: 4 }))
+    // Chat 4 is still loading; Ask no longer shows chat 1.
+    await user.click(chat(1))
+    await waitFor(() => expect(askOpen).toHaveBeenCalledTimes(3))
+    expect(askOpen).toHaveBeenLastCalledWith({ slug: 'paper-a', sessionId: 1 })
+    await act(async () => finishChat4())
+    expect(chat(1)).toHaveAttribute('aria-selected', 'true')
+    expect(chat(4)).toHaveAttribute('aria-selected', 'false')
+  })
+
   it('keeps displayed chat and draft until associated paper resolves, then commits both', async () => {
     const { user, chat } = await setup()
     await user.click(chat(1))

@@ -222,6 +222,17 @@ describe('classifyInput', () => {
     expect(classifyInput('10.48550/arXiv.hep-th/9901001').value).toBe('hep-th/9901001')
   })
 
+  it('rejects an arXiv DOI whose suffix is not an arXiv identifier', () => {
+    // The suffix must never be classified as a local path or a download URL.
+    for (const input of [
+      'https://doi.org/10.48550/arXiv./home/u/x.pdf',
+      '10.48550/arXiv.https://host/a.pdf',
+      '10.48550/arXiv.garbage',
+    ]) {
+      expect(() => classifyInput(input)).toThrow(/unrecognized arXiv DOI/)
+    }
+  })
+
   it('ignores query strings and fragments on arXiv links', () => {
     for (const input of [
       'https://arxiv.org/abs/1706.03762?context=cs.LG',

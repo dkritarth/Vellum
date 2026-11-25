@@ -119,7 +119,15 @@ export function classifyInput(raw: string): ClassifiedInput {
     }
   }
   const arxivDoi = doiName.match(ARXIV_DOI_RE)
-  if (arxivDoi) return classifyInput(arxivDoi[1])
+  if (arxivDoi) {
+    // Only an arXiv identifier may follow the prefix. Classifying an arbitrary
+    // remainder would let a DOI string become a local path or a download URL.
+    const id = arxivDoi[1]
+    if (!ARXIV_ID_RE.test(id) && !LEGACY_ARXIV_RE.test(id)) {
+      throw new Error(`classifyInput: unrecognized arXiv DOI: ${trimmed}`)
+    }
+    return classifyInput(id)
+  }
   if (DOI_BARE_RE.test(doiName)) {
     // DOI case folding applies to ASCII letters; URL escaping is transport-only.
     // https://www.crossref.org/documentation/member-setup/constructing-your-dois/

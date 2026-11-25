@@ -1092,12 +1092,14 @@ describe('Reader outline lands on the section, not the page top (#266)', () => {
   // A 600x1000pt page whose viewport flips PDF y (which grows upward) into
   // a top-down CSS offset, the way pdf.js's PageViewport does for an
   // unrotated page with a zero-origin crop box.
+  let rotation = 0
   function positionedPage(text: string): unknown {
     return {
       ...fakePage(text),
       getViewport: ({ scale = 1 }: { scale?: number } = {}) => ({
         width: 600 * scale,
         height: 1000 * scale,
+        rotation,
         convertToViewportPoint: (x: number, y: number) => [x * scale, (1000 - y) * scale],
       }),
     }
@@ -1150,6 +1152,17 @@ describe('Reader outline lands on the section, not the page top (#266)', () => {
     await user.click(screen.getByRole('button', { name: 'Results' }))
     expect(viewport.scrollTop).toBe(1016 + 600 * 1.5 - 8)
     expect(screen.getByLabelText('Page')).toHaveTextContent('2 of 2')
+  })
+
+  it('lands an x-less /FitH destination on the page top when the page is turned 90°', async () => {
+    rotation = 90
+    try {
+      const { viewport, user } = await openOutline()
+      await user.click(screen.getByRole('button', { name: 'Results' }))
+      expect(viewport.scrollTop).toBe(1016 - 8)
+    } finally {
+      rotation = 0
+    }
   })
 
   it('keeps destinations without a position at the page top', async () => {

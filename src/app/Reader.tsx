@@ -166,13 +166,14 @@ function isRefProxy(value: unknown): value is PdfRefProxy {
  * and /FitR carry no top to land on. A null top means "keep the current
  * position", which for an outline jump is the page top.
  */
-function destPoint(dest: unknown[]): { x: number; y: number } | null {
+function destPoint(dest: unknown[]): { x: number; y: number; hasX: boolean } | null {
   const kind = (dest[1] as { name?: unknown } | null)?.name
   const top = kind === 'XYZ' ? dest[3] : kind === 'FitH' || kind === 'FitBH' ? dest[2] : null
   if (typeof top !== 'number' || !Number.isFinite(top)) return null
   // x only matters on a rotated page; only /XYZ carries one.
   const left = kind === 'XYZ' ? dest[2] : null
-  return { x: typeof left === 'number' && Number.isFinite(left) ? left : 0, y: top }
+  const hasX = typeof left === 'number' && Number.isFinite(left)
+  return { x: hasX ? left : 0, y: top, hasX }
 }
 
 async function resolveDest(
@@ -196,6 +197,9 @@ async function resolveDest(
     // to a top-down offset in CSS px. At scale 1 that offset scales linearly
     // with zoom, so the jump multiplies it by the zoom in effect at click time.
     const viewport = (await pdf.getPage(pageNumber)).getViewport({ scale: 1 })
+    // On a page turned 90° or 270°, the vertical screen offset comes from the
+    // PDF x, which /FitH and /FitBH do not carry; land on the page top.
+    if (!point.hasX && (viewport.rotation ?? 0) % 180 !== 0) return { pageNumber, top: null }
     const [, top] = viewport.convertToViewportPoint(point.x, point.y)
     return { pageNumber, top: Number.isFinite(top) ? Math.max(0, Math.min(top, viewport.height)) : null }
   } catch {

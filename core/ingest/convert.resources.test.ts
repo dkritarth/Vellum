@@ -12,12 +12,13 @@ vi.mock('unpdf', () => ({ getDocumentProxy, extractTextItems }))
 beforeEach(() => {
   vi.clearAllMocks()
   getDocumentProxy.mockResolvedValue(document)
-  extractTextItems.mockResolvedValue({ items: [[{ str: 'Paper text', fontSize: 12 }]] })
+  // Enough text per page to count as a paper, not a scanned page (#274).
+  extractTextItems.mockResolvedValue({ items: [[{ str: 'Paper text '.repeat(20), fontSize: 12 }]] })
 })
 
 it('supplies readable local fonts explicitly and extracts through the owned document', async () => {
   const bytes = new Uint8Array([1])
-  await expect(convertPdfToMarkdown(bytes)).resolves.toBe('Paper text\n')
+  await expect(convertPdfToMarkdown(bytes)).resolves.toBe(`${'Paper text '.repeat(20).trim()}\n`)
   expect(getDocumentProxy).toHaveBeenCalledWith(bytes, {
     standardFontDataUrl: expect.stringMatching(/standard_fonts\/$/),
     disableFontFace: true,

@@ -70,6 +70,37 @@ export function rangeFromAnchor(container: Node, anchor: HighlightAnchor): Range
   return range
 }
 
+/**
+ * Where a stored highlight belongs on the page as rendered now. The stored
+ * offsets are trusted only while the text there still reads as the stored
+ * quote (whitespace ignored: a selection's text has line breaks the layer's
+ * text does not). When it does not, as after re-adding a paper whose PDF
+ * changed (an arXiv revision), the quote is searched for and the match
+ * nearest the old offset is used; null when the quote is not on the page,
+ * so a highlight is never drawn over unrelated text. Highlights saved
+ * without a quote keep their offsets.
+ */
+export function locateHighlight(container: Node, anchor: HighlightAnchor, quote: string): HighlightAnchor | null {
+  const wanted = quote.replace(/\s+/g, '')
+  if (!wanted) return anchor
+  const text = container.textContent ?? ''
+  if (text.slice(anchor.start, anchor.end).replace(/\s+/g, '') === wanted) return anchor
+  // Search the page text with whitespace removed, mapping back to offsets.
+  const positions: number[] = []
+  let compact = ''
+  for (let i = 0; i < text.length; i += 1) {
+    if (/\s/.test(text[i])) continue
+    positions.push(i)
+    compact += text[i]
+  }
+  let best: HighlightAnchor | null = null
+  for (let at = compact.indexOf(wanted); at !== -1; at = compact.indexOf(wanted, at + 1)) {
+    const found = { start: positions[at], end: positions[at + wanted.length - 1] + 1 }
+    if (!best || Math.abs(found.start - anchor.start) < Math.abs(best.start - anchor.start)) best = found
+  }
+  return best
+}
+
 // ---------------------------------------------------------------------------
 // [P2-03] Inline citation click-through.
 //

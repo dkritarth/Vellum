@@ -20,6 +20,7 @@ import {
   clearReaderViewState,
   injectCitationMarkers,
   rangeFromAnchor,
+  locateHighlight,
   Reader,
   type ReferenceIndex,
 } from './Reader'
@@ -308,6 +309,27 @@ describe('anchorFromRange / rangeFromAnchor [P2-02]', () => {
 
     expect(range).not.toBeNull()
     expect(range!.toString()).toBe('readsPDFs')
+  })
+
+  it('locateHighlight keeps offsets whose text still reads as the quote (#281)', () => {
+    const container = buildContainer(['Vellum reads', 'PDFs offline'])
+    // A selection's quote has a line break the layer's text does not.
+    expect(locateHighlight(container, { start: 7, end: 16 }, 'reads\nPDFs')).toEqual({ start: 7, end: 16 })
+    // Highlights saved without a quote keep their offsets.
+    expect(locateHighlight(container, { start: 0, end: 3 }, '')).toEqual({ start: 0, end: 3 })
+  })
+
+  it('locateHighlight moves a highlight to its quote when the page text changed (#281)', () => {
+    // The PDF was replaced: the quote now sits elsewhere, and twice.
+    const container = buildContainer(['New intro. Vellum reads', 'PDFs. Later: Vellum reads PDFs'])
+    const moved = locateHighlight(container, { start: 0, end: 9 }, 'reads PDFs')
+    expect(moved).toEqual({ start: 18, end: 27 })
+    expect(rangeFromAnchor(container, moved!)!.toString()).toBe('readsPDFs')
+  })
+
+  it('locateHighlight drops a highlight whose quote is no longer on the page (#281)', () => {
+    const container = buildContainer(['Completely different text'])
+    expect(locateHighlight(container, { start: 0, end: 10 }, 'Vellum reads')).toBeNull()
   })
 
   it('rangeFromAnchor returns null when the anchor no longer fits the current text', () => {

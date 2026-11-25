@@ -63,6 +63,7 @@ export {
   expandCitationNumbers,
   findTextMatches,
   injectCitationMarkers,
+  locateHighlight,
   rangeFromAnchor,
   type HighlightAnchor,
   type ReferenceEntry,

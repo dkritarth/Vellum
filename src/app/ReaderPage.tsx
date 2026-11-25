@@ -15,6 +15,7 @@ import type { HighlightRecord } from '../../core/highlights/repo'
 import {
   findTextMatches,
   injectCitationMarkers,
+  locateHighlight,
   rangeFromAnchor,
   type HighlightAnchor,
   type ReferenceIndex,
@@ -221,7 +222,9 @@ export function ReaderPage({
       } catch {
         continue
       }
-      const range = rangeFromAnchor(container, anchor)
+      // The page may have changed since the highlight was made (#281).
+      const located = locateHighlight(container, anchor, highlight.quote)
+      const range = located && rangeFromAnchor(container, located)
       if (!range) continue
       Array.from(range.getClientRects()).forEach((rect, i) => {
         next.push(

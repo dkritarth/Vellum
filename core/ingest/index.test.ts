@@ -90,7 +90,9 @@ describe('ingest', () => {
     const db = openDb({ path: ':memory:' })
     vi.stubGlobal('fetch', vi.fn(async (url: string) => url.includes('api.crossref.org/works/')
       ? new Response(CROSSREF_ORCID_BODY, { status: 200, headers: { 'content-type': 'application/json' } })
-      : new Response(body, { status: 200, headers: type ? { 'content-type': type } : {} })))
+      // Bytes, not a string: a string body would get text/plain automatically,
+      // and the no-content-type case would not be tested.
+      : new Response(new TextEncoder().encode(body), { status: 200, headers: type ? { 'content-type': type } : {} })))
     try {
       await expect(ingest('10.1234/not-a-pdf', { db, dataDir: tmpDir, client: new FakeClient([]) }))
         .rejects.toThrow('did not return a PDF')
@@ -108,6 +110,7 @@ describe('ingest', () => {
     const db = openDb({ path: ':memory:' })
     try {
       await expect(ingest(fake, { db, dataDir: tmpDir, client: new FakeClient([]) })).rejects.toThrow('is not a PDF file')
+      expect(listPapers(db)).toHaveLength(0)
     } finally {
       db.close()
     }

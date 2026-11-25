@@ -190,6 +190,33 @@ describe('MarkdownText math rendering (#228)', () => {
     expect(container.textContent).toBe(text)
   })
 
+  it('typesets ordinals and plurals written right after inline math', () => {
+    const { container } = render(<MarkdownText text={'The $n$th element, the $k$th layer and the $f$s.'} />)
+    expect(container.querySelectorAll('.katex')).toHaveLength(3)
+    expect(visibleText(container)).not.toContain('$')
+  })
+
+  it('does not typeset $$ used as prose with spaces inside', () => {
+    const text = 'Use $$ for display and $$ again.'
+    const { container } = render(<MarkdownText text={text} />)
+    expect(container.querySelector('.katex')).toBeNull()
+    expect(container.textContent).toBe(text)
+  })
+
+  it('keeps math after a TeX comment line in a list item display block', () => {
+    const { container } = render(<MarkdownText text={['- Item', '  $$', '  a = b % comment', '  + d', '  $$'].join('\n')} />)
+    const tex = container.querySelector('annotation')?.textContent ?? ''
+    expect(tex).toContain('+ d')
+    expect(tex).not.toContain('comment')
+  })
+
+  it('keeps math literal inside ~~~ fences', () => {
+    const text = ['~~~markdown', 'The update is $h_t$.', '$$', 'x', '$$', '~~~', 'After $y$.'].join('\n')
+    const { container } = render(<MarkdownText text={text} />)
+    expect(container.querySelector('pre')?.textContent).toBe('The update is $h_t$.\n$$\nx\n$$')
+    expect(container.querySelectorAll('.katex')).toHaveLength(1)
+  })
+
   it('shows the original \\[ \\] delimiters when a display block fails', () => {
     const { container } = render(<MarkdownText text={'\\[\n\\frac{1\n\\]'} />)
     const fallback = container.querySelector('[data-math-error]')!

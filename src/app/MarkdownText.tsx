@@ -39,10 +39,17 @@ export function parseBlocks(source: string): Block[] {
     const line = lines[i]
     const trimmed = line.trim()
 
-    if (trimmed.startsWith('```')) {
+    const fence = trimmed.match(/^(`{3,}|~{3,})/)
+    if (fence) {
+      // A fence closes on a line of the same character, at least as long.
       flush()
+      const marker = fence[1]
+      const closes = (candidate: string): boolean => {
+        const close = candidate.trim().match(/^(`{3,}|~{3,})$/)
+        return !!close && close[1][0] === marker[0] && close[1].length >= marker.length
+      }
       const code: string[] = []
-      for (i++; i < lines.length && !lines[i].trim().startsWith('```'); i++) code.push(lines[i])
+      for (i++; i < lines.length && !closes(lines[i]); i++) code.push(lines[i])
       blocks.push({ kind: 'code', text: code.join('\n') })
       continue
     }
@@ -83,7 +90,10 @@ export function parseBlocks(source: string): Block[] {
         const text = math.join('\n').trim()
         if (inItem && closed && list) {
           // TeX ignores newlines (rows use \\), so the block fits on one line.
-          list.items[list.items.length - 1] += ` $$${math.map((part) => part.trim()).join(' ').trim()}$$`
+          // A TeX `%` comment would swallow every later line once joined, so
+          // strip comments per line first.
+          const joined = math.map((part) => part.replace(/(?<!\\)%.*$/, '').trim()).join(' ').trim()
+          list.items[list.items.length - 1] += ` $$${joined}$$`
           continue
         }
         if (inItem) flush()
@@ -135,16 +145,18 @@ export function parseBlocks(source: string): Block[] {
 // Code spans and escaped `\$` keep their literal meaning. Single-dollar math
 // follows Pandoc's rule so prices stay text: the opening `$` is followed by a
 // non-space, the closing `$` follows a non-space and is not followed by a
-// digit, and the formula cannot span a newline or a code span. A closing `$`
-// followed by a letter or `$` (`$PATH$HOME`) is not math either. Every
+// digit, and the formula cannot span a newline or a code span. A letter may
+// follow (`the $n$th row`), except after an upper-case identifier, so shell
+// variables (`$PATH$HOME`) stay text. Inline `$$...$$` has the same no-space
+// rule at both ends, so prose about `$$` delimiters is not typeset. Every
 // repeated class is bounded so unclosed delimiters in very long lines cannot
 // make matching quadratic while an answer streams.
 const INLINE = new RegExp([
   /(`[^`\n]{1,1000}`)/.source, // 1 code
   /(\\\$)/.source, // 2 escaped dollar
   /(\\\((.{1,2000}?)\\\))/.source, // 3,4 \( \)
-  /(\$\$((?:\\.|[^$\\\n]){1,2000}?)\$\$)/.source, // 5,6 $$ $$
-  /(\$(?![\s$])((?:\\.|[^$\\`\n]){0,1000}?)(?<![\s\\])\$(?![\w$]))/.source, // 7,8 $ $
+  /(\$\$(?!\s)((?:\\.|[^$\\\n]){1,2000}?)(?<!\s)\$\$)/.source, // 5,6 $$ $$
+  /(\$(?![\s$])((?:\\.|[^$\\`\n]){0,1000}?)(?<![\s\\])\$(?![\d$])(?!(?<=\$[A-Z_][A-Z0-9_]{1,100}\$)[A-Za-z_]))/.source, // 7,8 $ $
   /(\*\*(.{1,2000}?)\*\*|__(.{1,2000}?)__)/.source, // 9,10,11 strong
   /(\*([^*\n]{1,1000}?)\*|(?<![\w])_([^_\n]{1,1000}?)_(?![\w]))/.source, // 12,13,14 em
   /(\[([^\]\n]{1,500})\]\(([^)\s]{1,2000})\))/.source, // 15,16,17 link

@@ -56,6 +56,9 @@ export interface ReaderPageProps {
   /** Changes when the user steps to a search result on this page, which
    * reveals that page's first hit. */
   searchFocusNonce: number | null
+  /** Called with each in-flight text-layer load, so the Reader can let it
+   * settle before it destroys the document's worker (#269). */
+  onTextWork?: (work: Promise<unknown>) => void
 }
 
 function isRenderCancelled(err: unknown): boolean {
@@ -81,6 +84,7 @@ export function ReaderPage({
   citationFlash,
   searchQuery,
   searchFocusNonce,
+  onTextWork,
 }: ReaderPageProps): JSX.Element {
   const canvasHostRef = useRef<HTMLDivElement>(null)
   const textLayerRef = useRef<HTMLDivElement>(null)
@@ -103,7 +107,7 @@ export function ReaderPage({
         .then((page) => page.cleanup())
         .catch(() => undefined)
     }
-  }, [doc, pageNumber, active])
+  }, [doc, pageNumber, active, onTextWork])
 
   // Canvas: rasterise at `renderScale` x devicePixelRatio into a fresh
   // canvas, then swap it in, so the old raster stays visible (stretched)
@@ -162,7 +166,7 @@ export function ReaderPage({
     let cancelled = false
     let textLayer: TextLayer | null = null
 
-    void (async () => {
+    const work = (async () => {
       try {
         const page = await doc.getPage(pageNumber)
         if (cancelled) return
@@ -181,6 +185,7 @@ export function ReaderPage({
         if (!cancelled) console.error(`[Reader] Failed to build text layer for page ${pageNumber}:`, err)
       }
     })()
+    onTextWork?.(work)
 
     return () => {
       cancelled = true

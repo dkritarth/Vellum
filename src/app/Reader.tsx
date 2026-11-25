@@ -336,6 +336,12 @@ export function Reader({
   const searchRequestRef = useRef(0)
   /** In-flight search on the current document; teardown waits for it. */
   const searchWorkRef = useRef<Promise<unknown> | null>(null)
+  /** In-flight text-layer loads of the rendered pages; teardown waits for them too. */
+  const pageTextWorkRef = useRef(new Set<Promise<unknown>>())
+  const trackPageTextWork = useCallback((work: Promise<unknown>) => {
+    pageTextWorkRef.current.add(work)
+    void work.finally(() => pageTextWorkRef.current.delete(work))
+  }, [])
   const [searchFocus, setSearchFocus] = useState<{ page: number; nonce: number } | null>(null)
   const [highlights, setHighlights] = useState<HighlightRecord[]>([])
   const [flashId, setFlashId] = useState<string | null>(null)
@@ -493,15 +499,17 @@ export function Reader({
         })
       }
       // A loaded document may still be mid-way through its reference-index
-      // pass or a search. Let those settle (both stop at their next
+      // pass, a search, or a page's text-layer load. Let those settle (both stop at their next
       // cancellation check) so the worker is not terminated under an
       // in-flight getTextContent, which pdf.js reports as a console warning.
       // The wait is capped so a wedged worker is still released. A pending
       // load is aborted now.
       const search = searchWorkRef.current
       searchWorkRef.current = null
+      // Pages build their text layers with their own getTextContent calls (#269).
+      const pageText = [...pageTextWorkRef.current]
       if (documentReady) {
-        const settled = Promise.allSettled([work, search])
+        const settled = Promise.allSettled([work, search, ...pageText])
         const cap = new Promise((resolve) => setTimeout(resolve, WORKER_RELEASE_WAIT_MS))
         void Promise.race([settled, cap]).finally(destroy)
       } else destroy()
@@ -1166,6 +1174,7 @@ export function Reader({
                       citationFlash={citationFlash?.page === n ? citationFlash.number : null}
                       searchQuery={submittedQuery}
                       searchFocusNonce={searchFocus?.page === n ? searchFocus.nonce : null}
+                      onTextWork={trackPageTextWork}
                     />
                   )
                 })

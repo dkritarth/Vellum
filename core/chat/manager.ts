@@ -83,16 +83,54 @@ function buildGroundingPreamble(mdPath: string): string {
   ].join('\n')
 }
 
+/** Most characters of earlier messages a recap carries (about 6k tokens). */
+export const RECAP_CHAR_BUDGET = 24_000
+
+/** Most characters of any single message in a recap, so one long answer
+ * cannot use the whole budget. */
+export const RECAP_MESSAGE_CHARS = 4_000
+
+const RECAP_HEADER = 'Prior conversation in this chat (for context — this is a resumed session):'
+
 /** Recaps prior turns for a session whose ACP agent process was just
- * (re)spawned — e.g. the app restarted, or "new chat" wasn't used but the
- * in-memory AcpSession cache was evicted after an error. Without this, a
- * fresh AcpSession has no memory of a chat's persisted history even though
- * the UI still shows it as one continuous thread. Kept short (role: content
- * pairs) — good enough for the agent to pick up context, not a token-budget
- * concern at MVP chat lengths. */
-function buildRecap(priorMessages: ChatMessage[]): string {
-  const lines = priorMessages.map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
-  return ['Prior conversation in this chat (for context — this is a resumed session):', ...lines].join('\n')
+ * (re)spawned — e.g. the app restarted, a Stop or an error evicted the
+ * cached AcpSession, or the user switched chats on the paper. Without this,
+ * a fresh AcpSession has no memory of a chat's persisted history even though
+ * the UI still shows it as one continuous thread.
+ *
+ * The recap is bounded (#263): long messages are shortened to their start
+ * and end, and when the chat exceeds RECAP_CHAR_BUDGET only the newest
+ * messages are kept, with a line saying how many earlier ones were left out.
+ * The budget counts message lines only, not the header or newlines. Short
+ * chats are recapped in full. Exported for tests. */
+export function buildRecap(priorMessages: ChatMessage[]): string {
+  const lines = priorMessages.map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${shortenForRecap(m.content)}`)
+  const kept: string[] = []
+  let used = 0
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (used + lines[i].length > RECAP_CHAR_BUDGET && kept.length > 0) break
+    kept.unshift(lines[i])
+    used += lines[i].length
+  }
+  // A cut between a question and its answer would start the recap with an
+  // answer to nothing; keep that question too, slightly over budget (one
+  // message is at most RECAP_MESSAGE_CHARS).
+  const firstKept = lines.length - kept.length
+  if (firstKept > 0 && priorMessages[firstKept].role === 'assistant' && priorMessages[firstKept - 1].role === 'user') {
+    kept.unshift(lines[firstKept - 1])
+  }
+  const omitted = lines.length - kept.length
+  const note = omitted > 0 ? [`(${omitted} earlier message${omitted === 1 ? '' : 's'} omitted)`] : []
+  return [RECAP_HEADER, ...note, ...kept].join('\n')
+}
+
+/** A message longer than RECAP_MESSAGE_CHARS keeps its start and end, which
+ * carry the question or the conclusion, around a marker. */
+function shortenForRecap(content: string): string {
+  if (content.length <= RECAP_MESSAGE_CHARS) return content
+  const keep = Math.floor((RECAP_MESSAGE_CHARS - 40) / 2)
+  const cut = content.length - 2 * keep
+  return `${content.slice(0, keep)}\n[… ${cut} characters omitted …]\n${content.slice(-keep)}`
 }
 
 function buildPromptText(mdPath: string, text: string, priorMessages: ChatMessage[]): string {

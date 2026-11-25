@@ -1087,3 +1087,77 @@ describe('Reader follows available panel width', () => {
     }
   })
 })
+
+describe('Reader outline lands on the section, not the page top (#266)', () => {
+  // A 600x1000pt page whose viewport flips PDF y (which grows upward) into
+  // a top-down CSS offset, the way pdf.js's PageViewport does for an
+  // unrotated page with a zero-origin crop box.
+  function positionedPage(text: string): unknown {
+    return {
+      ...fakePage(text),
+      getViewport: ({ scale = 1 }: { scale?: number } = {}) => ({
+        width: 600 * scale,
+        height: 1000 * scale,
+        convertToViewportPoint: (x: number, y: number) => [x * scale, (1000 - y) * scale],
+      }),
+    }
+  }
+
+  const PAGE_2 = { num: 5, gen: 0 }
+
+  function outlineDoc(): unknown {
+    return {
+      numPages: 2,
+      getPage: (pageNumber: number) => Promise.resolve(positionedPage(PAGE_TEXT[pageNumber - 1] ?? '')),
+      getOutline: () =>
+        Promise.resolve([
+          { title: 'Method', dest: [PAGE_2, { name: 'XYZ' }, 72, 700, null], items: [] },
+          { title: 'Results', dest: [PAGE_2, { name: 'FitH' }, 400], items: [] },
+          { title: 'Whole page', dest: [PAGE_2, { name: 'Fit' }], items: [] },
+          { title: 'No top', dest: [PAGE_2, { name: 'XYZ' }, 72, null, null], items: [] },
+        ]),
+      getDestination: () => Promise.resolve(null),
+      getPageIndex: () => Promise.resolve(1),
+    }
+  }
+
+  async function openOutline(): Promise<{ viewport: HTMLElement; user: ReturnType<typeof userEvent.setup> }> {
+    getDocumentMock.mockReturnValue({ promise: Promise.resolve(outlineDoc()), destroy: async () => {} })
+    const user = userEvent.setup()
+    const { container } = render(<Reader slug="outline-paper" />)
+    await waitFor(() => expect(container.querySelectorAll('[data-page-slot]')).toHaveLength(2))
+    // jsdom has no layout: place page 2 1016px down the scroll column.
+    const slot = container.querySelector('[data-page-slot][data-page-number="2"]') as HTMLElement
+    Object.defineProperty(slot, 'offsetTop', { configurable: true, value: 1016 })
+    await user.click(screen.getByRole('button', { name: 'Outline' }))
+    await screen.findByRole('button', { name: 'Method' })
+    return { viewport: container.querySelector('[data-reader-viewport]') as HTMLElement, user }
+  }
+
+  it('scrolls an /XYZ destination so its top sits just below the pane top', async () => {
+    const { viewport, user } = await openOutline()
+    await user.click(screen.getByRole('button', { name: 'Method' }))
+    // y=700 on a 1000pt page is 300px below the page top at 100%; 8px margin.
+    expect(viewport.scrollTop).toBe(1016 + 300 - 8)
+    expect(screen.getByLabelText('Page')).toHaveTextContent('2 of 2')
+  })
+
+  it('scrolls a /FitH destination to its top, scaled by the current zoom', async () => {
+    const { viewport, user } = await openOutline()
+    await user.click(screen.getByText('+', { selector: 'button' }))
+    await user.click(screen.getByText('+', { selector: 'button' }))
+    expect(screen.getByLabelText('Zoom')).toHaveTextContent('150%')
+    await user.click(screen.getByRole('button', { name: 'Results' }))
+    expect(viewport.scrollTop).toBe(1016 + 600 * 1.5 - 8)
+    expect(screen.getByLabelText('Page')).toHaveTextContent('2 of 2')
+  })
+
+  it('keeps destinations without a position at the page top', async () => {
+    const { viewport, user } = await openOutline()
+    await user.click(screen.getByRole('button', { name: 'Whole page' }))
+    expect(viewport.scrollTop).toBe(1016 - 8)
+    viewport.scrollTop = 0
+    await user.click(screen.getByRole('button', { name: 'No top' }))
+    expect(viewport.scrollTop).toBe(1016 - 8)
+  })
+})

@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { AcpBackend, AcpClient, AcpPromptRequest, AcpSession, AcpUpdate } from '../acp/client.js'
 import { upsertPaper } from '../library/repo.js'
 import { openDb } from '../store/db.js'
-import { ChatManager, type AskStreamEvent } from './manager.js'
+import { ChatManager, RECAP_CHAR_BUDGET, RECAP_MESSAGE_CHARS, buildRecap, type AskStreamEvent } from './manager.js'
 import { getChatMessages } from './repo.js'
 import { listUsageRecords, getUsageSummary } from '../usage/repo.js'
 
@@ -568,5 +568,43 @@ describe('ChatManager', () => {
     expect(summary.turnsWithMetrics).toBe(0)
     expect(summary.totalTokens).toBeNull() // Honest null, never 0
     expect(summary.backends.codex.totalTokens).toBeNull()
+  })
+})
+
+describe('buildRecap (#263)', () => {
+  const message = (id: number, role: 'user' | 'assistant', content: string) =>
+    ({ id, sessionId: 1, role, content, createdAt: 't' })
+
+  it('recaps a short chat in full', () => {
+    const recap = buildRecap([message(1, 'user', 'What is attention?'), message(2, 'assistant', 'A weighting.')])
+    expect(recap).toBe([
+      'Prior conversation in this chat (for context — this is a resumed session):',
+      'User: What is attention?',
+      'Assistant: A weighting.',
+    ].join('\n'))
+  })
+
+  it('keeps the newest messages within the budget and says how many were left out', () => {
+    const messages = Array.from({ length: 40 }, (_, i) =>
+      message(i + 1, i % 2 === 0 ? 'user' : 'assistant', `${i % 2 === 0 ? 'question' : 'answer'} ${i + 1} ${'x'.repeat(3000)}`))
+    const recap = buildRecap(messages)
+    expect(recap.length).toBeLessThan(RECAP_CHAR_BUDGET + 500)
+    expect(recap).toContain('answer 40 ')
+    expect(recap).toContain('question 39 ')
+    expect(recap).not.toContain('question 1 ')
+    const omitted = Number(recap.match(/\((\d+) earlier messages omitted\)/)?.[1])
+    const kept = recap.split('\n').filter((line) => /^(User|Assistant): /.test(line)).length
+    expect(omitted + kept).toBe(40)
+    expect(omitted).toBeGreaterThan(0)
+  })
+
+  it('shortens one very long message but keeps its start and end', () => {
+    const long = `START ${'y'.repeat(50_000)} END`
+    const recap = buildRecap([message(1, 'user', 'Summarize'), message(2, 'assistant', long)])
+    expect(recap.length).toBeLessThan(RECAP_MESSAGE_CHARS + 500)
+    expect(recap).toContain('Assistant: START ')
+    expect(recap).toMatch(/ END$/)
+    expect(recap).toMatch(/\[… \d+ characters omitted …\]/)
+    expect(recap).toContain('User: Summarize')
   })
 })

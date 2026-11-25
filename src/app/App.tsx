@@ -58,6 +58,10 @@ export function App(): JSX.Element {
   const [chatNavigationNonce, setChatNavigationNonce] = useState(0)
   // Conversation Ask shows (New chat can move it away from the selection).
   const [displayedChatSessionId, setDisplayedChatSessionId] = useState<number | null>(null)
+  // Latest committed value, read after awaits where the click-time closure
+  // would be stale (a load may have started or finished meanwhile).
+  const displayedChatRef = useRef(displayedChatSessionId)
+  displayedChatRef.current = displayedChatSessionId
   const [deletedSessionIds, setDeletedSessionIds] = useState<readonly number[]>([])
   const [chatBanner, setChatBanner] = useState<string | null>(null)
   // Library reached via the Search nav item: highlight Search and focus the
@@ -102,7 +106,7 @@ export function App(): JSX.Element {
       if (paper) {
         setChatBanner(null)
         // Ask already shows this chat: reloading would wipe the unsent draft.
-        const alreadyShown = session.id === displayedChatSessionId && paper.slug === activeTabId && rightPanelTab === 'Ask'
+        const alreadyShown = session.id === displayedChatRef.current && paper.slug === activeTabId && rightPanelTab === 'Ask'
         openPaper({ slug: paper.slug, title: paper.title })
         if (!alreadyShown) {
           setSelectedChatSessionId(session.id)

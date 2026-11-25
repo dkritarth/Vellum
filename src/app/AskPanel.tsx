@@ -166,6 +166,9 @@ export function AskPanel({
     lastSequence.current = 0
     setSessionId(null)
     displayedSessionId.current = null
+    // Nothing is shown until this load lands, so a click on the chat shown
+    // before it is a navigation, not a no-op (App's alreadyShown check).
+    sessionDisplayed.current?.(null)
     setInput('')
     setMessages([])
     setError(null)

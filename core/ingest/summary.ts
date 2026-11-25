@@ -1,11 +1,25 @@
 import { dirname } from 'node:path'
-import type { AcpBackend, AcpClient } from '../acp/client.js'
+import type { AcpBackend, AcpClient, AcpSession } from '../acp/client.js'
+import { backendOrder, runWithFallback } from '../acp/fallback.js'
 import { StdioAcpClient } from '../acp/stdio-client.js'
 
-export async function summarizePaper(mdPath: string, options: { client?: AcpClient; backend?: AcpBackend } = {}): Promise<string | undefined> {
+export async function summarizePaper(
+  mdPath: string,
+  options: { client?: AcpClient; backend?: AcpBackend | readonly AcpBackend[]; deadlineMs?: number } = {},
+): Promise<string | undefined> {
   const client = options.client ?? new StdioAcpClient()
-  const session = await client.newSession(options.backend ?? 'claude', { cwd: dirname(mdPath) }).catch(() => undefined)
-  if (!session) return undefined
+  const run = await runWithFallback(
+    client,
+    backendOrder(options.backend),
+    (session) => summarizeWith(session, mdPath),
+    (summary) => summary !== undefined,
+    // Scope the agent to the paper directory (#236).
+    { deadlineMs: options.deadlineMs, sessionOptions: { cwd: dirname(mdPath) } },
+  )
+  return run?.result
+}
+
+async function summarizeWith(session: AcpSession, mdPath: string): Promise<string | undefined> {
   try {
     let text = ''
     let completed = false
@@ -31,7 +45,5 @@ export async function summarizePaper(mdPath: string, options: { client?: AcpClie
     return completed ? text.trim() || undefined : undefined
   } catch {
     return undefined
-  } finally {
-    await session.dispose().catch(() => undefined)
   }
 }

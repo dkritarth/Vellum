@@ -1,0 +1,126 @@
+{
+  "slug": "local-1706.03762-fc17dbc35562ce010bc19fa07a47273f0b1d349e5a8c92110bdb39c4b2958b70",
+  "title": "Attention Is All You Need",
+  "authors": [
+    "Ashish Vaswani",
+    "Noam Shazeer",
+    "Niki Parmar",
+    "Jakob Uszkoreit",
+    "Llion Jones",
+    "Aidan N. Gomez",
+    "\u0141ukasz Kaiser",
+    "Illia Polosukhin"
+  ],
+  "year": 2017,
+  "venue": "31st Conference on Neural Information Processing Systems (NIPS 2017), Long Beach, CA, USA",
+  "abstract": "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks that include an encoder and a decoder. The best performing models also connect the encoder and",
+  "summary": "The paper introduces the Transformer, a sequence-to-sequence architecture that replaces recurrent and convolutional layers with attention. Its encoder and decoder use multi-head self-attention, feed-forward layers, and positional encodings, allowing more parallel computation while modeling relations",
+  "sections": [
+    {
+      "title": "Abstract",
+      "startOffset": 363,
+      "endOffset": 2538
+    },
+    {
+      "title": "1",
+      "startOffset": 2539,
+      "endOffset": 2567
+    },
+    {
+      "title": "Introduction",
+      "startOffset": 2568,
+      "endOffset": 4260
+    },
+    {
+      "title": "2",
+      "startOffset": 4261,
+      "endOffset": 4288
+    },
+    {
+      "title": "Background",
+      "startOffset": 4289,
+      "endOffset": 5504
+    },
+    {
+      "title": "3",
+      "startOffset": 5505,
+      "endOffset": 5532
+    },
+    {
+      "title": "Model Architecture",
+      "startOffset": 5533,
+      "endOffset": 6781
+    },
+    {
+      "title": "4",
+      "startOffset": 15326,
+      "endOffset": 15353
+    },
+    {
+      "title": "Why Self-Attention",
+      "startOffset": 15354,
+      "endOffset": 17247
+    },
+    {
+      "title": "5",
+      "startOffset": 17248,
+      "endOffset": 17275
+    },
+    {
+      "title": "Training",
+      "startOffset": 17276,
+      "endOffset": 18173
+    },
+    {
+      "title": "6",
+      "startOffset": 18174,
+      "endOffset": 18201
+    },
+    {
+      "title": "Results",
+      "startOffset": 18202,
+      "endOffset": 19242
+    },
+    {
+      "title": "7",
+      "startOffset": 29412,
+      "endOffset": 29439
+    },
+    {
+      "title": "Conclusion",
+      "startOffset": 29440,
+      "endOffset": 30279
+    },
+    {
+      "title": "References",
+      "startOffset": 30376,
+      "endOffset": 30402
+    },
+    {
+      "title": "Attention Visualizations",
+      "startOffset": 42421,
+      "endOffset": 42451
+    },
+    {
+      "title": "Input-Input Layer5",
+      "startOffset": 42452,
+      "endOffset": 42478
+    },
+    {
+      "title": "Input-Input Layer5",
+      "startOffset": 43394,
+      "endOffset": 43420
+    },
+    {
+      "title": "Input-Input Layer5",
+      "startOffset": 44068,
+      "endOffset": 44094
+    },
+    {
+      "title": "Input-Input Layer5",
+      "startOffset": 44742,
+      "endOffset": 44768
+    }
+  ],
+  "addedAt": "2026-11-18T13:13:51.454Z"
+}

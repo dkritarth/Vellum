@@ -306,6 +306,8 @@ export function Reader({
 }: ReaderProps): JSX.Element {
   const [activeSelection, setActiveSelection] = useState<ActiveSelection | null>(null)
   const [highlightSave, setHighlightSave] = useState<HighlightSave | null>(null)
+  // Why highlight mode did not save the last selection, when it could not.
+  const [highlightNotice, setHighlightNotice] = useState<string | null>(null)
   const currentSave = useRef<HighlightSave | null>(null)
   const pendingSelections = useRef(new Set<string>())
   const retryRef = useRef<HTMLButtonElement>(null)
@@ -528,6 +530,7 @@ export function Reader({
   function retireHighlightSave(): void {
     currentSave.current = null
     setHighlightSave(null)
+    setHighlightNotice(null)
   }
 
   // A paper switch retires the captured save context. Zoom and scrolling keep
@@ -794,7 +797,12 @@ export function Reader({
     retireHighlightSave()
 
     if (highlightTool?.active) {
-      if (!anchor) return
+      if (!anchor) {
+        // A highlight is anchored in one page's text layer, so a selection
+        // that ends on another page cannot be saved. Say so (#283).
+        setHighlightNotice("Highlights can't cross a page break. Select text on one page.")
+        return
+      }
       saveHighlight({ slug, page, color: highlightTool.color, quote, anchor: JSON.stringify(anchor) })
       return
     }
@@ -1088,6 +1096,11 @@ export function Reader({
         <p role="alert" className={styles.searchError}>
           {searchError}
         </p>
+      ) : null}
+      {highlightNotice && !highlightSave ? (
+        <div className={styles.highlightSave}>
+          <p role="status">{highlightNotice}</p>
+        </div>
       ) : null}
       {highlightSave ? (
         <div className={styles.highlightSave}>

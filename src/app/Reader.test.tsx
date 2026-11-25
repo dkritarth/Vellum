@@ -712,6 +712,23 @@ describe('Reader selection actions [R1-05]', () => {
   })
 })
 
+describe('Reader highlight mode across a page break (#283)', () => {
+  it('says why a selection that crosses pages was not highlighted', async () => {
+    const { container } = render(<Reader slug="my-paper" highlightTool={{ active: true, color: 'yellow' }} />)
+    await waitFor(() => expect(getTextLayer(container, 2)?.querySelector('span')).not.toBeNull())
+    const first = getTextLayer(container, 1)!.querySelector('span')!.firstChild as Text
+    const second = getTextLayer(container, 2)!.querySelector('span')!.firstChild as Text
+    const range = document.createRange()
+    range.setStart(first, 0)
+    range.setEnd(second, 3)
+    window.getSelection()!.removeAllRanges()
+    window.getSelection()!.addRange(range)
+    fireEvent.mouseUp(getTextLayer(container, 2)!)
+    expect(await screen.findByRole('status')).toHaveTextContent("Highlights can't cross a page break. Select text on one page.")
+    expect(window.vellum.highlightsCreate).not.toHaveBeenCalled()
+  })
+})
+
 function selectText(textLayer: HTMLElement, start: number, end: number): void {
   const textNode = textLayer.querySelector('span')!.firstChild!
   const range = document.createRange()

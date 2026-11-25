@@ -270,4 +270,67 @@ describe('snapSelectionStart and snapSelectionEnd', () => {
     expect(selection.anchorOffset).toBe(1)
     expect(selection.focusNode).toBe(prevText)
   })
+
+  it('drops text before the line when Chromium anchored a drag begun beside it too early', () => {
+    // On master a drag begun left of an abstract line also selected the
+    // "Abstract" heading above it: the anchor landed before the line.
+    const { layer, span } = lineLayer()
+    const previous = document.createElement('span')
+    previous.textContent = 'Abstract'
+    span.before(previous)
+    const prevText = previous.firstChild as Text
+    const text = span.firstChild as Text
+    const selection = select(prevText, 2, text, 5)
+    snapSelectionStart({ layer, x: 94, y: 60 }, selection)
+    expect(selection.toString()).toBe('Atten')
+  })
+
+  it('ignores rotated spans such as an arXiv margin stamp (#235 review)', () => {
+    const { layer, span } = lineLayer()
+    const stamp = document.createElement('span')
+    stamp.textContent = 'arXiv:1706.03762v7 [cs.CL]'
+    stamp.style.setProperty('--rotate', '-90deg')
+    span.before(stamp)
+    // Its axis-aligned box spans the page height and starts right of x.
+    stamp.getBoundingClientRect = () => ({ left: 96, right: 110, top: 0, bottom: 800, x: 96, y: 0, width: 14, height: 800, toJSON() {} }) as DOMRect
+    const text = span.firstChild as Text
+    const selection = select(text, 1, text, text.length)
+    snapSelectionStart({ layer, x: 94, y: 60 }, selection)
+    expect(selection.toString()).toBe('Attention Is All You Need')
+  })
+
+  it('does not select a line from a drag released in the margin (#235 review)', () => {
+    const { layer, text } = lineLayer()
+    const selection = select(text, text.length, text, text.length)
+    snapSelectionStart({ layer, x: 60, y: 60 }, selection, 90)
+    expect(selection.isCollapsed).toBe(true)
+  })
+
+  it('does not snap a shift+drag that extends an earlier selection (#235 review)', () => {
+    const { layer, span } = lineLayer()
+    bind(layer)
+    const previous = document.createElement('span')
+    previous.textContent = 'Earlier paragraph'
+    span.before(previous)
+    const prevText = previous.firstChild as Text
+    const text = span.firstChild as Text
+    const selection = select(text, 1, text, text.length)
+    layer.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, shiftKey: true, clientX: 94, clientY: 60 }))
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, clientX: 360, clientY: 60 }))
+    expect(selection.anchorOffset).toBe(1)
+    expect(prevText.textContent).toBe('Earlier paragraph')
+  })
+
+  it('snaps before a bubbling mouseup handler reads the selection', () => {
+    const { layer, text } = lineLayer()
+    bind(layer)
+    let seen = ''
+    const reader = (): void => { seen = document.getSelection()?.toString() ?? '' }
+    layer.addEventListener('mouseup', reader)
+    select(text, text.length, text, text.length)
+    layer.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: 94, clientY: 60 }))
+    layer.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, clientX: 360, clientY: 60 }))
+    layer.removeEventListener('mouseup', reader)
+    expect(seen).toBe('Attention Is All You Need')
+  })
 })

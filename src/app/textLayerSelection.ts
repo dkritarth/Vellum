@@ -55,6 +55,11 @@ function lineStartSpan(start: DragStart): HTMLElement | null {
   let bestLeft = Infinity
   for (const child of start.layer.children) {
     if (!(child instanceof HTMLElement) || child.tagName !== 'SPAN') continue
+    // pdf.js turns rotated text (an arXiv margin stamp, a sideways table)
+    // with --rotate. Its bounding box is a tall rectangle that would match
+    // almost any start, so it never counts as a line here.
+    const rotate = child.style.getPropertyValue('--rotate').trim()
+    if (rotate !== '' && parseFloat(rotate) !== 0) continue
     const rect = child.getBoundingClientRect()
     if (start.y < rect.top || start.y > rect.bottom) continue
     // The drag began inside text, where Chromium's anchor is already right.
@@ -78,18 +83,26 @@ function lineStartSpan(start: DragStart): HTMLElement | null {
  * selection. Callers only call this after the pointer moved, so a plain click
  * never selects anything. Exported for tests.
  */
-export function snapSelectionStart(start: DragStart | null, selection: Selection | null): void {
+export function snapSelectionStart(
+  start: DragStart | null,
+  selection: Selection | null,
+  releaseX?: number,
+): void {
   if (!start || !selection || selection.rangeCount !== 1) return
   const anchor = selection.anchorNode
   const focusNode = selection.focusNode
   if (!anchor || !focusNode || !start.layer.contains(anchor)) return
-  const line = lineStartSpan(start)
-  const first = line && firstTextNode(line)
-  if (!first || (anchor === first && selection.anchorOffset === 0)) return
   const range = selection.getRangeAt(0)
   // Only forward selections (anchor at the range start) are adjusted, and
-  // only when the focus is not before the line (an upward drag).
+  // only when the focus is not before the line (an upward drag). Checked
+  // before the geometry scan, which reads every span's box.
   if (range.startContainer !== anchor || range.startOffset !== selection.anchorOffset) return
+  const line = lineStartSpan(start)
+  const first = line && firstTextNode(line)
+  if (!line || !first || (anchor === first && selection.anchorOffset === 0)) return
+  // A collapsed selection only becomes the line when the pointer was
+  // released over it; a drag that stayed in the margin selects nothing.
+  if (selection.isCollapsed && releaseX !== undefined && releaseX < line.getBoundingClientRect().left - 1) return
   const lineStart = document.createRange()
   lineStart.setStart(first, 0)
   if (lineStart.comparePoint(focusNode, selection.focusOffset) < 0) return
@@ -129,7 +142,7 @@ function snapDragEnds(event: MouseEvent): void {
   blankStart = null
   if (!start || event.button !== 0) return
   if (Math.hypot(event.clientX - start.x, event.clientY - start.y) < DRAG_THRESHOLD_PX) return
-  snapSelectionStart(start, document.getSelection())
+  snapSelectionStart(start, document.getSelection(), event.clientX)
   snapSelectionEnd({ layer: start.layer, x: event.clientX, y: event.clientY }, document.getSelection())
 }
 
@@ -195,7 +208,9 @@ export function bindTextLayerSelection(layer: HTMLElement): () => void {
     layer.setAttribute('data-selecting', '')
     // Record every primary-button start; snapDragEnds only acts when the
     // start lies left of the selected line or the release lies right of it.
-    blankStart = event.button === 0 ? { layer, x: event.clientX, y: event.clientY } : null
+    // Shift+press extends an existing selection, whose anchor is the user's
+    // earlier choice; snapping it to this line would shrink the selection.
+    blankStart = event.button === 0 && !event.shiftKey ? { layer, x: event.clientX, y: event.clientY } : null
   }
   layer.addEventListener('mousedown', onMouseDown)
   layers.set(layer, end)

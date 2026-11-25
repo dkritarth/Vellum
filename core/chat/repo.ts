@@ -105,13 +105,16 @@ export function getLatestChatSession(db: Database, paperSlug: string): ChatSessi
   return row ? toSession(row) : undefined
 }
 
-/** Backend of the conversation the user most recently wrote in, falling back
- * to the newest session. Background agent work (ingest) starts with it. */
+/** Backend of the conversation the user most recently wrote in, or
+ * undefined before the first message. Empty sessions do not count: earlier
+ * builds created a `'claude'` session just by opening Ask, so an upgraded
+ * profile that never sent a message would otherwise keep preferring Claude
+ * (#252). New chats and background agent work (ingest) start with it. */
 export function getPreferredChatBackend(db: Database): AcpBackend | undefined {
-  const row = (db.prepare(
+  const row = db.prepare(
     `SELECT s.backend FROM chat_messages m JOIN chat_sessions s ON s.id = m.session_id
      WHERE m.role = 'user' ORDER BY m.id DESC LIMIT 1`,
-  ).get() ?? db.prepare(`SELECT backend FROM chat_sessions ORDER BY id DESC LIMIT 1`).get()) as { backend: string } | undefined
+  ).get() as { backend: string } | undefined
   return row && isAcpBackend(row.backend) ? row.backend : undefined
 }
 

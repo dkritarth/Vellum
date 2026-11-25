@@ -148,9 +148,12 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
     // Sequential writes settle before cleanup even if one fails.
     await writeFile(candidate.pdfPath, fetched.pdfBytes)
     await writeFile(candidate.mdPath, markdown)
-    // The backend that last produced metadata in this process goes first, so
-    // later imports do not re-probe adapters that are missing or signed out.
-    const preferred = backendOrder(lastWorkingBackend ? [lastWorkingBackend, ...backendOrder(options.backend)] : options.backend)
+    // The user's chat backend goes first (#239). The backend that last
+    // produced metadata in this process comes next, so a broken preferred
+    // backend does not also make later imports re-probe every other adapter
+    // that is missing or signed out.
+    const chatPreference = options.backend === undefined ? [] : typeof options.backend === 'string' ? [options.backend] : options.backend
+    const preferred = backendOrder([...chatPreference, ...(lastWorkingBackend ? [lastWorkingBackend] : [])])
     const extracted = await extractPaper(candidate.mdPath, { client: options.client, backend: preferred })
     if (extracted.backend) lastWorkingBackend = extracted.backend
     // Start the summary on whichever backend just worked for extraction.

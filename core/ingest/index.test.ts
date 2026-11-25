@@ -94,12 +94,18 @@ describe('ingest', () => {
       },
     }
     try {
-      await ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client, backend: 'codex' })
+      await ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client })
       // Extraction: codex fails, claude works. Summary starts on claude.
       expect(tried).toEqual(['codex', 'claude', 'claude'])
       tried.length = 0
-      await ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client, backend: 'codex' })
+      // No chat preference: the remembered backend skips the failed probe.
+      await ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client })
       expect(tried).toEqual(['claude', 'claude'])
+      tried.length = 0
+      // The user's chat backend still goes first (they may have signed in
+      // since), with the remembered backend as the next try.
+      await ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client, backend: 'codex' })
+      expect(tried).toEqual(['codex', 'claude', 'claude'])
     } finally {
       db.close()
       resetIngestBackendMemory()

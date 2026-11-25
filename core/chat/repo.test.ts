@@ -166,7 +166,8 @@ describe('chat repo', () => {
   it('prefers the backend of the most recently used conversation', () => {
     expect(getPreferredChatBackend(db)).toBeUndefined()
     const claude = createChatSession(db, { paperSlug: 'attention-is-all-you-need', backend: 'claude' })
-    expect(getPreferredChatBackend(db)).toBe('claude')
+    // An empty session (older builds created one just by opening Ask) is not use.
+    expect(getPreferredChatBackend(db)).toBeUndefined()
     const codex = createChatSession(db, { paperSlug: 'attention-is-all-you-need', backend: 'codex' })
     addChatMessage(db, { sessionId: codex.id, role: 'user', content: 'first' })
     // A newer empty session does not outrank actual use.
@@ -177,7 +178,8 @@ describe('chat repo', () => {
   })
 
   it('ignores unknown stored backend names', () => {
-    db.prepare(`INSERT INTO chat_sessions (paper_slug, backend, created_at) VALUES (?, 'legacy', ?)`).run('attention-is-all-you-need', new Date().toISOString())
+    const info = db.prepare(`INSERT INTO chat_sessions (paper_slug, backend, created_at) VALUES (?, 'legacy', ?)`).run('attention-is-all-you-need', new Date().toISOString())
+    addChatMessage(db, { sessionId: Number(info.lastInsertRowid), role: 'user', content: 'hi' })
     expect(getPreferredChatBackend(db)).toBeUndefined()
   })
 })

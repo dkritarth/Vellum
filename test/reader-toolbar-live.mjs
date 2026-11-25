@@ -23,15 +23,18 @@ const paper = { slug: 'toolbar-paper', title: 'Toolbar verification paper', auth
 const compiledPath = path.join(ROOT, 'out/main', `toolbar-live-${process.pid}.cjs`)
 let compiled = fs.readFileSync(path.join(ROOT, 'out/main/index.cjs'), 'utf8')
 function replaceOnce(before, after) {
-  assert(compiled.includes(before), `Compiled instrumentation anchor missing: ${before}`)
+  const found = typeof before === 'string' ? compiled.includes(before) : before.test(compiled)
+  assert(found, `Compiled instrumentation anchor missing: ${before}`)
   compiled = compiled.replace(before, after)
 }
-replaceOnce('let chatManager;', `
+// Rolldown-based Vite 8 bundles emit module-level `let` as `var` and indent
+// with tabs, so anchors that must survive both bundlers are regexes.
+replaceOnce(/^(?:let|var) chatManager;$/m, `
 StdioAcpClient.prototype.newSession = async function () {
   return { async *prompt() { yield {kind:'done',data:{stopReason:'end_turn'}} }, async dispose() {} };
 };
 let chatManager;`)
-replaceOnce('  createWindow();', `
+replaceOnce(/^[ \t]*createWindow\(\);$/m, `
 if (listPapers(getDb(), {}).length === 0) {
   upsertPaper(getDb(), ${JSON.stringify(paper)});
   const other = {...${JSON.stringify(paper)}, slug:'missing-paper', title:'Unavailable paper'};

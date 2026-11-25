@@ -598,6 +598,17 @@ describe('buildRecap (#263)', () => {
     expect(omitted).toBeGreaterThan(0)
   })
 
+  it('keeps the question of an answer the budget cut would orphan', () => {
+    // Budget fits the last question and answer plus one more answer, but not
+    // that answer's question: the recap must not start with a bare answer.
+    const big = 'z'.repeat(3000)
+    const messages = Array.from({ length: 14 }, (_, i) =>
+      message(i + 1, i % 2 === 0 ? 'user' : 'assistant', `${i % 2 === 0 ? 'question' : 'answer'} ${i + 1} ${big}`))
+    const lines = buildRecap(messages).split('\n').filter((line) => /^(User|Assistant): /.test(line))
+    expect(lines[0]).toMatch(/^User: /)
+    expect(lines.at(-1)).toMatch(/^Assistant: answer 14 /)
+  })
+
   it('shortens one very long message but keeps its start and end', () => {
     const long = `START ${'y'.repeat(50_000)} END`
     const recap = buildRecap([message(1, 'user', 'Summarize'), message(2, 'assistant', long)])

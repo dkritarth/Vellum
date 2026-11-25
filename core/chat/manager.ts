@@ -101,7 +101,8 @@ const RECAP_HEADER = 'Prior conversation in this chat (for context — this is a
  * The recap is bounded (#263): long messages are shortened to their start
  * and end, and when the chat exceeds RECAP_CHAR_BUDGET only the newest
  * messages are kept, with a line saying how many earlier ones were left out.
- * Short chats are recapped in full. Exported for tests. */
+ * The budget counts message lines only, not the header or newlines. Short
+ * chats are recapped in full. Exported for tests. */
 export function buildRecap(priorMessages: ChatMessage[]): string {
   const lines = priorMessages.map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${shortenForRecap(m.content)}`)
   const kept: string[] = []
@@ -110,6 +111,13 @@ export function buildRecap(priorMessages: ChatMessage[]): string {
     if (used + lines[i].length > RECAP_CHAR_BUDGET && kept.length > 0) break
     kept.unshift(lines[i])
     used += lines[i].length
+  }
+  // A cut between a question and its answer would start the recap with an
+  // answer to nothing; keep that question too, slightly over budget (one
+  // message is at most RECAP_MESSAGE_CHARS).
+  const firstKept = lines.length - kept.length
+  if (firstKept > 0 && priorMessages[firstKept].role === 'assistant' && priorMessages[firstKept - 1].role === 'user') {
+    kept.unshift(lines[firstKept - 1])
   }
   const omitted = lines.length - kept.length
   const note = omitted > 0 ? [`(${omitted} earlier message${omitted === 1 ? '' : 's'} omitted)`] : []

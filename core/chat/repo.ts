@@ -95,11 +95,21 @@ export function createChatSession(
   }
 }
 
-/** Most recently created chat session for a paper, or undefined if none
- * exist yet — used to reload history when a paper's Ask tab (re)opens. */
+/** The paper's chat session with the latest activity (its creation or its
+ * newest message), or undefined if none exist yet. Used to reload history
+ * when a paper's Ask tab (re)opens without an explicit chat. Ordering by
+ * creation alone reopened an empty New chat after the user had gone back to
+ * an older conversation and kept asking there (#258). Timestamps are ISO
+ * strings, so they compare as text; ties go to the newer session. */
 export function getLatestChatSession(db: Database, paperSlug: string): ChatSession | undefined {
   const row = db
-    .prepare(`SELECT * FROM chat_sessions WHERE paper_slug = ? ORDER BY id DESC LIMIT 1`)
+    .prepare(
+      `SELECT s.* FROM chat_sessions s
+       WHERE s.paper_slug = ?
+       ORDER BY MAX(s.created_at, COALESCE((SELECT MAX(m.created_at) FROM chat_messages m WHERE m.session_id = s.id), '')) DESC,
+                s.id DESC
+       LIMIT 1`,
+    )
     .get(paperSlug) as ChatSessionRow | undefined
   return row ? toSession(row) : undefined
 }

@@ -1,5 +1,5 @@
 import type { Database } from 'better-sqlite3'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { openDb } from '../store/db.js'
 import { upsertPaper } from '../library/repo.js'
@@ -39,6 +39,26 @@ describe('chat repo', () => {
 
     const latest = getLatestChatSession(db, 'attention-is-all-you-need')
     expect(latest?.id).toBe(second.id)
+  })
+
+  it('returns the session with the latest activity, not the newest created (#258)', () => {
+    const paperSlug = 'attention-is-all-you-need'
+    try {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-11-24T10:00:00Z'))
+      const a = createChatSession(db, { paperSlug, backend: 'codex' })
+      addChatMessage(db, { sessionId: a.id, role: 'user', content: 'first question' })
+      vi.setSystemTime(new Date('2026-11-24T10:01:00Z'))
+      // New chat: just created, so it is the latest activity.
+      const b = createChatSession(db, { paperSlug, backend: 'codex' })
+      expect(getLatestChatSession(db, paperSlug)?.id).toBe(b.id)
+      vi.setSystemTime(new Date('2026-11-24T10:02:00Z'))
+      // The user went back to A and asked again: A is the latest activity.
+      addChatMessage(db, { sessionId: a.id, role: 'user', content: 'follow-up' })
+      expect(getLatestChatSession(db, paperSlug)?.id).toBe(a.id)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('appends and reloads messages for a session in order', () => {

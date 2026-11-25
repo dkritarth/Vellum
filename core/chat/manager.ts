@@ -159,7 +159,7 @@ export class ChatManager {
   constructor(private readonly client: AcpClient) {}
 
   /**
-   * Open (or reload) the Ask tab for a paper: reuses the most recent chat
+   * Open (or reload) the Ask tab for a paper: reuses the chat with the latest activity
    * session + its history if one exists, else starts a brand new one.
    * Never touches the ACP layer — cheap, safe to call on every tab focus.
    */

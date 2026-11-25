@@ -21,4 +21,12 @@ describe('friendlyIpcError', () => {
     expect(friendlyIpcError('offline')).toBe('offline')
     expect(friendlyIpcError(undefined, 'Could not ingest')).toBe('Could not ingest')
   })
+
+  it('strips a main-process "vellum:<channel>:" prefix (#272)', () => {
+    expect(
+      friendlyIpcError(
+        new Error("Error invoking remote method 'vellum:ask-start': Error: vellum:ask-start: paper 'x' has no markdown to ground on"),
+      ),
+    ).toBe("Paper 'x' has no markdown to ground on")
+  })
 })

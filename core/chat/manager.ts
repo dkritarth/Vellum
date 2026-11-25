@@ -20,6 +20,7 @@
 // row swapped.
 
 import { randomUUID } from 'node:crypto'
+import { dirname } from 'node:path'
 
 import type { Database } from 'better-sqlite3'
 
@@ -243,7 +244,7 @@ export class ChatManager {
     let acpSession: AcpSession
     let freshlySpawned: boolean
     try {
-      ;({ session: acpSession, freshlySpawned } = await this.getOrCreateAcpSession(params.paperSlug, backend, params.chatSessionId))
+      ;({ session: acpSession, freshlySpawned } = await this.getOrCreateAcpSession(params.paperSlug, backend, params.chatSessionId, params.mdPath))
     } catch (err) {
       onEvent({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
       return
@@ -370,11 +371,12 @@ export class ChatManager {
     paperSlug: string,
     backend: AcpBackend,
     chatSessionId: number,
+    mdPath: string,
   ): Promise<{ session: AcpSession; freshlySpawned: boolean }> {
     const cached = this.acpSessions.get(backend)?.get(paperSlug)
     if (cached?.chatSessionId === chatSessionId) return { session: cached.session, freshlySpawned: false }
     if (cached) await this.disposeSession(paperSlug, backend)
-    const session = await this.client.newSession(backend)
+    const session = await this.client.newSession(backend, { cwd: dirname(mdPath) })
     const sessions = this.acpSessions.get(backend)
     const entry = { chatSessionId, session }
     if (sessions) sessions.set(paperSlug, entry)

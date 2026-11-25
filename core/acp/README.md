@@ -47,10 +47,136 @@ that `AcpSession.prompt()` yields from, mapped onto `AcpUpdate` via
 `mapSessionUpdate`. The RPC promise from `session/prompt` settling pushes the
 terminal `done`/`error` update and closes the queue.
 
-The `requestPermission` client handler auto-allows (falls back to cancel if
-no allow option is offered) — there's no UI yet to ask a human, so headless
-tool-call permission is a deliberate placeholder until the Ask panel wires a
-real prompt.
+### Session mode (the policy only works if the adapter asks)
+
+Both adapters start in a mode that approves workspace writes **in-process,
+without ever sending `session/request_permission`**, which would bypass the
+policy below entirely. Verified against the installed sources
+(`claude-agent-acp` 0.107.0, `codex-acp` 2.2.2):
+
+| Backend | Default mode | What it auto-approves | Mode Vellum forces |
+| --- | --- | --- | --- |
+| `claude` | `auto` (or the user's `permissions.defaultMode`, e.g. `acceptEdits`): `session-mode.js` `resolveInitialPermissionMode` | file edits inside cwd | `default` ("Manual: always ask before making changes") |
+| `codex` | `agent` (`auto_review` + `workspace-write`): `AgentMode.DEFAULT_AGENT_MODE` | writes inside the workspace | `read-only` (read-only sandbox, approval `on-request`) |
+
+After `session/new`, `newSession` reads the announced `modes`, sends
+`session/set_mode` when the current mode is not the safe one, and logs
+`[vellum:acp] session mode backend=… initial=… enforced=…`. It **fails closed**:
+if the adapter announces no modes, does not offer the safe mode, rejects
+`set_mode`, or announces a `current_mode_update` away from it during the handshake, the
+adapter is killed and `newSession` rejects. A `current_mode_update` away from it
+after the session exists fails the in-flight turn with an error, kills the
+adapter and fails every later prompt. For Codex the child env also carries
+`INITIAL_AGENT_MODE=read-only`, so the session starts read-only before
+`set_mode`. Constants: `SAFE_SESSION_MODE` in `stdio-client.ts`. Antigravity
+has no such mode switch and is unchanged.
+
+Claude can still reach the network through its own tools (`WebFetch`,
+`WebSearch`); in `default` mode these send `session/request_permission`
+(`fetch`), which the policy rejects.
+
+### Permission policy (deny by default)
+
+Paper text is untrusted (arbitrary PDFs and arXiv downloads), and Vellum has no
+permission prompt UI yet. `requestPermission` therefore decides from
+`toolCall.kind` and, for `read` and `search`, the paths the call names, in
+`permission-policy.ts`:
+
+| `toolCall.kind` | Outcome |
+| --- | --- |
+| `think` | Allow: selects `allow_once`, else `allow_always`; cancels if neither is offered |
+| `read`, `search` | Allow (selecting only `allow_once`; cancel when it is not offered, never `allow_always`) only when every path named in `toolCall.locations[].path` and path-like `rawInput` fields (`path`, `file_path`, `paths`, `uri`, escaping globs, …) resolves inside the session cwd after `..` and symlinks (including dangling ones) are resolved, and no other `rawInput` string (keys the policy does not vet, any depth, split on whitespace, commas, semicolons, quotes, brackets, `=`, `|`, `&` and `:`) is an absolute path outside cwd, a home path (`~`, `~/x`, `~user/x`), any `file:` URI, a URL, or a `..` path. The scan fails closed (`scan truncated`) beyond depth 8 or 500 strings. Regex text in Claude's Grep `pattern` is not scanned (a regex cannot name a path); Grep's `glob` filter and Glob's `pattern` are checked as globs. A glob that can expand to `..` (a `..` after the first wildcard, a bracket/brace group containing a dot, or a leading-dot wildcard component such as `.*/x` or `.?/x`) is rejected. A `read` that names no path is rejected. A `search` with no path is treated as rooted at cwd (Grep/Glob default) when it has a string `pattern` and nothing remote-looking (`query`, `url`, `webSearch`); otherwise it is rejected. Env vars matching `PERMISSION|BYPASS|DANGEROUS|SKIP_PERM` or `IS_SANDBOX` are removed from the adapter env and from forwarded Claude settings `env`. |
+| `edit`, `delete`, `move`, `execute`, `switch_mode`, `other`, `fetch`, absent, `null` or unknown | Reject: selects `reject_once`, else `reject_always`; cancels if neither is offered |
+
+`fetch` is denied on purpose. It reaches the network, so injected paper text
+could use it to send the paper or other local content to an attacker, and
+grounding only needs local file reads. An allow option is never selected for a
+denied kind, even when it is the only option offered. Every decision is logged
+as `[vellum:acp] permission backend=… kind=… decision=…` plus `reason="…"` when
+a read/search was refused (override with the `onPermissionDecision`
+constructor option).
+
+### Web search (Codex)
+
+`search` is **not** a local-only kind. Codex's native web search is reported as
+`kind: search` and runs **without** a permission request, so the policy cannot
+stop it; injected paper text could put paper content in a query. Vellum
+therefore disables it in the adapter env (`buildAdapterEnv`, `CODEX_CONFIG`):
+
+- `web_search = "disabled"` removes the native tool.
+- `features.apps = false` is also required. With only `web_search` disabled,
+  Codex fell back to the ChatGPT Apps connector tool
+  `mcp.codex_apps.search_service.web_run` (kind `execute`, no permission
+  request, live results returned). With `apps` off, 4 of 4 probe turns made no
+  search call (3 of 3 made one with neither key set).
+
+Both keys override the user's own `CODEX_CONFIG`. Residual risk: MCP servers the
+user configured in `~/.codex/config.toml` are not touched and can still reach
+the network. Claude's `WebSearch`/`WebFetch` are covered by the permission
+policy (see above).
+
+### Codex file reads are not path-scoped by the permission policy
+
+Codex reads files by running shell commands inside codex-cli's read-only
+sandbox. Its permission profile (Codex rollout `turn_context`) is
+`file_system: restricted, entries: [root: read]`, so every file on the machine
+is readable and Codex sends **no** `session/request_permission` for it. The
+path scoping above only sees requests the adapter chooses to send (kinds
+`execute`, `other`, `switch_mode`), so it cannot scope Codex reads.
+
+codex-acp 2.2.2 sends `approvalPolicy: on-request` and a `readOnly`
+`sandboxPolicy` on every turn, so Vellum cannot select `untrusted` approval,
+and a restricted `default_permissions` filesystem profile in `CODEX_CONFIG` made
+Codex session creation fail on the development host (the bwrap fs helper cannot
+start there). Neither was shipped. Instead `buildAdapterEnv` sets
+`features.shell_tool = false`, `features.unified_exec = false` and `features.view_image = false`, plus every other default-on feature that can reach a browser, the screen, the network or other code (`browser_use*`, `computer_use`, `in_app_browser`, `image_generation`, `plugins`, `remote_plugin`, `plugin_sharing`, `tool_suggest`, `hooks`, `multi_agent`, `multi_agent_v2`; see `CODEX_RESTRICTED_FEATURES`). With the shell features off
+the tool list reported by Codex has no command runner (`apply_patch`,
+MCP resource tools, goals, clock, image generation), and a
+request to read an absolute path was answered "no file or shell reader exposed".
+
+Consequences and residual risk:
+
+- Codex grounding relies on the paper text Vellum embeds in the prompt
+  (`MAX_EMBEDDED_CONTEXT_BYTES`, 512 KiB). A larger `paper.md` is only linked
+  and Codex can no longer open it.
+- `view_image` is disabled (`features.view_image = false`). Live probe: with it on, Codex
+  read a canary PNG outside cwd with 0 permission requests; with it off the model
+  has no such tool. `apply_patch` still
+  exists but needs approval, which the policy rejects as kind `edit`.
+- The JavaScript `exec` code-mode isolate stays listed. A live probe found it has no `require`, `process`, Deno or filesystem access. The `collaboration.*` sub-agent tools also stay listed with `multi_agent` off; sub-agents run in the same read-only sandbox.
+- Reads by user-configured MCP servers are not scoped by Vellum.
+- This was verified from the tool list and one model answer on a host where the
+  Codex shell cannot run anyway (bwrap). It was not verified on a host with a
+  working Codex sandbox.
+
+### Claude settings sources
+
+claude-agent-acp loads the user's, project and local Claude settings. Claude Code
+matches their allow rules (`Read(//**)`, `Bash(*)`) before `canUseTool`, so such a
+rule skipped `session/request_permission` entirely (live probe: Read and Bash
+read a canary outside cwd, 0 permission lines). `session/new` now carries
+`_meta.claudeCode.options.settingSources = []`, which claude-agent-acp spreads over
+its default. Because sign-in on some hosts lives in the user's settings
+(`apiKeyHelper`, gateway `env`) and `settingSources: []` alone made the session
+fail with "OAuth session expired", `buildClaudeSessionMeta` re-supplies only
+`apiKeyHelper`, `env`, `model`, `awsAuthRefresh`, `awsCredentialExport`,
+`forceLoginMethod` and `forceLoginOrgUUID` from `$CLAUDE_CONFIG_DIR/settings.json`
+(or `~/.claude/settings.json`) as programmatic settings. Permission rules, hooks,
+plugins and MCP servers from user settings are no longer loaded. Managed (enterprise)
+policy still applies.
+
+### Session working directory
+
+`newSession(backend, { cwd })` forwards `cwd` to `session/new`. The chat
+manager, ingest extract and ingest summary pass the paper directory
+(`dirname(paper.md)`), so adapters that scope file access to cwd still read
+`paper.md` but not the Vellum source tree, and the permission policy scopes
+`read`/`search` to it. With no `cwd` the client creates a private `0700`
+`mkdtemp` directory for that session and removes it on dispose (or on a failed
+handshake). It never uses `process.cwd()` or the shared OS temp dir. The adapter
+process is also spawned with the session cwd as its process cwd (sessions are one
+process each), so relative paths resolve there and project config is not read from
+the app's checkout.
 
 `SpawnAdapter` is an injectable seam: unit tests substitute a small
 dependency-free ndjson JSON-RPC script in place of the real adapter binary,
@@ -128,7 +254,8 @@ An absent or blank override leaves `CODEX_CONFIG` untouched. Claude receives
 no model override. Vellum also retains `-c model=<JSON-encoded value>` as one
 argv entry for legacy adapter compatibility, without invoking a shell.
 Current 2.2.2 server entry ignores arbitrary argv and reads `CODEX_CONFIG`.
-No provider, authentication, sandbox, or service-tier default changes.
+No provider, authentication, or service-tier default changes. Vellum does force
+the session mode and Codex web-search limits described above.
 See [issue #136 verification](../../docs/verification/issue-136.md) for
 official source locations, delivery evidence, and live verification limits.
 

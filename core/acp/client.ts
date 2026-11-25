@@ -56,8 +56,14 @@ export interface AcpSession {
   dispose(): Promise<void>
 }
 
+export interface AcpSessionOptions {
+  /** Absolute working directory for the session: the paper directory (or the
+   * data directory). Never the app's own process cwd. */
+  cwd?: string
+}
+
 export interface AcpClient {
   /** Spawn the backend's ACP server subprocess and open a session. */
-  newSession(backend: AcpBackend): Promise<AcpSession>
+  newSession(backend: AcpBackend, options?: AcpSessionOptions): Promise<AcpSession>
 }
 

@@ -237,6 +237,18 @@ describe('extractPaper', () => {
     expect(client.session?.disposed).toBe(true)
   })
 
+  it('opens the session in the paper directory, not the process cwd', async () => {
+    let cwd: string | undefined
+    const client: AcpClient = {
+      newSession: (_backend, options) => {
+        cwd = options?.cwd
+        return Promise.reject(new Error('stop here'))
+      },
+    }
+    await extractPaper('/data/papers/x/paper.md', { client })
+    expect(cwd).toBe('/data/papers/x')
+  })
+
   it('never throws when newSession() itself rejects (adapter fails to spawn)', async () => {
     const client = new FakeClient([], () => Promise.reject(new Error('failed to spawn ACP adapter')))
 

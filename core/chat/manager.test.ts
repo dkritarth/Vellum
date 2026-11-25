@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { AcpBackend, AcpClient, AcpPromptRequest, AcpSession, AcpUpdate } from '../acp/client.js'
 import { upsertPaper } from '../library/repo.js'
 import { openDb } from '../store/db.js'
-import { ChatManager, STOPPED_MARKER, type AskStreamEvent } from './manager.js'
+import { ChatManager, STOPPED_MARKER, markStoppedAnswer, type AskStreamEvent } from './manager.js'
 import { getChatMessages } from './repo.js'
 import { listUsageRecords, getUsageSummary } from '../usage/repo.js'
 
@@ -874,5 +874,20 @@ describe('ChatManager', () => {
     expect(summary.turnsWithMetrics).toBe(0)
     expect(summary.totalTokens).toBeNull() // Honest null, never 0
     expect(summary.backends.codex.totalTokens).toBeNull()
+  })
+})
+
+describe('markStoppedAnswer', () => {
+  it('appends the marker after the partial answer', () => {
+    expect(markStoppedAnswer('Section 1 says attention.  \n')).toBe(`Section 1 says attention.\n\n${STOPPED_MARKER}`)
+  })
+
+  it('closes a code fence the answer was stopped inside', () => {
+    expect(markStoppedAnswer('Example:\n```python\nx = 1')).toBe(`Example:\n\`\`\`python\nx = 1\n\`\`\`\n\n${STOPPED_MARKER}`)
+    expect(markStoppedAnswer('~~~~\na\n~~~\nb')).toBe(`~~~~\na\n~~~\nb\n~~~~\n\n${STOPPED_MARKER}`)
+  })
+
+  it('leaves closed fences alone', () => {
+    expect(markStoppedAnswer('```\ncode\n```\nAfter')).toBe(`\`\`\`\ncode\n\`\`\`\nAfter\n\n${STOPPED_MARKER}`)
   })
 })

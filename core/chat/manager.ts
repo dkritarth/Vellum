@@ -48,6 +48,23 @@ export type AskStreamEvent = (
  * with the answer so a restart shows the same marked text. */
 export const STOPPED_MARKER = '*(stopped)*'
 
+/** A stopped partial answer as saved: the text, then the marker. When Stop
+ * landed inside a fenced code block, the fence is closed first so the marker
+ * renders as a marker rather than as a line of code. */
+export function markStoppedAnswer(partial: string): string {
+  const text = partial.trimEnd()
+  let open: string | null = null
+  for (const line of text.split('\n')) {
+    const fence = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/)
+    if (!fence) continue
+    if (open === null) open = fence[1]
+    // A closing fence uses the opener's character, at least as many of them,
+    // and nothing else on the line.
+    else if (fence[1][0] === open[0] && fence[1].length >= open.length && fence[2].trim() === '') open = null
+  }
+  return `${text}${open ? `\n${open}` : ''}\n\n${STOPPED_MARKER}`
+}
+
 /** After `session/cancel`, how long an adapter may take to end its turn
  * before the session is disposed and the turn ends anyway. */
 const DEFAULT_CANCEL_GRACE_MS = 5_000
@@ -482,7 +499,7 @@ export class ChatManager {
         ? addChatMessage(params.db, {
             sessionId: params.chatSessionId,
             role: 'assistant',
-            content: `${accumulated.trimEnd()}\n\n${STOPPED_MARKER}`,
+            content: markStoppedAnswer(accumulated),
           })
         : undefined
       onEvent(message ? { kind: 'cancelled', message } : { kind: 'cancelled' })

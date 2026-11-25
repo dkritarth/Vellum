@@ -211,4 +211,55 @@ describe('classifyInput', () => {
     const result = classifyInput('10.1038/S41586-021-03819-2')
     expect(result.slug).toMatch(/^[a-z0-9._-]+$/)
   })
+
+  // Link forms people paste (overnight ingest review).
+  it('routes arXiv DOIs to arXiv, bare or as a URL', () => {
+    for (const input of ['10.48550/arXiv.1706.03762', 'https://doi.org/10.48550/arXiv.1706.03762', 'https://doi.org/10.48550/ARXIV.1706.03762v7']) {
+      const result = classifyInput(input)
+      expect(result.kind).toBe('arxiv')
+      expect(result.value).toMatch(/^1706\.03762(v7)?$/)
+    }
+    expect(classifyInput('10.48550/arXiv.hep-th/9901001').value).toBe('hep-th/9901001')
+  })
+
+  it('rejects an arXiv DOI whose suffix is not an arXiv identifier', () => {
+    // The suffix must never be classified as a local path or a download URL.
+    for (const input of [
+      'https://doi.org/10.48550/arXiv./home/u/x.pdf',
+      '10.48550/arXiv.https://host/a.pdf',
+      '10.48550/arXiv.garbage',
+    ]) {
+      expect(() => classifyInput(input)).toThrow(/unrecognized arXiv DOI/)
+    }
+  })
+
+  it('ignores query strings and fragments on arXiv links', () => {
+    for (const input of [
+      'https://arxiv.org/abs/1706.03762?context=cs.LG',
+      'https://arxiv.org/abs/1706.03762#abstract',
+      'https://arxiv.org/pdf/1706.03762v7.pdf?download=1',
+      'https://arxiv.org/abs/hep-th/9901001v2?context=hep-th',
+    ]) {
+      const result = classifyInput(input)
+      expect(result.kind).toBe('arxiv')
+    }
+    expect(classifyInput('https://arxiv.org/pdf/1706.03762v7.pdf?download=1').value).toBe('1706.03762v7')
+  })
+
+  it('ignores query strings and fragments on DOI links', () => {
+    const plain = classifyInput('https://doi.org/10.1038/s41586-021-03819-2')
+    for (const input of ['https://doi.org/10.1038/s41586-021-03819-2?utm_source=x', 'https://doi.org/10.1038/s41586-021-03819-2#sec1']) {
+      expect(classifyInput(input)).toEqual(plain)
+    }
+  })
+
+  it('rejects malformed DOI URL escapes with a clear message', () => {
+    expect(() => classifyInput('https://doi.org/10.1000/foo%zz')).toThrow('classifyInput: malformed DOI URL')
+  })
+
+  it('accepts file:// URLs to local PDFs', () => {
+    const url = new URL(`file://${localPdfPath}`).href
+    const result = classifyInput(url)
+    expect(result).toEqual(classifyInput(localPdfPath))
+  })
 })

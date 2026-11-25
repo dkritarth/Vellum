@@ -289,6 +289,13 @@ describe('UsageView [L2-05]', () => {
     expect(usageGetSummary).toHaveBeenCalledTimes(2)
   })
 
+  it('shows a load failure without the IPC wrapper (#272)', async () => {
+    usageGetSummary.mockRejectedValueOnce(new Error("Error invoking remote method 'vellum:usage-summary': Error: getUsageSummary: database is locked"))
+    render(<UsageView />)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Database is locked'))
+    expect(screen.getByRole('alert')).not.toHaveTextContent('invoking remote method')
+  })
+
   it('displays error banner when loading fails', async () => {
     usageGetSummary.mockRejectedValueOnce(new Error('IPC query failed'))
 

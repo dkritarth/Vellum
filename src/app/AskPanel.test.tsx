@@ -732,3 +732,19 @@ describe('deleted session recovery', () => {
     expect(screen.getByLabelText('Ask a question')).toBeEnabled()
   })
 })
+
+describe('Ask error text (#272)', () => {
+  it('shows history load and New chat failures without the IPC wrapper', async () => {
+    const user = userEvent.setup()
+    askOpen.mockRejectedValueOnce(new Error("Error invoking remote method 'vellum:ask-open': Error: openChat: database is locked"))
+    render(<AskPanel slug="p1" />)
+    expect(await screen.findByText(/Database is locked/)).toBeInTheDocument()
+    expect(screen.queryByText(/invoking remote method/)).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    await waitFor(() => expect(screen.getByLabelText(/ask a question/i)).toBeEnabled())
+    askNewChat.mockRejectedValueOnce(new Error("Error invoking remote method 'vellum:ask-new-chat': Error: newChat: database is locked"))
+    await user.click(screen.getByRole('button', { name: 'New chat' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Database is locked')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('invoking remote method')
+  })
+})

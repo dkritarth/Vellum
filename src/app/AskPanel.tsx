@@ -196,7 +196,7 @@ export function AskPanel({
         if (!cancelled && generation === contextGeneration.current) {
           awaitingRequest.current = false
           queuedUpdates.current = []
-          setLoadError(err instanceof Error ? err.message : String(err))
+          setLoadError(friendlyIpcError(err))
         }
       })
 
@@ -272,7 +272,7 @@ export function AskPanel({
       })
       .catch((err: unknown) => {
         if (generation === contextGeneration.current) {
-          setError(err instanceof Error ? err.message : String(err))
+          setError(friendlyIpcError(err))
         }
       })
       .finally(() => {

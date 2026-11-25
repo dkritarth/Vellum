@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { UsageSummary, UsageRecord } from '../../core/usage/repo.js'
 import type { AcpBackend } from '../../core/acp/client.js'
 import styles from './UsageView.module.css'
+import { friendlyIpcError } from './ipcError'
 
 const USAGE_CARDS: Array<{ backend: AcpBackend; title: string }> = [
   { backend: 'claude', title: 'Claude (claude-agent-acp)' },
@@ -32,7 +33,7 @@ export function UsageView({ onBackToLibrary }: UsageViewProps): JSX.Element {
       setSummary(sum)
       setRecords(list)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load usage telemetry')
+      setError(friendlyIpcError(err, 'Failed to load usage telemetry'))
     } finally {
       setLoading(false)
     }

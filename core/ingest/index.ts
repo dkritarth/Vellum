@@ -19,6 +19,7 @@
 // Re-ingest updates files and metadata through the same paper slug.
 
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import type { Database } from 'better-sqlite3'
@@ -133,6 +134,24 @@ function assertPdfBytes(input: ClassifiedInput, bytes: Uint8Array): void {
   )
 }
 
+/** Whether a re-ingest of unchanged bytes should keep the stored outline:
+ * when extraction found no sections, or when degraded output (some entries
+ * malformed) salvaged fewer sections than the stored outline has. */
+function keepStoredSections(extracted: { sections: unknown[]; degraded: boolean }, stored: unknown[] | undefined): boolean {
+  if (!stored || stored.length === 0) return false
+  if (extracted.sections.length === 0) return true
+  return extracted.degraded && extracted.sections.length < stored.length
+}
+
+function sameBytes(path: string | undefined, bytes: Uint8Array): boolean {
+  if (!path) return false
+  try {
+    return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).equals(readFileSync(path))
+  } catch {
+    return false
+  }
+}
+
 /**
  * Ingest a paper end-to-end: classify -> fetch -> convert -> extract -> write
  * files + DB row. See module comment for the idempotency guarantee.
@@ -186,6 +205,7 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
     // not produce an untitled paper. Without agent or fetch metadata, guess the
     // title from the PDF's first page, then fall back to the file name so the
     // title is never empty and never a raw filesystem path.
+    const sourcedTitle = nonBlank(extracted.metadata.title) ?? nonBlank(fetched.metadata?.title)
     const title =
       nonBlank(extracted.metadata.title) ??
       nonBlank(fetched.metadata?.title) ??
@@ -206,6 +226,23 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
     const { slug, pdfPath, mdPath } = withPaperPublication(candidate, (publish) => options.db.transaction(() => {
       const paths = resolveIngestSource(classified, fetched.pdfBytes, { db: options.db, dataDir })
       const { slug, pdfPath, mdPath } = paths
+      // Re-ingest refreshes metadata but never regresses it: when this run
+      // could not produce a field (agent unavailable, degraded output,
+      // summary failure), keep the stored value. The added date is the first
+      // ingest's, so re-adding does not reorder the library.
+      const stored = getPaper(options.db, slug)
+      // Stored metadata describes the stored PDF. When the bytes changed it
+      // may describe a different document, so only the added date carries.
+      const existing = stored && sameBytes(stored.pdfPath, fetched.pdfBytes) ? stored : undefined
+      const keepAuthors = metadata.authors.length === 0 && (existing?.authors.length ?? 0) > 0
+      Object.assign(metadata, {
+        title: sourcedTitle === undefined && existing ? existing.title : metadata.title,
+        authors: keepAuthors ? existing!.authors : metadata.authors,
+        authorOrcids: keepAuthors ? existing!.authorOrcids : metadata.authorOrcids,
+        year: metadata.year ?? existing?.year,
+        venue: metadata.venue ?? existing?.venue,
+        abstract: metadata.abstract ?? existing?.abstract,
+      })
       const record: PaperRecord = {
         slug,
         title: metadata.title,
@@ -215,11 +252,11 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
         doi: classified.kind === 'doi' ? classified.value : undefined,
         arxivId: classified.kind === 'arxiv' ? classified.value : undefined,
         abstract: metadata.abstract,
-        summary,
+        summary: summary ?? existing?.summary,
         mdPath,
         pdfPath,
-        sections: extracted.sections,
-        addedAt: new Date().toISOString(),
+        sections: keepStoredSections(extracted, existing?.sections) ? existing!.sections : extracted.sections,
+        addedAt: stored?.addedAt ?? new Date().toISOString(),
         authorOrcids: metadata.authorOrcids,
       }
       publish(paths)

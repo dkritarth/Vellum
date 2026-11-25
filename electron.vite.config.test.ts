@@ -18,4 +18,11 @@ it('build ships matching PDF fonts, decoders, JS fallbacks and licenses beside e
       }
     }
   }
+  // KaTeX math fonts must load under the renderer CSP (no data: fonts).
+  const assets = resolve('out', 'renderer', 'assets')
+  const files = readdirSync(assets)
+  expect(files.some((file) => /^KaTeX_Main-Regular.*\.woff2$/.test(file))).toBe(true)
+  for (const file of files.filter((name) => name.endsWith('.css'))) {
+    expect(readFileSync(resolve(assets, file), 'utf8')).not.toMatch(/url\(\s*["']?data:/)
+  }
 }, 90000)

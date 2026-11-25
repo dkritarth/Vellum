@@ -27,6 +27,7 @@
     "test:gate:reader": "node test/reader-gate.mjs",
     "test:gate:reader-scroll-zoom": "node test/reader-scroll-zoom-gate.mjs",
     "test:gate:app-ux": "node test/app-ux-live.mjs",
+    "test:gate:math-chat": "node test/math-chat-live.mjs",
     "demo:record": "node test/walkthrough-live.mjs",
     "site:build": "node scripts/build-website.mjs"
   },
@@ -49,6 +50,7 @@
     "electron-builder": "26.18.0",
     "electron-vite": "^2.3.0",
     "jsdom": "^25.0.1",
+    "katex": "0.19.1",
     "playwright": "^1.63.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",

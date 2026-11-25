@@ -16,10 +16,11 @@ describe('MarkdownText', () => {
     expect(container.querySelector('code')?.textContent).toBe('d_model')
   })
 
-  it('strips LaTeX delimiters from inline and display math', () => {
+  it('typesets inline and display math instead of showing delimiters', () => {
     const { container } = render(<MarkdownText text={'With \\(h = 8\\) heads.\n\n$$\nd_k = 64\n$$'} />)
-    expect(container.textContent).toContain('With h = 8 heads.')
-    expect(container.textContent).toContain('d_k = 64')
+    expect(container.querySelectorAll('.katex')).toHaveLength(2)
+    expect(container.textContent).toContain('With ')
+    expect(container.textContent).toContain(' heads.')
     expect(container.textContent).not.toMatch(/\\\(|\$\$/)
   })
 

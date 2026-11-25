@@ -107,7 +107,7 @@ export function ReaderPage({
         .then((page) => page.cleanup())
         .catch(() => undefined)
     }
-  }, [doc, pageNumber, active, onTextWork])
+  }, [doc, pageNumber, active])
 
   // Canvas: rasterise at `renderScale` x devicePixelRatio into a fresh
   // canvas, then swap it in, so the old raster stays visible (stretched)
@@ -192,7 +192,7 @@ export function ReaderPage({
       textLayer?.cancel()
       setTextVersion(0)
     }
-  }, [doc, pageNumber, active])
+  }, [doc, pageNumber, active, onTextWork])
 
   // [P2-03] Wrap resolved `[n]` markers once the text layer exists, and again
   // if the reference index arrives later (injection is idempotent).

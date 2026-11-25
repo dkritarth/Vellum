@@ -119,7 +119,9 @@ async function runBackend(backend) {
       assert(!grounded.error, `Codex Ask must answer: ${grounded.error}`)
       console.log(`[${backend}] ANSWER: ${grounded.answer.slice(0, 600)}`)
       assert.match(grounded.answer, /Transformer/i)
-      assert.match(grounded.answer, /section|§|\b\d+(\.\d+)*\b/i, 'answer should cite a section')
+      // A citation by number ("Section 3.2", "§3") or by heading name
+      // ("In the Abstract", "The Introduction adds") both ground the answer.
+      assert.match(grounded.answer, /section|§|\b\d+(\.\d+)*\b|\b(abstract|introduction|background|model architecture|conclusion)\b/i, 'answer should cite a section')
       await window.screenshot({ path: path.join(evidence, `${backend}-answer.png`) })
     } else {
       console.log(`[${backend}] grounded ask: ${grounded.error ? `ERROR ${grounded.error}` : grounded.answer.slice(0, 300)}`)

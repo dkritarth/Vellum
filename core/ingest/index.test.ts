@@ -37,6 +37,8 @@ class FakeSession implements AcpSession {
     this.contextContents.push(...(req.contextFiles ?? []).map(file => readFileSync(file, 'utf8')))
     for (const update of this.updates) yield update
   }
+  async cancel(): Promise<void> {}
+
   async dispose(): Promise<void> {
     this.disposed = true
   }

@@ -28,7 +28,7 @@ function replaceOnce(before, after) {
 }
 replaceOnce('let chatManager;', `
 StdioAcpClient.prototype.newSession = async function () {
-  return { async *prompt() { yield {kind:'done',data:{stopReason:'end_turn'}} }, async dispose() {} };
+  return { async *prompt() { yield {kind:'done',data:{stopReason:'end_turn'}} }, async cancel() {}, async dispose() {} };
 };
 let chatManager;`)
 replaceOnce('  createWindow();', `

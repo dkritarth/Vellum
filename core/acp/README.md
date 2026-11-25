@@ -47,6 +47,23 @@ that `AcpSession.prompt()` yields from, mapped onto `AcpUpdate` via
 `mapSessionUpdate`. The RPC promise from `session/prompt` settling pushes the
 terminal `done`/`error` update and closes the queue.
 
+### Stop (cancel a turn)
+
+`AcpSession.cancel()` sends the ACP `session/cancel` notification for the turn
+in flight (no-op when idle or disposed). A conforming agent ends the turn with
+`stopReason: 'cancelled'`, so `prompt()` still finishes with a `done` update and
+the session stays usable. `ChatManager.cancelTurn` (core/chat/manager.ts) drives
+it from the Ask panel's Stop button:
+
+- A stopped turn with answer text saves that partial answer with a trailing
+  `*(stopped)*` marker, so a restart shows the same thread. A stopped turn with no
+  answer text saves nothing (the user's question stays).
+- If the adapter has not ended the turn 5 s after `session/cancel`, the session is
+  disposed (adapter process tree killed) and the turn ends as stopped; the next
+  turn spawns a fresh session with the chat history recapped.
+- Stop pressed while the agent session is still starting ends the turn when the
+  session is ready, without sending the prompt.
+
 The `requestPermission` client handler auto-allows (falls back to cancel if
 no allow option is offered) — there's no UI yet to ask a human, so headless
 tool-call permission is a deliberate placeholder until the Ask panel wires a

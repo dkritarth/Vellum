@@ -9,6 +9,8 @@ class FakeSession implements AcpSession {
     yield { kind: 'text', data: { type: 'text', text: 'Grounded paper summary.' } }
     yield { kind: 'done', data: {} }
   }
+  async cancel(): Promise<void> {}
+
   async dispose(): Promise<void> {}
 }
 
@@ -29,6 +31,7 @@ it.each(['error', 'throw', 'EOF'] as const)('discards nonempty summary after %s 
           if (failure === 'throw') throw new Error('stream broke')
           if (failure === 'error') yield { kind: 'error', data: { message: 'adapter failed' } }
         },
+        async cancel() {},
         async dispose() { disposed = true; throw new Error('cleanup failed') },
       }
     },
@@ -45,6 +48,7 @@ it.each(['max_tokens', 'max_turn_requests', 'refusal', 'cancelled', 'future_reas
       yield { kind: 'text', data: { type: 'text', text: 'Nonempty interrupted summary.' } }
       yield { kind: 'done', data: { stopReason } }
     },
+    async cancel() {},
     async dispose() { disposed = true },
   } } }
   await expect(summarizePaper('/papers/p1/paper.md', { client })).resolves.toBeUndefined()
@@ -59,6 +63,7 @@ it.each([{}, { stopReason: 'end_turn' }, null, undefined])('keeps completed chun
       yield { kind: 'text', data: { type: 'text', text: 'paper summary.  ' } }
       yield { kind: 'done', data }
     },
+    async cancel() {},
     async dispose() { throw new Error('cleanup failed') },
   } } }
   await expect(summarizePaper('/papers/p1/paper.md', { client })).resolves.toBe('Grounded paper summary.')
@@ -72,6 +77,7 @@ it('returns no summary if spawning the adapter fails', async () => {
 it('returns no summary for a completed empty turn', async () => {
   const client: AcpClient = { async newSession() { return {
     async *prompt() { yield { kind: 'done', data: {} } },
+    async cancel() {},
     async dispose() {},
   } } }
   await expect(summarizePaper('/papers/p1/paper.md', { client })).resolves.toBeUndefined()

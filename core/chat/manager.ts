@@ -242,11 +242,17 @@ export class ChatManager {
       this.startingPapers.delete(params.paperSlug)
       this.activeTurns.delete(params.paperSlug)
     }
+    // The session is ready: delete/purge refusals now say "answering"
+    // rather than "starting". Owner-checked like release, because a turn that
+    // already ended may see its session start resolve after a newer turn began.
+    const sessionReady = (): void => {
+      if (this.activeTurns.get(params.paperSlug) === activeTurn) this.startingPapers.delete(params.paperSlug)
+    }
     return this.runActiveTurn(params, (event) => {
       if (event.kind === 'text') activeTurn.text += event.text
       if (event.kind === 'done' || event.kind === 'error') release()
       onEvent({ ...event, sequence: ++activeTurn.sequence })
-    }).finally(release)
+    }, sessionReady).finally(release)
   }
 
   /**
@@ -306,7 +312,7 @@ export class ChatManager {
     }
   }
 
-  private async runActiveTurn(params: RunTurnParams, onEvent: (event: AskStreamEvent) => void): Promise<void> {
+  private async runActiveTurn(params: RunTurnParams, onEvent: (event: AskStreamEvent) => void, sessionReady: () => void): Promise<void> {
     const backend = params.backend ?? DEFAULT_BACKEND
 
     // Snapshot history *before* adding this turn's user message — this is
@@ -319,7 +325,7 @@ export class ChatManager {
     let freshlySpawned: boolean
     try {
       ;({ session: acpSession, freshlySpawned } = await this.getOrCreateAcpSession(params.paperSlug, backend, params.chatSessionId))
-      this.startingPapers.delete(params.paperSlug)
+      sessionReady()
     } catch (err) {
       onEvent({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
       return

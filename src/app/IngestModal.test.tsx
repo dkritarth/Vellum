@@ -148,7 +148,7 @@ describe('IngestModal', () => {
     function Probe({ isOpen }: { isOpen: boolean }) {
       useLayoutEffect(() => {
         if (!isOpen) return
-        const input = document.querySelector<HTMLInputElement>('#ingest-input, input[type="text"], input:not([type])')
+        const input = document.querySelector<HTMLInputElement>('#paper-input')
         firstFrames.push({ value: input?.value ?? '<none>', alert: Boolean(document.querySelector('[role="alert"]')) })
       }, [isOpen])
       return null

@@ -26,14 +26,32 @@ import styles from './NotesPanel.module.css'
 
 const SAVE_DEBOUNCE_MS = 500
 
-// Text whose leave-time save failed, by paper slug. Module scope so it
-// survives the panel unmounting (leaving the Notes tab) as well as a paper
-// switch.
-const unsavedNotes = new Map<string, string>()
+// Text whose leave-time save failed, by paper slug, with the write that
+// failed. Module scope so it survives the panel unmounting (leaving the
+// Notes tab) as well as a paper switch.
+const unsavedNotes = new Map<string, { body: string; write: number }>()
+// Latest write (save or clear) started per paper. A failed leave-time save
+// is kept only while no newer write has started for that paper, and any
+// write that succeeds drops what was kept from older ones, so stale text
+// can never come back over a newer saved or cleared note.
+const latestNoteWrite = new Map<string, number>()
+let noteWriteSeq = 0
+
+function startNoteWrite(slug: string): number {
+  noteWriteSeq += 1
+  latestNoteWrite.set(slug, noteWriteSeq)
+  return noteWriteSeq
+}
+
+function noteWriteSucceeded(slug: string, write: number): void {
+  const kept = unsavedNotes.get(slug)
+  if (kept && kept.write <= write) unsavedNotes.delete(slug)
+}
 
 /** Test seam: forget text kept from failed leave-time saves. */
 export function clearUnsavedNotes(): void {
   unsavedNotes.clear()
+  latestNoteWrite.clear()
 }
 
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -65,6 +83,13 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
   const slugRef = useRef<string | undefined>(slug)
   bodyRef.current = body
   slugRef.current = slug
+  // The paper whose note this mounted editor has loaded, if any.
+  const loadedSlugRef = useRef<string | undefined>(undefined)
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   // Fires a pending debounced save immediately for `outgoingSlug` instead of
   // letting the timer be silently cleared. No-ops if there's no dirty edit
@@ -79,20 +104,31 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
     const generation = paperGeneration.current
     const revision = editRevision.current
     dirtyRef.current = false
+    const write = startNoteWrite(outgoingSlug)
     window.vellum.notesSave({ slug: outgoingSlug, body: pendingBody })
-      .then(() => {
-        if (unsavedNotes.get(outgoingSlug) === pendingBody) unsavedNotes.delete(outgoingSlug)
-      })
+      .then(() => noteWriteSucceeded(outgoingSlug, write))
       .catch(() => {
-        // The flush runs from effect cleanups, which retire this generation
-        // right after, so the editor that issued it is normally gone. Keep the
-        // text for the next time this paper's note opens instead of losing it.
-        if (generation !== paperGeneration.current || revision !== editRevision.current) {
-          unsavedNotes.set(outgoingSlug, pendingBody)
+        if (generation === paperGeneration.current && revision === editRevision.current) {
+          dirtyRef.current = true
+          setStatus('idle')
           return
         }
-        dirtyRef.current = true
-        setStatus('idle')
+        // The flush runs from effect cleanups, which retire this generation
+        // right after, so the editor that issued it is normally gone. A newer
+        // save or clear for this paper supersedes it.
+        if (latestNoteWrite.get(outgoingSlug) !== write) return
+        if (mountedRef.current && slugRef.current === outgoingSlug && loadedSlugRef.current === outgoingSlug && !dirtyRef.current) {
+          // The user is already back on this note and has not edited it:
+          // show the unsaved text and the error now.
+          setBody(pendingBody)
+          bodyRef.current = pendingBody
+          dirtyRef.current = true
+          setStatus('idle')
+          setMutationError('save')
+          return
+        }
+        // Keep the text for the next time this paper's note opens.
+        unsavedNotes.set(outgoingSlug, { body: pendingBody, write })
       })
   }, [])
 
@@ -105,6 +141,7 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
     setStatus('idle')
     setMutationError(null)
     setLoad({ slug, status: 'loading' })
+    loadedSlugRef.current = undefined
     dirtyRef.current = false
 
     if (!slug) {
@@ -119,7 +156,8 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
       .notesGet(slug)
       .then((note) => {
         if (cancelled) return
-        const unsaved = unsavedNotes.get(slug)
+        loadedSlugRef.current = slug
+        const unsaved = unsavedNotes.get(slug)?.body
         if (unsaved !== undefined) {
           // A leave-time save of this note failed: show that text, not the
           // stored note, and offer Retry save.
@@ -167,8 +205,10 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
     dirtyRef.current = false
     setMutationError(null)
     setStatus('saving')
+    const write = startNoteWrite(paperSlug)
     window.vellum.notesSave({ slug: paperSlug, body: next })
       .then(() => {
+        noteWriteSucceeded(paperSlug, write)
         if (generation !== paperGeneration.current || revision !== editRevision.current) return
         setStatus('saved')
       })
@@ -193,9 +233,11 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
     setBody('')
     setMutationError(null)
     setStatus('clearing')
+    const write = startNoteWrite(slug)
     window.vellum
       .notesDelete(slug)
       .then(() => {
+        noteWriteSucceeded(slug, write)
         if (generation !== paperGeneration.current || revision !== editRevision.current) return
         setStatus('cleared')
       })

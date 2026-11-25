@@ -2,7 +2,7 @@
 import '@testing-library/jest-dom/vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { NotesPanel } from './NotesPanel'
+import { NotesPanel, clearUnsavedNotes } from './NotesPanel'
 
 let notesGet: ReturnType<typeof vi.fn>
 let notesSave: ReturnType<typeof vi.fn>
@@ -22,6 +22,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  clearUnsavedNotes()
   vi.useRealTimers()
 })
 
@@ -349,6 +350,99 @@ describe('NotesPanel', () => {
       expect(screen.getByText('Saved')).toBeInTheDocument()
     },
   )
+
+  it('keeps text whose save failed on a paper switch and offers it again on return (#267)', async () => {
+    notesGet.mockResolvedValue({ paperSlug: 'p1', body: 'stored', updatedAt: 't' })
+    notesSave.mockRejectedValueOnce(new Error('database is locked'))
+    const { rerender } = render(<NotesPanel slug="p1" />)
+    await flushPromises()
+    fireEvent.change(screen.getByRole('textbox', { name: /note/i }), { target: { value: 'stored plus new idea' } })
+    rerender(<NotesPanel slug="p2" />)
+    await flushPromises()
+    expect(notesSave).toHaveBeenCalledWith({ slug: 'p1', body: 'stored plus new idea' })
+
+    rerender(<NotesPanel slug="p1" />)
+    await flushPromises()
+    expect(screen.getByRole('textbox', { name: /note/i })).toHaveValue('stored plus new idea')
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not save this note')
+    fireEvent.click(screen.getByRole('button', { name: 'Retry save' }))
+    await flushPromises()
+    expect(notesSave).toHaveBeenLastCalledWith({ slug: 'p1', body: 'stored plus new idea' })
+  })
+
+  it('keeps text whose save failed on unmount and offers it again on remount (#267)', async () => {
+    notesGet.mockResolvedValue({ paperSlug: 'p1', body: '', updatedAt: 't' })
+    notesSave.mockRejectedValueOnce(new Error('disk full'))
+    const { unmount } = render(<NotesPanel slug="p1" />)
+    await flushPromises()
+    fireEvent.change(screen.getByRole('textbox', { name: /note/i }), { target: { value: 'typed then left the tab' } })
+    unmount()
+    await flushPromises()
+
+    render(<NotesPanel slug="p1" />)
+    await flushPromises()
+    expect(screen.getByRole('textbox', { name: /note/i })).toHaveValue('typed then left the tab')
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not save this note')
+  })
+
+  it('never brings a stale failed save back over a newer saved note (#267 review)', async () => {
+    notesGet.mockResolvedValue({ paperSlug: 'p1', body: 'stored', updatedAt: 't' })
+    const stalled = deferred<void>()
+    notesSave.mockReturnValueOnce(stalled.promise)
+    const { rerender } = render(<NotesPanel slug="p1" />)
+    await flushPromises()
+    fireEvent.change(screen.getByRole('textbox', { name: /note/i }), { target: { value: 'X stalled' } })
+    rerender(<NotesPanel slug="p2" />)
+    await flushPromises()
+    // Back on p1 before the stalled save settles; then type a newer note.
+    rerender(<NotesPanel slug="p1" />)
+    await flushPromises()
+    fireEvent.change(screen.getByRole('textbox', { name: /note/i }), { target: { value: 'Y newer' } })
+    await act(async () => { vi.advanceTimersByTime(500) })
+    await act(async () => { stalled.reject(new Error('database is locked')) })
+    await flushPromises()
+    expect(screen.getByRole('textbox', { name: /note/i })).toHaveValue('Y newer')
+    // Leave and return: Y was saved, X must not come back.
+    rerender(<NotesPanel slug="p2" />)
+    await flushPromises()
+    notesGet.mockResolvedValue({ paperSlug: 'p1', body: 'Y newer', updatedAt: 't' })
+    rerender(<NotesPanel slug="p1" />)
+    await flushPromises()
+    expect(screen.getByRole('textbox', { name: /note/i })).toHaveValue('Y newer')
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('shows a stalled leave-time save failure on the note the user already returned to', async () => {
+    notesGet.mockResolvedValue({ paperSlug: 'p1', body: 'stored', updatedAt: 't' })
+    const stalled = deferred<void>()
+    notesSave.mockReturnValueOnce(stalled.promise)
+    const { rerender } = render(<NotesPanel slug="p1" />)
+    await flushPromises()
+    fireEvent.change(screen.getByRole('textbox', { name: /note/i }), { target: { value: 'X stalled' } })
+    rerender(<NotesPanel slug="p2" />)
+    await flushPromises()
+    rerender(<NotesPanel slug="p1" />)
+    await flushPromises()
+    expect(screen.getByRole('textbox', { name: /note/i })).toHaveValue('stored')
+    await act(async () => { stalled.reject(new Error('database is locked')) })
+    await flushPromises()
+    expect(screen.getByRole('textbox', { name: /note/i })).toHaveValue('X stalled')
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not save this note')
+  })
+
+  it('leaves nothing behind when the leave-time save succeeds', async () => {
+    notesGet.mockResolvedValue({ paperSlug: 'p1', body: '', updatedAt: 't' })
+    const { rerender } = render(<NotesPanel slug="p1" />)
+    await flushPromises()
+    fireEvent.change(screen.getByRole('textbox', { name: /note/i }), { target: { value: 'saved on leave' } })
+    rerender(<NotesPanel slug="p2" />)
+    await flushPromises()
+    notesGet.mockResolvedValue({ paperSlug: 'p1', body: 'saved on leave', updatedAt: 't' })
+    rerender(<NotesPanel slug="p1" />)
+    await flushPromises()
+    expect(screen.getByRole('textbox', { name: /note/i })).toHaveValue('saved on leave')
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
 
   it('does not dirty the active paper when an outgoing flush fails', async () => {
     const outgoingSave = deferred<void>()

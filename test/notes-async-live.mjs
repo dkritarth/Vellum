@@ -179,7 +179,11 @@ try {
   await select(a.title)
   const after = await app.evaluate(() => globalThis.__vellum92.calls.length)
   assert.equal(after, before, 'Stale flush failure must not trigger a redundant B save')
-  await record('Outgoing flush failure cannot dirty B or clear its Saved status')
+  // #267: the text whose leave-time save failed is back in A's editor with
+  // the save error, not silently replaced by the stored note.
+  await noteIs('A outgoing flush failure')
+  await window.getByRole('alert').filter({ hasText: 'Could not save this note' }).waitFor()
+  await record('Outgoing flush failure cannot dirty B or clear its Saved status; A gets its unsaved text back')
 
   await editor.fill('A final persisted note')
   await saved()

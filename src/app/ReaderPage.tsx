@@ -56,6 +56,9 @@ export interface ReaderPageProps {
   /** Changes when the user steps to a search result on this page, which
    * reveals that page's first hit. */
   searchFocusNonce: number | null
+  /** Called with each in-flight text-layer load, so the Reader can let it
+   * settle before it destroys the document's worker (#269). */
+  onTextWork?: (work: Promise<unknown>) => void
 }
 
 function isRenderCancelled(err: unknown): boolean {
@@ -81,6 +84,7 @@ export function ReaderPage({
   citationFlash,
   searchQuery,
   searchFocusNonce,
+  onTextWork,
 }: ReaderPageProps): JSX.Element {
   const canvasHostRef = useRef<HTMLDivElement>(null)
   const textLayerRef = useRef<HTMLDivElement>(null)
@@ -162,7 +166,7 @@ export function ReaderPage({
     let cancelled = false
     let textLayer: TextLayer | null = null
 
-    void (async () => {
+    const work = (async () => {
       try {
         const page = await doc.getPage(pageNumber)
         if (cancelled) return
@@ -181,13 +185,14 @@ export function ReaderPage({
         if (!cancelled) console.error(`[Reader] Failed to build text layer for page ${pageNumber}:`, err)
       }
     })()
+    onTextWork?.(work)
 
     return () => {
       cancelled = true
       textLayer?.cancel()
       setTextVersion(0)
     }
-  }, [doc, pageNumber, active])
+  }, [doc, pageNumber, active, onTextWork])
 
   // [P2-03] Wrap resolved `[n]` markers once the text layer exists, and again
   // if the reference index arrives later (injection is idempotent).

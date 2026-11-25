@@ -980,6 +980,43 @@ describe('Reader document ownership and search errors (ported stack)', () => {
     await waitFor(() => expect(destroyB).toHaveBeenCalledTimes(1))
   })
 
+  it('waits for a page text-layer load before destroying the worker (#269)', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    let gatedCalls = 0
+    const destroy = vi.fn().mockResolvedValue(undefined)
+    getDocumentMock.mockReturnValueOnce({
+      promise: Promise.resolve({
+        ...(fakePdfDoc() as object),
+        getPage: (pageNumber: number) => {
+          const page = fakePage(PAGE_TEXT[pageNumber - 1] ?? '')
+          return Promise.resolve({
+            ...page,
+            getTextContent: async () => {
+              // Hold only the text-layer loads (called from ReaderPage), not
+              // the Reader's own reference-index pass, which is already waited for.
+              if (new Error().stack?.includes('ReaderPage')) {
+                gatedCalls += 1
+                await gate
+              }
+              return page.getTextContent()
+            },
+          })
+        },
+      }),
+      destroy,
+    })
+    getDocumentMock.mockReturnValueOnce({ promise: new Promise(() => {}), destroy: async () => {} })
+    const { rerender } = render(<Reader slug="paper-a" />)
+    await waitFor(() => expect(gatedCalls).toBeGreaterThan(0))
+    rerender(<Reader slug="paper-b" />)
+    // Give the teardown a chance to run; the gated load is still in flight.
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)) })
+    expect(destroy).not.toHaveBeenCalled()
+    await act(async () => release())
+    await waitFor(() => expect(destroy).toHaveBeenCalledTimes(1))
+  })
+
   it('destroys a still-pending loading task immediately when the paper leaves', async () => {
     const destroy = vi.fn().mockResolvedValue(undefined)
     getDocumentMock.mockReturnValueOnce({ promise: new Promise(() => {}), destroy })

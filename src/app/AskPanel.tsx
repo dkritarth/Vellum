@@ -74,7 +74,7 @@ export function AskPanel({
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [backend, setBackend] = useState<ChatBackend>('claude')
+  const [backend, setBackend] = useState<ChatBackend>('codex')
   const [switchingSession, setSwitchingSession] = useState(false)
   const activeRequestId = useRef<string | null>(null)
   const activeTurnSessionId = useRef<number | null>(null)
@@ -178,7 +178,7 @@ export function AskPanel({
         if (cancelled || generation !== contextGeneration.current) return
         setSessionId(result.session.id)
         displayedSessionId.current = result.session.id
-        setBackend(isChatBackend(result.session.backend) ? result.session.backend : 'claude')
+        setBackend(isChatBackend(result.session.backend) ? result.session.backend : 'codex')
         const turn = result.activeTurn
         activeRequestId.current = turn?.requestId ?? null
         activeTurnSessionId.current = turn?.chatSessionId ?? null
@@ -266,7 +266,7 @@ export function AskPanel({
         if (generation !== contextGeneration.current) return
         setSessionId(result.session.id)
         displayedSessionId.current = result.session.id
-        setBackend(isChatBackend(result.session.backend) ? result.session.backend : 'claude')
+        setBackend(isChatBackend(result.session.backend) ? result.session.backend : 'codex')
         setMessages([])
       })
       .catch((err: unknown) => {

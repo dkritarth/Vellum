@@ -9,7 +9,7 @@ import type { AcpBackend, AcpClient, AcpPromptRequest, AcpSession, AcpUpdate } f
 import { upsertPaper } from '../library/repo.js'
 import { openDb } from '../store/db.js'
 import { ChatManager, type AskStreamEvent } from './manager.js'
-import { getChatMessages } from './repo.js'
+import { addChatMessage, createChatSession, getChatMessages } from './repo.js'
 import { listUsageRecords, getUsageSummary } from '../usage/repo.js'
 
 class FakeSession implements AcpSession {
@@ -76,6 +76,32 @@ describe('ChatManager', () => {
     const { session } = manager.openChat({ db, paperSlug: slug })
     await manager.runTurn({ db, chatSessionId: session.id, paperSlug: slug, mdPath, text: 'hi' }, () => {})
     expect(client.cwds).toEqual(['data/papers/attention-is-all-you-need'])
+  })
+
+  it('starts a first conversation on Codex, the validated backend', () => {
+    const manager = new ChatManager(new FakeClient())
+    expect(manager.openChat({ db, paperSlug: slug }).session.backend).toBe('codex')
+  })
+
+  it('starts on Codex for an upgraded profile whose only chats are empty Claude sessions', async () => {
+    // Earlier builds created a 'claude' session just by opening Ask. Without
+    // a message in it, that is not a choice the user made.
+    upsertPaper(db, { slug: 'second-paper', title: 'Second', authors: [], addedAt: new Date().toISOString() })
+    createChatSession(db, { paperSlug: slug, backend: 'claude' })
+    const manager = new ChatManager(new FakeClient())
+    expect(manager.openChat({ db, paperSlug: 'second-paper' }).session.backend).toBe('codex')
+    expect((await manager.newChat({ db, paperSlug: slug })).backend).toBe('codex')
+  })
+
+  it('starts new conversations on the backend the user last chatted with', async () => {
+    upsertPaper(db, { slug: 'second-paper', title: 'Second', authors: [], addedAt: new Date().toISOString() })
+    const manager = new ChatManager(new FakeClient())
+    const used = await manager.newChat({ db, paperSlug: slug, backend: 'antigravity' })
+    addChatMessage(db, { sessionId: used.id, role: 'user', content: 'question' })
+    expect(manager.openChat({ db, paperSlug: 'second-paper' }).session.backend).toBe('antigravity')
+    expect((await manager.newChat({ db, paperSlug: 'second-paper' })).backend).toBe('antigravity')
+    // An explicit choice still wins.
+    expect((await manager.newChat({ db, paperSlug: 'second-paper', backend: 'claude' })).backend).toBe('claude')
   })
 
   it('rejects a concurrent prompt before creating an ACP session or persisting its question', async () => {

@@ -162,6 +162,83 @@ async function run() {
     assert.strictEqual(indicatorPage(await state(window)), 2, 'prev -> page 2')
     console.log('3. prev/next scroll to target page')
 
+    // 3b. Outline entries land on their section heading, not the top of its
+    // page (#266). Only headings that sit well down their page prove that: a
+    // page-top jump leaves those far below the pane top.
+    await window.getByRole('button', { name: 'Outline', exact: true }).click()
+    const entries = window.locator('nav[aria-label="Table of contents"] button:not([disabled])')
+    const entryCount = await entries.count()
+    /** Click outline entry `i`; return where its heading landed, or null. */
+    async function landOnEntry(i) {
+      const title = (await entries.nth(i).textContent()).trim()
+      await entries.nth(i).click()
+      // The target page mounts its text layer after the scroll; poll.
+      let found = null
+      for (let tries = 0; tries < 30 && !found; tries += 1) {
+        await window.waitForTimeout(100)
+        found = await window.evaluate(([sel, wanted]) => {
+          const norm = (t) => t.replace(/\s+/g, ' ').trim()
+          const vp = document.querySelector(sel)
+          const vpTop = vp.getBoundingClientRect().top
+          const page = Number(document.querySelector('[aria-label="Page"]').textContent.split(' of ')[0])
+          const slot = document.querySelector(`[data-page-slot][data-page-number="${page}"]`)
+          const spans = [...(slot?.querySelectorAll('[data-text-layer] span') ?? [])].filter((sp) => {
+            const t = norm(sp.textContent)
+            return t === wanted || t.endsWith(` ${wanted}`)
+          })
+          if (spans.length === 0) return null
+          const slotRect = slot.getBoundingClientRect()
+          // Several spans can carry the title (running headers, references);
+          // the heading is the one nearest the pane top.
+          const best = spans
+            .map((sp) => sp.getBoundingClientRect())
+            .sort((a, b) => Math.abs(a.top - vpTop) - Math.abs(b.top - vpTop))[0]
+          return {
+            page,
+            fromPaneTop: best.top - vpTop,
+            inPage: (best.top - slotRect.top) / slotRect.height,
+            zoom: document.querySelector('[aria-label="Zoom"]').textContent,
+          }
+        }, [VIEWPORT, title])
+      }
+      return found && { title, ...found }
+    }
+    function assertNearTop(landed) {
+      console.log(`3b. outline "${landed.title}" @ ${landed.zoom}: heading ${(landed.inPage * 100).toFixed(0)}% down page ${landed.page}, ${landed.fromPaneTop.toFixed(0)}px below pane top`)
+      assert(landed.fromPaneTop >= -4 && landed.fromPaneTop <= 80,
+        `outline "${landed.title}" @ ${landed.zoom} should land its heading near the pane top, got ${landed.fromPaneTop.toFixed(0)}px`)
+    }
+    if (entryCount === 0) {
+      console.log('3b. PDF has no outline; outline landing not checked')
+    } else {
+      const midPageEntries = []
+      for (let i = 0; i < entryCount && midPageEntries.length < 3; i += 1) {
+        const landed = await landOnEntry(i)
+        if (!landed || landed.inPage < 0.25) continue
+        midPageEntries.push(i)
+        assertNearTop(landed)
+        if (midPageEntries.length === 1) await shot('03b-outline-landed')
+      }
+      assert(midPageEntries.length > 0, 'no outline entry with a mid-page heading was checked')
+      // Same jump at a different zoom: the offset must scale with the page.
+      await window.click('button[aria-label="Zoom in"]')
+      await window.click('button[aria-label="Zoom in"]')
+      await window.waitForTimeout(400)
+      const zoomed = await landOnEntry(midPageEntries.at(-1))
+      assert(zoomed, 'zoomed outline jump found its heading')
+      assertNearTop(zoomed)
+      await window.locator(VIEWPORT).focus()
+      await window.keyboard.press('Control+0')
+      await window.waitForTimeout(400)
+    }
+    await window.getByRole('button', { name: 'Outline', exact: true }).click()
+    // Later steps expect the top of page 2, where step 3 left the reader.
+    await window.evaluate((sel) => { document.querySelector(sel).scrollTop = 0 }, VIEWPORT)
+    await window.waitForTimeout(300)
+    await window.click('button[aria-label="Next page"]')
+    await window.waitForTimeout(300)
+    assert.strictEqual(indicatorPage(await state(window)), 2, 'back on page 2 after the outline checks')
+
     // 4. Pinch (Ctrl+wheel) zoom anchored at the cursor. Horizontally the
     // cursor sits at the pane centre: while the page is narrower than the
     // pane it is centred, and scrollLeft can't go negative to hold an

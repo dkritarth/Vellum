@@ -105,6 +105,9 @@ export function countOccurrences(text: string, query: string): number {
 export interface OutlineItem {
   title: string
   pageNumber: number | null
+  /** Distance from the page's top edge to the destination, in CSS px at
+   * 100% zoom; null when the destination names only a page (#266). */
+  top: number | null
   items: OutlineItem[]
 }
 
@@ -122,8 +125,9 @@ export interface SearchMatch {
 
 /**
  * Resolve a pdf.js outline (as returned by `PDFDocumentProxy.getOutline()`)
- * into a tree of `{ title, pageNumber, items }`, walking named/explicit
- * destinations down to a 1-based page number via `getPageIndex`. A node
+ * into a tree of `{ title, pageNumber, top, items }`, walking named/explicit
+ * destinations down to a 1-based page number via `getPageIndex` and, when
+ * the destination carries one, a position on that page. A node
  * whose destination can't be resolved gets `pageNumber: null` (rendered
  * non-clickable) rather than throwing — a malformed outline shouldn't crash
  * the reader.
@@ -131,9 +135,9 @@ export interface SearchMatch {
 export async function resolveOutline(pdf: PDFDocumentProxy, nodes: RawOutlineNode[]): Promise<OutlineItem[]> {
   return Promise.all(
     nodes.map(async (node) => {
-      const pageNumber = await resolveDestPage(pdf, node.dest)
+      const { pageNumber, top } = await resolveDest(pdf, node.dest)
       const items = await resolveOutline(pdf, node.items ?? [])
-      return { title: node.title, pageNumber, items }
+      return { title: node.title, pageNumber, top, items }
     }),
   )
 }
@@ -155,9 +159,57 @@ function isRefProxy(value: unknown): value is PdfRefProxy {
   )
 }
 
-async function resolveDestPage(pdf: PDFDocumentProxy, dest: string | unknown[] | null): Promise<number | null> {
+/**
+ * PDF-space point an explicit destination's top edge sits at, or null when
+ * it names only a page. Per the PDF spec (ISO 32000 12.3.2.2): `[page /XYZ
+ * left top zoom]` and `[page /FitH top]` / `[page /FitBH top]`; /Fit, /FitB
+ * and /FitR carry no top to land on. A null top means "keep the current
+ * position", which for an outline jump is the page top.
+ */
+function destPoint(dest: unknown[]): { x: number; y: number; hasX: boolean } | null {
+  const kind = (dest[1] as { name?: unknown } | null)?.name
+  const top = kind === 'XYZ' ? dest[3] : kind === 'FitH' || kind === 'FitBH' ? dest[2] : null
+  if (typeof top !== 'number' || !Number.isFinite(top)) return null
+  // x only matters on a rotated page; only /XYZ carries one.
+  const left = kind === 'XYZ' ? dest[2] : null
+  const hasX = typeof left === 'number' && Number.isFinite(left)
+  return { x: hasX ? left : 0, y: top, hasX }
+}
+
+async function resolveDest(
+  pdf: PDFDocumentProxy,
+  dest: string | unknown[] | null,
+): Promise<{ pageNumber: number | null; top: number | null }> {
+  let explicitDest: unknown
+  let pageNumber: number | null
   try {
-    const explicitDest = typeof dest === 'string' ? await pdf.getDestination(dest) : dest
+    explicitDest = typeof dest === 'string' ? await pdf.getDestination(dest) : dest
+    pageNumber = await resolveDestPage(pdf, explicitDest)
+  } catch {
+    return { pageNumber: null, top: null }
+  }
+  if (pageNumber === null || !Array.isArray(explicitDest)) return { pageNumber, top: null }
+  const point = destPoint(explicitDest)
+  if (point === null) return { pageNumber, top: null }
+  try {
+    // PDF y grows upward from the crop box's lower-left corner, and the page
+    // may be rotated; the page's own viewport applies both, mapping the point
+    // to a top-down offset in CSS px. At scale 1 that offset scales linearly
+    // with zoom, so the jump multiplies it by the zoom in effect at click time.
+    const viewport = (await pdf.getPage(pageNumber)).getViewport({ scale: 1 })
+    // On a page turned 90° or 270°, the vertical screen offset comes from the
+    // PDF x, which /FitH and /FitBH do not carry; land on the page top.
+    if (!point.hasX && (viewport.rotation ?? 0) % 180 !== 0) return { pageNumber, top: null }
+    const [, top] = viewport.convertToViewportPoint(point.x, point.y)
+    return { pageNumber, top: Number.isFinite(top) ? Math.max(0, Math.min(top, viewport.height)) : null }
+  } catch {
+    // A page we can't measure still resolves; the jump lands on its top.
+    return { pageNumber, top: null }
+  }
+}
+
+async function resolveDestPage(pdf: PDFDocumentProxy, explicitDest: unknown): Promise<number | null> {
+  try {
     const ref = Array.isArray(explicitDest) ? explicitDest[0] : null
     // pdf.js's own explicit-destination array is untyped (`Array<any>`) in
     // its declarations; the first element is documented (pdf.js source,
@@ -725,7 +777,9 @@ export function Reader({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [doc, applyZoom])
 
-  function goToPage(next: number): void {
+  /** Jump to page `next`; with `top` (CSS px below the page's top edge
+   * at 100% zoom), land on that point of the page instead of its top. */
+  function goToPage(next: number, top: number | null = null): void {
     const target = clampPage(next, numPages)
     retireHighlightSave()
     setActiveSelection(null)
@@ -733,7 +787,10 @@ export function Reader({
     pageLockRef.current = target
     const viewport = viewportRef.current
     const slot = viewport?.querySelector<HTMLElement>(`[data-page-slot][data-page-number="${target}"]`)
-    if (viewport && slot) viewport.scrollTop = Math.max(0, slot.offsetTop - JUMP_TOP_MARGIN_PX)
+    // The point stays inside the target page, so the page lock above keeps
+    // the indicator on `target` after the scroll event (see updateViewport).
+    const offset = top === null ? 0 : top * scaleRef.current
+    if (viewport && slot) viewport.scrollTop = Math.max(0, slot.offsetTop + offset - JUMP_TOP_MARGIN_PX)
   }
 
   // Jump seam: drive the reader to a highlight's page and flash it briefly.
@@ -1194,7 +1251,13 @@ export function Reader({
 }
 
 
-function OutlineList({ items, onSelect }: { items: OutlineItem[]; onSelect: (page: number) => void }): JSX.Element {
+function OutlineList({
+  items,
+  onSelect,
+}: {
+  items: OutlineItem[]
+  onSelect: (page: number, top: number | null) => void
+}): JSX.Element {
   return (
     <ul className={styles.tocList}>
       {items.map((item, index) => (
@@ -1203,7 +1266,7 @@ function OutlineList({ items, onSelect }: { items: OutlineItem[]; onSelect: (pag
             type="button"
             className={styles.tocItem}
             disabled={item.pageNumber === null}
-            onClick={() => item.pageNumber !== null && onSelect(item.pageNumber)}
+            onClick={() => item.pageNumber !== null && onSelect(item.pageNumber, item.top)}
           >
             {item.title}
           </button>

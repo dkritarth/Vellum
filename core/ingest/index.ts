@@ -134,6 +134,15 @@ function assertPdfBytes(input: ClassifiedInput, bytes: Uint8Array): void {
   )
 }
 
+/** Whether a re-ingest of unchanged bytes should keep the stored outline:
+ * when extraction found no sections, or when degraded output (some entries
+ * malformed) salvaged fewer sections than the stored outline has. */
+function keepStoredSections(extracted: { sections: unknown[]; degraded: boolean }, stored: unknown[] | undefined): boolean {
+  if (!stored || stored.length === 0) return false
+  if (extracted.sections.length === 0) return true
+  return extracted.degraded && extracted.sections.length < stored.length
+}
+
 function sameBytes(path: string | undefined, bytes: Uint8Array): boolean {
   if (!path) return false
   try {
@@ -246,7 +255,7 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
         summary: summary ?? existing?.summary,
         mdPath,
         pdfPath,
-        sections: extracted.sections.length > 0 ? extracted.sections : existing?.sections ?? [],
+        sections: keepStoredSections(extracted, existing?.sections) ? existing!.sections : extracted.sections,
         addedAt: stored?.addedAt ?? new Date().toISOString(),
         authorOrcids: metadata.authorOrcids,
       }

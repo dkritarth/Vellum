@@ -842,6 +842,57 @@ describe('ingest', () => {
     vi.stubGlobal('fetch', fetchMock)
   }
 
+  it('keeps the stored outline when a re-ingest salvages fewer sections from degraded output', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-degraded-'))
+    const db = openDb({ path: ':memory:' })
+    // One of the two sections has no title, so extraction is degraded and
+    // keeps only the valid one.
+    const partial = JSON.stringify({
+      sections: [{ title: 'Only Valid', startOffset: 0, endOffset: 20 }, { startOffset: 21, endOffset: 100 }],
+      metadata: { title: 'Sample Paper Title (agent-refined)' },
+    })
+    try {
+      const first = await ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client: new FakeClient([textUpdate(AGENT_JSON), doneUpdate]) })
+      const before = getPaper(db, first.slug)!
+      expect(before.sections).toHaveLength(2)
+      await ingest(FIXTURE_PDF, { db, dataDir: tmpDir, client: new FakeClient([textUpdate(partial), doneUpdate]) })
+      expect(getPaper(db, first.slug)!.sections).toEqual(before.sections)
+    } finally {
+      db.close()
+    }
+  })
+
+  it('does not carry stored metadata over when a re-ingested DOI returns different PDF bytes', async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-changed-'))
+    const db = openDb({ path: ':memory:' })
+    const doi = '10.1371/journal.pone.0000308'
+    const offline: AcpClient = { newSession: async () => { throw new Error('adapter exited: not signed in') } }
+    try {
+      stubCrossrefFetch(readFileSync(FIXTURE_PDF))
+      const first = await ingest(doi, { db, dataDir: tmpDir, client: new FakeClient([textUpdate(AGENT_JSON), doneUpdate]) })
+      const before = getPaper(db, first.slug)!
+      expect(before.abstract).toBe('Agent-written abstract.')
+      expect(before.sections).toHaveLength(2)
+
+      vi.unstubAllGlobals()
+      stubCrossrefFetch(readFileSync(fileURLToPath(new URL('./fixtures/sample2.pdf', import.meta.url))))
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      const second = await ingest(doi, { db, dataDir: tmpDir, client: offline })
+      const after = getPaper(db, second.slug)!
+      expect(second.slug).toBe(first.slug)
+      // Agent-only fields described the old PDF; Crossref fields are refetched.
+      expect(after.abstract).toBeUndefined()
+      expect(after.venue).toBeUndefined()
+      expect(after.summary).toBeUndefined()
+      expect(after.sections).toEqual([])
+      expect(after.authors).toEqual(['Ada Lovelace', 'Alan Turing'])
+      expect(after.addedAt).toBe(before.addedAt)
+    } finally {
+      db.close()
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('leaves existing paper files, database and notes unchanged when a DOI returns HTML', async () => {
     tmpDir = mkdtempSync(join(tmpdir(), 'vellum-ingest-'))
     const db = openDb({ path: ':memory:' })

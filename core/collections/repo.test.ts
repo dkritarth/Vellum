@@ -58,6 +58,19 @@ describe('collections repo [L2-01]', () => {
     expect(() => createCollection(db, { name: 'Child', parentId: 999 })).toThrow(/does not exist/)
   })
 
+  it('rejects a name already used by a sibling, ignoring case (#285)', () => {
+    const ml = createCollection(db, { name: 'ML' })
+    createCollection(db, { name: 'Transformers', parentId: ml.id })
+    expect(() => createCollection(db, { name: 'transformers ', parentId: ml.id })).toThrow('A collection named "transformers" already exists here.')
+    // The same name under another parent, or at the top level, is fine.
+    const top = createCollection(db, { name: 'Transformers' })
+    const other = createCollection(db, { name: 'Vision', parentId: ml.id })
+    expect(() => renameCollection(db, other.id, 'TRANSFORMERS')).toThrow(/already exists here/)
+    // Renaming a collection to its own name (any case) is allowed.
+    expect(() => renameCollection(db, other.id, 'vision')).not.toThrow()
+    expect(() => moveCollection(db, top.id, ml.id)).toThrow(/already exists here/)
+  })
+
   it('rejects cycles and self-parenting when moving collections', () => {
     const c1 = createCollection(db, { name: 'Level 1' })
     const c2 = createCollection(db, { name: 'Level 2', parentId: c1.id })

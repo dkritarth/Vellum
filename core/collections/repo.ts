@@ -45,6 +45,16 @@ function validateParent(db: Database, id: number | null, parentId: number | null
   }
 }
 
+/** Two collections with the same name under the same parent look identical
+ * in the tree and in the "Add to collection" picker, so a paper could go
+ * into the wrong one. Names are compared case-insensitively. */
+function assertUniqueSiblingName(db: Database, name: string, parentId: number | null, exceptId: number | null): void {
+  const clash = db
+    .prepare('SELECT id FROM collections WHERE parent_id IS ? AND lower(name) = lower(?) AND id IS NOT ?')
+    .get(parentId, name, exceptId)
+  if (clash) throw new Error(`A collection named "${name}" already exists here.`)
+}
+
 /** Create a new collection. */
 export function createCollection(
   db: Database,
@@ -56,6 +66,7 @@ export function createCollection(
   }
   const parentId = params.parentId ?? null
   validateParent(db, null, parentId)
+  assertUniqueSiblingName(db, name, parentId, null)
 
   const stmt = db.prepare('INSERT INTO collections (name, parent_id) VALUES (?, ?)')
   const result = stmt.run(name, parentId)
@@ -72,6 +83,8 @@ export function renameCollection(db: Database, id: number, name: string): void {
   if (!trimmed) {
     throw new Error('Collection name cannot be empty')
   }
+  const current = db.prepare('SELECT parent_id FROM collections WHERE id = ?').get(id) as CollectionRow | undefined
+  if (current) assertUniqueSiblingName(db, trimmed, current.parent_id, id)
   const result = db.prepare('UPDATE collections SET name = ? WHERE id = ?').run(trimmed, id)
   if (result.changes === 0) {
     throw new Error(`Collection ${id} not found`)
@@ -81,6 +94,8 @@ export function renameCollection(db: Database, id: number, name: string): void {
 /** Move / re-parent an existing collection. */
 export function moveCollection(db: Database, id: number, parentId: number | null): void {
   validateParent(db, id, parentId)
+  const moving = db.prepare('SELECT name FROM collections WHERE id = ?').get(id) as { name: string } | undefined
+  if (moving) assertUniqueSiblingName(db, moving.name, parentId, id)
   const result = db.prepare('UPDATE collections SET parent_id = ? WHERE id = ?').run(parentId, id)
   if (result.changes === 0) {
     throw new Error(`Collection ${id} not found`)

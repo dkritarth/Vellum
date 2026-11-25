@@ -68,8 +68,9 @@ export interface FallbackRun<T> {
 
 /**
  * Run `turn` on each backend in order until one returns a result `accept`
- * approves. Backends whose session does not start are skipped. At most
- * `maxTurns` turns run, and nothing starts after `deadlineMs`. Returns the
+ * approves. Backends whose session does not start are skipped. When only one
+ * backend took a turn, it gets one more. At most `maxTurns` turns run, and
+ * nothing starts after `deadlineMs`. Returns the
  * last turn's result when none was accepted, or undefined when no session
  * started. Sessions are always disposed.
  */
@@ -97,6 +98,23 @@ export async function runWithFallback<T>(
       if (last.accepted) return last
     } finally {
       await session.dispose().catch(() => undefined)
+    }
+  }
+  // Only one backend took a turn (the others are missing or signed out) and
+  // its answer was not accepted. Agent output varies from turn to turn, so
+  // spend the remaining turn on that backend again rather than giving up:
+  // on a Codex-only install one unparseable answer otherwise left the paper
+  // with no metadata.
+  if (last && !last.accepted && turns === 1 && turns < maxTurns) {
+    const remaining = deadline - Date.now()
+    const session = remaining > 0 ? await startWithin(client, last.backend, remaining, options.sessionOptions) : undefined
+    if (session) {
+      try {
+        const result = await turn(session)
+        last = { result, backend: last.backend, accepted: accept(result) }
+      } finally {
+        await session.dispose().catch(() => undefined)
+      }
     }
   }
   return last

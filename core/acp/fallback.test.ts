@@ -62,6 +62,28 @@ describe('runWithFallback', () => {
     expect(client.tried).toEqual(['codex', 'claude'])
   })
 
+  it('retries the only working backend once when its first turn is not accepted', async () => {
+    // Codex-only install: an unparseable answer must not end the import with
+    // no metadata while the turn budget still allows another try.
+    const client = clientWith(['codex'])
+    let turns = 0
+    const run = await runWithFallback(
+      client,
+      ['codex', 'claude', 'antigravity'],
+      async () => (++turns === 1 ? '' : 'metadata'),
+      (result) => result.length > 0,
+    )
+    expect(run).toEqual({ result: 'metadata', backend: 'codex', accepted: true })
+    expect(client.tried).toEqual(['codex', 'claude', 'antigravity', 'codex'])
+  })
+
+  it('does not retry the same backend once another backend has taken a turn', async () => {
+    const client = clientWith(['codex', 'claude'])
+    const run = await runWithFallback(client, ['codex', 'claude', 'antigravity'], async () => '', (result) => result.length > 0)
+    expect(run).toEqual({ result: '', backend: 'claude', accepted: false })
+    expect(client.tried).toEqual(['codex', 'claude'])
+  })
+
   it('stops at the deadline and disposes a session that starts too late', async () => {
     let lateDisposed = false
     let resolveLate!: (session: AcpSession) => void

@@ -86,6 +86,7 @@ describe('chat repo', () => {
     expect(bertSession.title).toBe('BERT fine-tuning discussion')
     expect(bertSession.backend).toBe('codex')
     expect(bertSession.messageCount).toBe(1)
+    expect(bertSession.turnCount).toBe(1)
     expect(bertSession.preview).toBe('How does masked LM work?')
 
     const transformerSession = sessions.find((s) => s.id === s1.id)!
@@ -93,6 +94,8 @@ describe('chat repo', () => {
     expect(transformerSession.title).toBe('Explain multi-head attention mechanism in simple terms')
     expect(transformerSession.backend).toBe('claude')
     expect(transformerSession.messageCount).toBe(2)
+    // One question with its answer is one turn (#260).
+    expect(transformerSession.turnCount).toBe(1)
   })
 
   it('filters sessions by search term across title, paper, and message content [L2-02]', () => {

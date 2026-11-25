@@ -296,7 +296,7 @@ describe('displayed conversation deletion', () => {
       askOpen: vi.fn().mockImplementation(() => Promise.resolve(snapshot(deleted ? 2 : 1))),
       askStart: vi.fn().mockResolvedValue({ requestId: 'next' }),
       chatListSessions: vi.fn().mockImplementation(() => Promise.resolve((deleted ? [2] : [1, 2]).map((id) => ({
-        id, paperSlug: slug, paperTitle: 'Attention Is All You Need', title: `Conversation ${id}`, backend: 'codex', messageCount: 1, lastActiveAt: '2026-11-01',
+        id, paperSlug: slug, paperTitle: 'Attention Is All You Need', title: `Conversation ${id}`, backend: 'codex', messageCount: 1, turnCount: 1, lastActiveAt: '2026-11-01',
       })))),
       chatDeleteSession: vi.fn().mockImplementation(async (id: number) => { if (id === 1) deleted = true }),
     })
@@ -361,7 +361,7 @@ describe('chat navigation ownership', () => {
       questionsGet: vi.fn().mockResolvedValue([]),
       chatListSessions: vi.fn().mockResolvedValue(papers.map((paper, i) => ({
         id: i + 1, paperSlug: paper.slug, paperTitle: paper.title, title: `Chat ${i + 1}`,
-        backend: 'codex', messageCount: 1, lastActiveAt: '2026-01-01',
+        backend: 'codex', messageCount: 1, turnCount: 1, lastActiveAt: '2026-01-01',
       }))),
       askOpen: vi.fn().mockImplementation(async (target: string | { slug: string; sessionId?: number }) => {
         const slug = typeof target === 'string' ? target : target.slug

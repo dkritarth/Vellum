@@ -197,7 +197,7 @@ export function ChatsList({ selectedSessionId, onSelectSession, onSessionDeleted
                 <div className={styles.itemMeta}>
                   <span className={`${styles.badge} ${backendClass}`}>{isChatBackend(session.backend) ? BACKEND_LABELS[session.backend] : session.backend}</span>
                   <span className={styles.msgCount}>
-                    {session.messageCount} {session.messageCount === 1 ? 'turn' : 'turns'}
+                    {session.turnCount} {session.turnCount === 1 ? 'turn' : 'turns'}
                   </span>
                   <span className={styles.timestamp} title={session.lastActiveAt}>
                     {formatRelativeTime(session.lastActiveAt)}

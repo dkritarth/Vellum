@@ -5,7 +5,7 @@
 // as plain text: opening agent-chosen URLs from the app is not wanted. The
 // only injected HTML is KaTeX output (see MathTex), generated with trust off.
 
-import { Fragment, type ReactNode } from 'react'
+import { Fragment, memo, type ReactNode } from 'react'
 
 import { MathTex } from './MathTex'
 import styles from './MarkdownText.module.css'
@@ -194,7 +194,10 @@ function withLineBreaks(text: string, key: string): ReactNode[] {
     : [<br key={`${key}-br-${i}`} />, ...renderInline(line, `${key}-${i}`)]))
 }
 
-export function MarkdownText({ text }: { text: string }) {
+// Memoized on `text`: every streamed chunk re-renders the whole thread, and a
+// finished answer whose text did not change must not be parsed and its math
+// typeset again for each chunk of the next one.
+export const MarkdownText = memo(function MarkdownText({ text }: { text: string }) {
   return (
     <div className={styles.markdown}>
       {parseBlocks(text).map((block, i) => {
@@ -222,4 +225,4 @@ export function MarkdownText({ text }: { text: string }) {
       })}
     </div>
   )
-}
+})

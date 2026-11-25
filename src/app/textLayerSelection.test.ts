@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { bindTextLayerSelection, snapSelectionStart } from './textLayerSelection'
+import { bindTextLayerSelection, snapSelectionEnd, snapSelectionStart } from './textLayerSelection'
 
 const unbinds: Array<() => void> = []
 function bind(layer: HTMLElement): () => void {
@@ -88,7 +88,7 @@ describe('bindTextLayerSelection', () => {
   })
 })
 
-describe('snapSelectionStart', () => {
+describe('snapSelectionStart and snapSelectionEnd', () => {
   // Title line spans x 100..300, y 50..70 (client coordinates).
   function lineLayer(withCitation = false): { layer: HTMLElement; text: Text; span: HTMLElement } {
     const layer = makeLayer()
@@ -162,5 +162,112 @@ describe('snapSelectionStart', () => {
     // The drag began left of the line, not left of the citation button.
     snapSelectionStart({ layer, x: 94, y: 60 }, selection)
     expect(selection.toString()).toBe('See [1] for details')
+  })
+
+  it('moves a forward selection released right of the line to its last character', () => {
+    const { layer, text } = lineLayer()
+    // Chromium leaves the focus one character short over the guard.
+    const selection = select(text, 0, text, text.length - 1)
+    snapSelectionEnd({ layer, x: 360, y: 60 }, selection)
+    expect(selection.toString()).toBe('Attention Is All You Need')
+  })
+
+  it('leaves the end alone when the drag was released inside the text or on another line', () => {
+    const { layer, text } = lineLayer()
+    const selection = select(text, 0, text, 9)
+    snapSelectionEnd({ layer, x: 200, y: 60 }, selection)
+    expect(selection.focusOffset).toBe(9)
+    snapSelectionEnd({ layer, x: 360, y: 120 }, selection)
+    expect(selection.focusOffset).toBe(9)
+  })
+
+  it('leaves the end of backward selections alone', () => {
+    const { layer, text } = lineLayer()
+    const selection = select(text, text.length - 1, text, 0)
+    snapSelectionEnd({ layer, x: 360, y: 60 }, selection)
+    expect(selection.anchorOffset).toBe(text.length - 1)
+    expect(selection.focusOffset).toBe(0)
+  })
+
+  it('extends to the end of the whole line span past a citation marker', () => {
+    const { layer, span } = lineLayer(true)
+    const lead = span.firstChild as Text
+    const selection = select(lead, 0, lead, 2)
+    snapSelectionEnd({ layer, x: 360, y: 60 }, selection)
+    expect(selection.toString()).toBe('See [1] for details')
+  })
+
+  it('turns a drag Chromium collapsed at the line end into the dragged line', () => {
+    // Seen live on paragraph lines: a drag begun left of the line anchors at
+    // its end, and releasing on the line leaves a collapsed selection.
+    const { layer, text } = lineLayer()
+    const selection = select(text, text.length, text, text.length)
+    snapSelectionStart({ layer, x: 94, y: 60 }, selection)
+    expect(selection.toString()).toBe('Attention Is All You Need')
+  })
+
+  it('starts at the leftmost span when pdf.js split the line', () => {
+    const { layer, span } = lineLayer()
+    span.textContent = 'Attention Is '
+    const tail = document.createElement('span')
+    tail.textContent = 'All You Need'
+    span.after(tail)
+    tail.getBoundingClientRect = () => ({ left: 200, right: 300, top: 50, bottom: 70, x: 200, y: 50, width: 100, height: 20, toJSON() {} }) as DOMRect
+    const tailText = tail.firstChild as Text
+    // Chromium anchored in the second span of the line.
+    const selection = select(tailText, 1, tailText, tailText.length)
+    snapSelectionStart({ layer, x: 94, y: 60 }, selection)
+    expect(selection.toString()).toBe('Attention Is All You Need')
+  })
+
+  it('does not snap on a click without a drag', () => {
+    const { layer, text } = lineLayer()
+    bind(layer)
+    const selection = select(text, text.length, text, text.length)
+    layer.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: 94, clientY: 60 }))
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, clientX: 95, clientY: 60 }))
+    expect(selection.isCollapsed).toBe(true)
+    layer.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: 94, clientY: 60 }))
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, clientX: 360, clientY: 60 }))
+    expect(selection.toString()).toBe('Attention Is All You Need')
+  })
+
+  it('leaves a drag that began inside the first span of a split line alone', () => {
+    const { layer, span } = lineLayer()
+    span.textContent = 'Attention Is '
+    const tail = document.createElement('span')
+    tail.textContent = 'All You Need'
+    span.after(tail)
+    tail.getBoundingClientRect = () => ({ left: 200, right: 300, top: 50, bottom: 70, x: 200, y: 50, width: 100, height: 20, toJSON() {} }) as DOMRect
+    const lead = span.firstChild as Text
+    const selection = select(lead, 4, tail.firstChild as Text, 3)
+    snapSelectionStart({ layer, x: 140, y: 60 }, selection)
+    expect(selection.anchorNode).toBe(lead)
+    expect(selection.anchorOffset).toBe(4)
+  })
+
+  it('starts at the dragged line when Chromium anchored at the next line', () => {
+    const { layer, span } = lineLayer()
+    const next = document.createElement('span')
+    next.textContent = 'Ashish Vaswani'
+    span.after(next)
+    next.getBoundingClientRect = () => ({ left: 100, right: 300, top: 80, bottom: 100, x: 100, y: 80, width: 200, height: 20, toJSON() {} }) as DOMRect
+    const nextText = next.firstChild as Text
+    const selection = select(nextText, 0, nextText, nextText.length)
+    snapSelectionStart({ layer, x: 94, y: 60 }, selection)
+    expect(selection.toString()).toBe('Attention Is All You NeedAshish Vaswani')
+  })
+
+  it('leaves an upward drag that began left of a line alone', () => {
+    const { layer, span } = lineLayer()
+    const previous = document.createElement('span')
+    previous.textContent = 'Title above'
+    span.before(previous)
+    const prevText = previous.firstChild as Text
+    const text = span.firstChild as Text
+    const selection = select(text, 1, prevText, 3)
+    snapSelectionStart({ layer, x: 94, y: 60 }, selection)
+    expect(selection.anchorOffset).toBe(1)
+    expect(selection.focusNode).toBe(prevText)
   })
 })

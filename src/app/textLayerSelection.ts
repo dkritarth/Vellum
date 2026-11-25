@@ -7,17 +7,23 @@
 // selection to the next text in DOM order (for example the author block
 // under a title). Chromium still anchors such a drag one character into the
 // line, so a drag that starts in blank space left of a line snaps its start
-// to the line's first character. Global listeners are shared by all bound
-// layers.
+// to the line's first character, and a drag released right of a line snaps
+// its end to the line's last character. Global listeners are shared by all
+// bound layers.
+//
+// TextLayerBuilder also moves the guard next to the selection's moving end on
+// each selectionchange, but only for Chromium before 148. Electron 45 ships
+// Chromium 156, which pdf.js 6.2 treats as modern and skips, so that half is
+// not ported.
 
 const layers = new Map<HTMLElement, HTMLElement>()
 let globalListeners: AbortController | null = null
-// Where the current primary-button drag started.
-let blankStart: { layer: HTMLElement; x: number; y: number } | null = null
-// Cleared when a new press starts or the window loses focus, so a drag that
-// ended outside the window cannot leave a stale start behind.
-
 type DragStart = { layer: HTMLElement; x: number; y: number }
+
+// Where the current primary-button drag started. Cleared when a new press
+// starts or the window loses focus, so a drag that ended outside the window
+// cannot leave a stale start behind.
+let blankStart: DragStart | null = null
 
 /** First text node inside `element`, in document order. */
 function firstTextNode(element: Element): Text | null {
@@ -25,36 +31,106 @@ function firstTextNode(element: Element): Text | null {
   return walker.nextNode() as Text | null
 }
 
+/** Last text node inside `element`, in document order. */
+function lastTextNode(element: Element): Text | null {
+  const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+  let last: Text | null = null
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) last = node as Text
+  return last
+}
+
+/** The layer's direct child that contains `node`: one positioned line box. */
+function lineSpan(layer: HTMLElement, node: Node): HTMLElement | null {
+  let span = node.parentElement
+  while (span && span.parentElement !== layer) span = span.parentElement
+  return span
+}
+
+/** The line the drag started beside: of the layer's spans on the start's
+ * line whose left edge lies at or right of it, the leftmost. pdf.js often
+ * splits one visual line into several spans, and in a two-column page the
+ * nearest line to the right is the one in the column the drag began in. */
+function lineStartSpan(start: DragStart): HTMLElement | null {
+  let best: HTMLElement | null = null
+  let bestLeft = Infinity
+  for (const child of start.layer.children) {
+    if (!(child instanceof HTMLElement) || child.tagName !== 'SPAN') continue
+    const rect = child.getBoundingClientRect()
+    if (start.y < rect.top || start.y > rect.bottom) continue
+    // The drag began inside text, where Chromium's anchor is already right.
+    if (rect.left < start.x - 1 && rect.right > start.x) return null
+    if (rect.left < start.x - 1) continue
+    if (rect.left < bestLeft) {
+      best = child
+      bestLeft = rect.left
+    }
+  }
+  return best
+}
+
 /**
  * After a forward drag that began at or left of a line's first glyph, move
- * the selection's start to the beginning of that line's span. The span is the
+ * the selection's start to the beginning of that line. The span is the
  * layer's direct child, so a citation marker wrapped inside it (readerText.ts)
- * does not change which box counts as the line. Exported for tests.
+ * does not change which box counts as the line. Chromium anchors such a drag
+ * one character into the line, at its end, or at the start of the next line;
+ * at the line's end, a drag released on the same line even leaves a collapsed
+ * selection. Callers only call this after the pointer moved, so a plain click
+ * never selects anything. Exported for tests.
  */
 export function snapSelectionStart(start: DragStart | null, selection: Selection | null): void {
-  if (!start || !selection || selection.rangeCount !== 1 || selection.isCollapsed) return
+  if (!start || !selection || selection.rangeCount !== 1) return
   const anchor = selection.anchorNode
-  if (!anchor || anchor.nodeType !== Node.TEXT_NODE || !start.layer.contains(anchor)) return
-  let span = anchor.parentElement
-  while (span && span.parentElement !== start.layer) span = span.parentElement
-  if (!span) return
-  const first = firstTextNode(span)
-  if (!first || (anchor === first && selection.anchorOffset === 0)) return
-  const rect = span.getBoundingClientRect()
-  const sameLine = start.y >= rect.top && start.y <= rect.bottom
-  if (!sameLine || start.x > rect.left + 1) return
-  const range = selection.getRangeAt(0)
-  // Only forward selections (anchor at the range start) are adjusted.
-  if (range.startContainer !== anchor || range.startOffset !== selection.anchorOffset) return
   const focusNode = selection.focusNode
-  if (!focusNode) return
+  if (!anchor || !focusNode || !start.layer.contains(anchor)) return
+  const line = lineStartSpan(start)
+  const first = line && firstTextNode(line)
+  if (!first || (anchor === first && selection.anchorOffset === 0)) return
+  const range = selection.getRangeAt(0)
+  // Only forward selections (anchor at the range start) are adjusted, and
+  // only when the focus is not before the line (an upward drag).
+  if (range.startContainer !== anchor || range.startOffset !== selection.anchorOffset) return
+  const lineStart = document.createRange()
+  lineStart.setStart(first, 0)
+  if (lineStart.comparePoint(focusNode, selection.focusOffset) < 0) return
   selection.setBaseAndExtent(first, 0, focusNode, selection.focusOffset)
 }
 
-function snapBlankStart(): void {
+/**
+ * After a forward drag released at or right of a line's last glyph, move the
+ * selection's end to the end of that line's span. Over the guard Chromium
+ * places the focus one character short, so a drag past the end of a title
+ * dropped its last letter. Exported for tests.
+ */
+export function snapSelectionEnd(end: DragStart | null, selection: Selection | null): void {
+  if (!end || !selection || selection.rangeCount !== 1 || selection.isCollapsed) return
+  const focus = selection.focusNode
+  if (!focus || focus.nodeType !== Node.TEXT_NODE || !end.layer.contains(focus)) return
+  const span = lineSpan(end.layer, focus)
+  if (!span) return
+  const last = lastTextNode(span)
+  if (!last || (focus === last && selection.focusOffset === last.length)) return
+  const rect = span.getBoundingClientRect()
+  const sameLine = end.y >= rect.top && end.y <= rect.bottom
+  if (!sameLine || end.x < rect.right - 1) return
+  const range = selection.getRangeAt(0)
+  // Only forward selections (focus at the range end) are adjusted.
+  if (range.endContainer !== focus || range.endOffset !== selection.focusOffset) return
+  const anchor = selection.anchorNode
+  if (!anchor) return
+  selection.setBaseAndExtent(anchor, selection.anchorOffset, last, last.length)
+}
+
+// Pointer travel below this many pixels is a click, not a drag.
+const DRAG_THRESHOLD_PX = 3
+
+function snapDragEnds(event: MouseEvent): void {
   const start = blankStart
   blankStart = null
+  if (!start || event.button !== 0) return
+  if (Math.hypot(event.clientX - start.x, event.clientY - start.y) < DRAG_THRESHOLD_PX) return
   snapSelectionStart(start, document.getSelection())
+  snapSelectionEnd({ layer: start.layer, x: event.clientX, y: event.clientY }, document.getSelection())
 }
 
 function reset(end: HTMLElement, layer: HTMLElement): void {
@@ -80,7 +156,7 @@ function enableGlobalListeners(): void {
   }, { signal })
   // Capture phase: fix the range before the Reader's own mouseup handler
   // reads it for the selection toolbar and Add to chat.
-  document.addEventListener('mouseup', snapBlankStart, { capture: true, signal })
+  document.addEventListener('mouseup', snapDragEnds, { capture: true, signal })
   window.addEventListener('blur', () => {
     pointerDown = false
     blankStart = null
@@ -117,8 +193,8 @@ export function bindTextLayerSelection(layer: HTMLElement): () => void {
   layer.append(end)
   const onMouseDown = (event: MouseEvent) => {
     layer.setAttribute('data-selecting', '')
-    // Record every primary-button start; snapBlankStart only acts when the
-    // start lies at or left of the selected line's first glyph.
+    // Record every primary-button start; snapDragEnds only acts when the
+    // start lies left of the selected line or the release lies right of it.
     blankStart = event.button === 0 ? { layer, x: event.clientX, y: event.clientY } : null
   }
   layer.addEventListener('mousedown', onMouseDown)

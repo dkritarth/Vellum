@@ -118,13 +118,15 @@ async function checkAlignment(window, sample, scale, name) {
 }
 
 // startDx: where the drag begins relative to the span's left edge. Negative
-// values start in blank page space, as people usually do.
-async function selectWithPointer(window, span, text, startDx = 0.2) {
+// values start in blank page space, as people usually do. endDx: where it is
+// released relative to the span's right edge; positive values end in blank
+// space right of the line.
+async function selectWithPointer(window, span, text, startDx = 0.2, endDx = -0.2) {
   await span.scrollIntoViewIfNeeded()
   const box = await span.boundingBox()
   await window.mouse.move(box.x + startDx, box.y + box.height / 2)
   await window.mouse.down()
-  await window.mouse.move(box.x + box.width - 0.2, box.y + box.height / 2, { steps: 30 })
+  await window.mouse.move(box.x + box.width + endDx, box.y + box.height / 2, { steps: 30 })
   await window.mouse.up()
   assert.equal(await window.evaluate(() => window.getSelection()?.toString()), text)
   await window.getByRole('button', { name: 'Add to chat', exact: true }).waitFor()
@@ -149,6 +151,27 @@ try {
   // title, not jump to the author block below it, and must keep its first
   // letter.
   await selectWithPointer(window, span, title.text, -6)
+  await window.mouse.click(5, 5)
+  // Released in blank space right of the title: keeps the last letter.
+  await selectWithPointer(window, span, title.text, 0.2, 40)
+  await window.mouse.click(5, 5)
+  // A paragraph line dragged from blank space at its left to blank space at
+  // its right selects that line: not nothing, and not the heading above it.
+  const abstractLine = window.locator('[data-page-slot][data-page-number="1"] [data-text-layer] > span')
+    .filter({ hasText: 'The dominant sequence transduction' }).first()
+  const lineText = await abstractLine.textContent()
+  await selectWithPointer(window, abstractLine, lineText, -6, 30)
+  await window.mouse.click(5, 5)
+  // Down to the right of the third line: starts at the first line, not the
+  // second (Chromium anchors this drag at the start of the next line).
+  const lineBox = await abstractLine.boundingBox()
+  await window.mouse.move(lineBox.x - 6, lineBox.y + lineBox.height / 2)
+  await window.mouse.down()
+  await window.mouse.move(lineBox.x + lineBox.width + 30, lineBox.y + lineBox.height * 2.6, { steps: 30 })
+  await window.mouse.up()
+  const multiLine = await window.evaluate(() => window.getSelection()?.toString() ?? '')
+  assert(multiLine.startsWith(lineText), `Multi-line drag must start at the first line: ${JSON.stringify(multiLine.slice(0, 80))}`)
+  assert(!multiLine.includes('Abstract'), 'Multi-line drag must not include the heading above')
   await window.mouse.click(5, 5)
   await selectWithPointer(window, span, title.text)
   await window.screenshot({ path: path.join(evidence, 'selection-page1.png') })

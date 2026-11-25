@@ -20,6 +20,7 @@ import { ModelSelector, isChatBackend } from './ModelSelector'
 import type { ChatBackend } from './ModelSelector'
 import { QuickActions } from './QuickActions'
 import { MarkdownText } from './MarkdownText'
+import { friendlyIpcError } from './ipcError'
 import styles from './AskPanel.module.css'
 
 type Role = 'user' | 'assistant'
@@ -231,7 +232,7 @@ export function AskPanel({
       if (generation !== contextGeneration.current) return
       awaitingRequest.current = false
       queuedUpdates.current = []
-      setError(err instanceof Error ? err.message : String(err))
+      setError(friendlyIpcError(err))
       setSending(false)
     }
   }, [input, sessionId, sending, slug, replayUpdates])

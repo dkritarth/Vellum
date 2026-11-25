@@ -25,7 +25,24 @@ import type { Database } from 'better-sqlite3'
 
 import type { AcpBackend, AcpClient, AcpSession, AcpUpdate } from '../acp/client.js'
 import type { ChatMessage, ChatSession } from './repo.js'
-import { addChatMessage, createChatSession, getChatMessages, getChatSession, getLatestChatSession } from './repo.js'
+import { addChatMessage, createChatSession, deleteChatSession, getChatMessages, getChatSession, getLatestChatSession } from './repo.js'
+import { purgePaper } from '../library/repo.js'
+
+/** A delete was refused because the chat or paper is busy. Expected, not a fault. */
+export class ChatBusyError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ChatBusyError'
+  }
+}
+
+/** The chat was deleted (for example from another window) before the send. */
+export class ChatGoneError extends Error {
+  constructor() {
+    super('This chat was deleted. Open or start another chat to continue.')
+    this.name = 'ChatGoneError'
+  }
+}
 import { recordTurnUsage } from '../usage/repo.js'
 
 const DEFAULT_BACKEND: AcpBackend = 'claude'
@@ -155,6 +172,8 @@ export class ChatManager {
   // including session creation, and keep ownership outside the renderer.
   private readonly activeTurns = new Map<string, AskActiveTurn>()
   private readonly resettingPapers = new Set<string>()
+  // Papers whose turn has locked but not yet got an ACP session (still spawning).
+  private readonly startingPapers = new Set<string>()
 
   constructor(private readonly client: AcpClient) {}
 
@@ -208,6 +227,7 @@ export class ChatManager {
     // Synchronous rejection lets ask-start reject its invoke before returning
     // a request ID. No rejected prompt is persisted or sent to ACP.
     this.requireIdle(params.paperSlug)
+    if (!getChatSession(params.db, params.chatSessionId)) throw new ChatGoneError()
     const activeTurn: AskActiveTurn = {
       requestId: params.requestId ?? randomUUID(),
       chatSessionId: params.chatSessionId,
@@ -215,14 +235,75 @@ export class ChatManager {
       sequence: 0,
     }
     this.activeTurns.set(params.paperSlug, activeTurn)
+    this.startingPapers.add(params.paperSlug)
     const release = (): void => {
-      if (this.activeTurns.get(params.paperSlug) === activeTurn) this.activeTurns.delete(params.paperSlug)
+      // A stale release from an earlier turn must not clear a newer turn's state.
+      if (this.activeTurns.get(params.paperSlug) !== activeTurn) return
+      this.startingPapers.delete(params.paperSlug)
+      this.activeTurns.delete(params.paperSlug)
+    }
+    // The session is ready: delete/purge refusals now say "answering"
+    // rather than "starting". Owner-checked like release, because a turn that
+    // already ended may see its session start resolve after a newer turn began.
+    const sessionReady = (): void => {
+      if (this.activeTurns.get(params.paperSlug) === activeTurn) this.startingPapers.delete(params.paperSlug)
     }
     return this.runActiveTurn(params, (event) => {
       if (event.kind === 'text') activeTurn.text += event.text
       if (event.kind === 'done' || event.kind === 'error') release()
       onEvent({ ...event, sequence: ++activeTurn.sequence })
-    }).finally(release)
+    }, sessionReady).finally(release)
+  }
+
+  /**
+   * Delete a conversation. Refused (not cancelled) while that conversation has
+   * an active turn: the turn would otherwise finish and insert its reply for a
+   * missing session, failing with a raw SQLITE_CONSTRAINT_FOREIGNKEY. Other
+   * chats of the same paper are unaffected.
+   */
+  deleteChat(db: Database, chatSessionId: number): void {
+    for (const [paperSlug, turn] of this.activeTurns) {
+      if (turn.chatSessionId !== chatSessionId) continue
+      throw new ChatBusyError(
+        this.startingPapers.has(paperSlug)
+          ? 'This chat is still starting. Wait a moment, then delete it.'
+          : 'This chat is still answering. Wait for the answer to finish, then delete it.',
+      )
+    }
+    const paperSlug = getChatSession(db, chatSessionId)?.paperSlug
+    if (paperSlug && this.resettingPapers.has(paperSlug)) {
+      throw new ChatBusyError('This paper is starting a new chat. Wait a moment, then delete this one.')
+    }
+    deleteChatSession(db, chatSessionId)
+  }
+
+  /**
+   * Permanently delete a paper. Refused while any chat of that paper has an
+   * active turn or is being reset, because purge cascades to its chats. After
+   * a successful purge, cached agent sessions for the paper are closed so none
+   * points at deleted files.
+   */
+  async purgePaper(db: Database, paperSlug: string, libraryDir?: string): Promise<boolean> {
+    if (this.activeTurns.has(paperSlug)) {
+      throw new ChatBusyError(
+        this.startingPapers.has(paperSlug)
+          ? 'This paper has a chat starting up. Wait a moment, then delete it permanently.'
+          : 'This paper has an answer in progress. Wait for it to finish, then delete it permanently.',
+      )
+    }
+    if (this.resettingPapers.has(paperSlug)) {
+      throw new ChatBusyError('This paper has a chat starting up. Wait a moment, then delete it permanently.')
+    }
+    // Hold the paper while its sessions close, so a new chat or turn cannot
+    // insert rows for the purged paper during the await (raw FK error).
+    this.resettingPapers.add(paperSlug)
+    try {
+      const purged = purgePaper(db, paperSlug, libraryDir)
+      if (purged) await this.disposePaperSessions(paperSlug)
+      return purged
+    } finally {
+      this.resettingPapers.delete(paperSlug)
+    }
   }
 
   private requireIdle(paperSlug: string): void {
@@ -231,7 +312,7 @@ export class ChatManager {
     }
   }
 
-  private async runActiveTurn(params: RunTurnParams, onEvent: (event: AskStreamEvent) => void): Promise<void> {
+  private async runActiveTurn(params: RunTurnParams, onEvent: (event: AskStreamEvent) => void, sessionReady: () => void): Promise<void> {
     const backend = params.backend ?? DEFAULT_BACKEND
 
     // Snapshot history *before* adding this turn's user message — this is
@@ -244,6 +325,7 @@ export class ChatManager {
     let freshlySpawned: boolean
     try {
       ;({ session: acpSession, freshlySpawned } = await this.getOrCreateAcpSession(params.paperSlug, backend, params.chatSessionId))
+      sessionReady()
     } catch (err) {
       onEvent({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
       return

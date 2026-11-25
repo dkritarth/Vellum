@@ -167,6 +167,26 @@ describe('main process startup and preload contract', () => {
     }
   })
 
+  it('routes chat delete and paper purge through the chat manager when idle', async () => {
+    electron.runHandlers = true
+    try {
+      await expect(electron.api['chatDeleteSession']!(999)).resolves.toBeUndefined()
+      await expect(electron.api['paperPurge']!('missing-paper')).resolves.toBe(false)
+    } finally {
+      electron.runHandlers = false
+    }
+  })
+
+  it('answers a send to a deleted chat with a friendly message', async () => {
+    electron.runHandlers = true
+    try {
+      await expect(electron.api['askStart']!({ chatSessionId: 999, slug: 'p1', text: 'hi' }))
+        .rejects.toThrow('This chat was deleted. Open or start another chat to continue.')
+    } finally {
+      electron.runHandlers = false
+    }
+  })
+
   it('preserves valid usage filters and collection operations through preload', async () => {
     electron.runHandlers = true
     try {

@@ -4,7 +4,7 @@ import { SuggestedQuestions } from './SuggestedQuestions'
 // (preload bridge) — never imports Node/core directly, per AGENTS.md.
 //
 // Flow:
-//   1. On mount / slug change: `askOpen(slug)` reloads the most recent chat
+//   1. On mount / slug change: `askOpen(slug)` reloads the chat with the latest activity
 //      session + its persisted history (electron/main.ts's `vellum:ask-open`).
 //   2. Sending a turn: optimistically appends the user's message, then
 //      `askStart(...)` kicks off the turn and returns a `requestId`

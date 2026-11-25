@@ -360,8 +360,8 @@ function parseAskOpenParams(value: unknown, maybeSessionId?: unknown): { slug: s
   return { slug, sessionId }
 }
 
-// Open (or reload) the Ask tab for a paper: returns the requested or most
-// recent chat session for this slug + its full history.
+// Open (or reload) the Ask tab for a paper: returns the requested chat
+// session, else the one with the latest activity, + its full history.
 ipcMain.handle('vellum:ask-open', (_event, slugOrParams: unknown, maybeSessionId?: unknown): AskOpenResult => {
   const { slug, sessionId } = parseAskOpenParams(slugOrParams, maybeSessionId)
   return getChatManager().openChat({ db: getDb(), paperSlug: slug, chatSessionId: sessionId })

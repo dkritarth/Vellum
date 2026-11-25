@@ -335,6 +335,11 @@ export function Reader({
   const searchWorkRef = useRef<Promise<unknown> | null>(null)
   // The hit the user last stepped to; the nonce re-reveals it on every step.
   const [searchFocus, setSearchFocus] = useState<{ page: number; hit: number; nonce: number } | null>(null)
+  // Source of focus nonces. It never restarts: clearing or editing the query
+  // resets searchFocus to null, and a nonce counted from null again would
+  // repeat one ReaderPage already revealed, so the next search's first hit
+  // was never scrolled to.
+  const searchFocusSeq = useRef(0)
   const [highlights, setHighlights] = useState<HighlightRecord[]>([])
   const [flashId, setFlashId] = useState<string | null>(null)
   // [P2-03] Built once per loaded doc (see the doc-load effect) from a
@@ -896,7 +901,7 @@ export function Reader({
 
   function focusSearchResult(hit: SearchHit): void {
     goToPage(hit.pageNumber)
-    setSearchFocus((current) => ({ page: hit.pageNumber, hit: hit.hitOnPage, nonce: (current?.nonce ?? 0) + 1 }))
+    setSearchFocus({ page: hit.pageNumber, hit: hit.hitOnPage, nonce: ++searchFocusSeq.current })
   }
 
   function clearSearch(): void {

@@ -94,6 +94,10 @@ export function ReaderPage({
   // effects (overlays, citation markers, flashes) key off it.
   const [textVersion, setTextVersion] = useState(0)
   const [overlays, setOverlays] = useState<OverlayBox[]>([])
+  // The search query the rendered overlays were built for. On a new query
+  // the reveal effect can run before the recomputed overlays render; it must
+  // wait for them instead of scrolling to the previous query's mark.
+  const [overlaysQuery, setOverlaysQuery] = useState('')
 
   // Release pdf.js's per-page operator list and decoded resources when the
   // page leaves the render window, so scrolling a long paper doesn't keep
@@ -207,6 +211,7 @@ export function ReaderPage({
     const container = textLayerRef.current
     if (!container || textVersion === 0) {
       setOverlays([])
+      setOverlaysQuery(searchQuery)
       return
     }
     const layerRect = container.getBoundingClientRect()
@@ -248,6 +253,7 @@ export function ReaderPage({
       })
     })
     setOverlays(next)
+    setOverlaysQuery(searchQuery)
   }, [highlights, flashHighlightId, searchQuery, textVersion])
 
   // Reveal the flashing highlight once its overlay exists.
@@ -275,6 +281,7 @@ export function ReaderPage({
   const revealedSearchRef = useRef<number | null>(null)
   useEffect(() => {
     if (searchFocusNonce === null || revealedSearchRef.current === searchFocusNonce) return
+    if (overlaysQuery !== searchQuery) return
     const overlay = overlayRef.current
     const el =
       overlay?.querySelector(`[data-search-hit="${searchFocusHit ?? 0}"]`) ?? overlay?.querySelector('[data-search-hit]')
@@ -282,7 +289,7 @@ export function ReaderPage({
     if (!el || !viewport) return
     revealedSearchRef.current = searchFocusNonce
     revealInViewport(viewport, el)
-  }, [searchFocusNonce, searchFocusHit, overlays])
+  }, [searchFocusNonce, searchFocusHit, overlays, overlaysQuery, searchQuery])
 
   // [P2-03] Flash + reveal the cited reference's marker on this page.
   useEffect(() => {

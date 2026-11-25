@@ -984,6 +984,34 @@ describe('Reader search steps through hits (#259)', () => {
   })
 })
 
+describe('Reader search reveals the new query\'s hit (#259 review)', () => {
+  it('does not reveal a stale mark from the previous query', async () => {
+    getDocumentMock.mockReturnValue({
+      promise: Promise.resolve(fakePdfDocWithItems([[{ str: 'Vellum reads', hasEOL: true }, { str: 'papers. vellum' }]])),
+      destroy: async () => {},
+    })
+    const user = userEvent.setup()
+    const { container } = render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(getTextLayer(container, 1)?.querySelector('span')).not.toBeNull())
+    const input = screen.getByLabelText('Search in document')
+    await user.type(input, 'vellum{Enter}')
+    await waitFor(() => expect(screen.getByLabelText('Search matches')).toHaveTextContent('1 / 2'))
+    vi.mocked(revealInViewport).mockClear()
+
+    await user.clear(input)
+    await user.type(input, 'papers{Enter}')
+    await waitFor(() => expect(screen.getByLabelText('Search matches')).toHaveTextContent('1 / 1'))
+    await waitFor(() => expect(vi.mocked(revealInViewport)).toHaveBeenCalled())
+    // Every reveal targeted a mark of the current query, still on the page.
+    for (const call of vi.mocked(revealInViewport).mock.calls) {
+      const target = call[1] as HTMLElement
+      if (!target.hasAttribute('data-search-hit')) continue
+      expect(target.isConnected).toBe(true)
+      expect(target.hasAttribute('data-search-current')).toBe(true)
+    }
+  })
+})
+
 describe('injectCitationMarkers idempotency', () => {
   it('does not nest markers when run twice over the same text layer', () => {
     const container = document.createElement('div')

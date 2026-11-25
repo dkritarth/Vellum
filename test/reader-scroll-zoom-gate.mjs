@@ -359,6 +359,22 @@ async function run() {
     await expectCurrent(1, 1, 0, 'next from the last hit wraps to the first')
     console.log(`    wrapped both ways (${total} / ${total} on page ${c.hits[0].page})`)
     await shot('08b-search-hits')
+    // A new search after clearing the old one still scrolls to its first hit.
+    // The focus nonce used to restart after a clear, so the second identical
+    // first-hit focus on page 1 was treated as already revealed.
+    // "BLEU" first appears mid-page 1 (abstract), below the fold at this zoom,
+    // so only the in-page reveal brings it into view.
+    await window.press(SEARCH, 'Escape')
+    await window.fill(SEARCH, 'BLEU')
+    await window.press(SEARCH, 'Enter')
+    await expectCurrent(1, 1, 0, 'search after clearing')
+    await window.press(SEARCH, 'Escape')
+    await window.evaluate((sel) => { const vp = document.querySelector(sel); vp.scrollTop = vp.scrollHeight / 3 }, VIEWPORT)
+    await window.waitForTimeout(400)
+    await window.fill(SEARCH, 'BLEU')
+    await window.press(SEARCH, 'Enter')
+    await expectCurrent(1, 1, 0, 'search again after clearing and scrolling away')
+    console.log('    a search after clearing scrolls back to its first hit')
     await window.press(SEARCH, 'Escape')
     await window.locator(VIEWPORT).focus()
     await window.keyboard.press('Control+0')

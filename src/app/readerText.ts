@@ -270,6 +270,11 @@ export function findTextMatches(container: Node, query: string): HighlightAnchor
  * textContent is the strings joined with nothing in between. Document search
  * counts hits in this text so its count matches the hits marked on the page.
  * Marked-content items carry no `str` and add no text.
+ *
+ * Trade-off: with nothing at line ends, a phrase that wraps onto the next
+ * line ("attention is" split after "attention") is not found, and two words
+ * meeting at a line end can form a false hit. Counting the same text the
+ * page marks keeps the counter and the marks consistent.
  */
 export function textLayerText(items: ReadonlyArray<object>): string {
   return items.map((item) => ('str' in item && typeof item.str === 'string' ? item.str : '')).join('')

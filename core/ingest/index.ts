@@ -113,6 +113,26 @@ function resolveIngestSource(
   }).immediate()
 }
 
+/** PDF readers accept a `%PDF-` header anywhere in the first 1024 bytes. */
+function looksLikePdf(bytes: Uint8Array): boolean {
+  const head = Buffer.from(bytes.buffer, bytes.byteOffset, Math.min(bytes.byteLength, 1024))
+  return head.includes('%PDF-')
+}
+
+/** Reject non-PDF bytes with an actionable message before PDF.js parses them.
+ * Publishers often serve landing or sign-in pages as text/plain or
+ * application/octet-stream, which pass the content-type check in fetch.ts. */
+function assertPdfBytes(input: ClassifiedInput, bytes: Uint8Array): void {
+  if (looksLikePdf(bytes)) return
+  if (input.kind === 'local_pdf') {
+    throw new Error(`ingest: ${input.value} is not a PDF file`)
+  }
+  throw new Error(
+    `ingest: ${input.value} did not return a PDF (it looks like a web page or another file type). ` +
+    'Supply a direct PDF URL or download the PDF and import the local file.',
+  )
+}
+
 /**
  * Ingest a paper end-to-end: classify -> fetch -> convert -> extract -> write
  * files + DB row. See module comment for the idempotency guarantee.
@@ -124,6 +144,7 @@ export async function ingest(raw: string, options: IngestOptions): Promise<Inges
 
   const classified: ClassifiedInput = classifyInput(raw)
   const fetched = await fetchSource(classified)
+  assertPdfBytes(classified, fetched.pdfBytes)
   // convertPdfToMarkdown's PDF.js backend (unpdf) detaches/transfers the
   // ArrayBuffer it's given while parsing — pass it a copy so
   // fetched.pdfBytes stays intact for the paper.pdf write below.

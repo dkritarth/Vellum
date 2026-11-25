@@ -2,6 +2,7 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useLayoutEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { IngestModal } from './IngestModal'
 
@@ -138,6 +139,38 @@ describe('IngestModal', () => {
 
     expect(screen.getByPlaceholderText(/1706\.03762/)).toHaveValue('')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('never paints the failed attempt when reopened', async () => {
+    // Layout effects run after the DOM commit but before passive effects and
+    // paint, so this sees exactly what the first reopened frame shows.
+    const firstFrames: Array<{ value: string; alert: boolean }> = []
+    function Probe({ isOpen }: { isOpen: boolean }) {
+      useLayoutEffect(() => {
+        if (!isOpen) return
+        const input = document.querySelector<HTMLInputElement>('#paper-input')
+        firstFrames.push({ value: input?.value ?? '<none>', alert: Boolean(document.querySelector('[role="alert"]')) })
+      }, [isOpen])
+      return null
+    }
+    ingestMock.mockRejectedValue(new Error('Local PDF not found: /missing.pdf'))
+    const user = userEvent.setup()
+    const view = (isOpen: boolean) => (
+      <>
+        <IngestModal isOpen={isOpen} onClose={vi.fn()} onSuccess={vi.fn()} />
+        <Probe isOpen={isOpen} />
+      </>
+    )
+    const { rerender } = render(view(true))
+    await user.type(screen.getByPlaceholderText(/1706\.03762/), '/missing.pdf')
+    await user.click(screen.getByRole('button', { name: /add paper/i }))
+    await screen.findByRole('alert')
+
+    rerender(view(false))
+    firstFrames.length = 0
+    rerender(view(true))
+
+    expect(firstFrames).toEqual([{ value: '', alert: false }])
   })
 
   it('strips Electron IPC wrapper noise from ingest errors', async () => {

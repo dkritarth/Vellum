@@ -18,10 +18,23 @@
 //      no-op past the first.
 //   4. "Clear note" deletes the persisted note outright (`notesDelete`) and
 //      empties the editor — the delete half of CRUD.
+//   5. If that leave-time flush fails, the text is kept in `unsavedNotes` and
+//      put back in the editor, with the save error and Retry, the next time
+//      the paper's note is opened (#267). It lives only for this app run.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import styles from './NotesPanel.module.css'
 
 const SAVE_DEBOUNCE_MS = 500
+
+// Text whose leave-time save failed, by paper slug. Module scope so it
+// survives the panel unmounting (leaving the Notes tab) as well as a paper
+// switch.
+const unsavedNotes = new Map<string, string>()
+
+/** Test seam: forget text kept from failed leave-time saves. */
+export function clearUnsavedNotes(): void {
+  unsavedNotes.clear()
+}
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -66,11 +79,21 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
     const generation = paperGeneration.current
     const revision = editRevision.current
     dirtyRef.current = false
-    window.vellum.notesSave({ slug: outgoingSlug, body: pendingBody }).catch(() => {
-      if (generation !== paperGeneration.current || revision !== editRevision.current) return
-      dirtyRef.current = true
-      setStatus('idle')
-    })
+    window.vellum.notesSave({ slug: outgoingSlug, body: pendingBody })
+      .then(() => {
+        if (unsavedNotes.get(outgoingSlug) === pendingBody) unsavedNotes.delete(outgoingSlug)
+      })
+      .catch(() => {
+        // The flush runs from effect cleanups, which retire this generation
+        // right after, so the editor that issued it is normally gone. Keep the
+        // text for the next time this paper's note opens instead of losing it.
+        if (generation !== paperGeneration.current || revision !== editRevision.current) {
+          unsavedNotes.set(outgoingSlug, pendingBody)
+          return
+        }
+        dirtyRef.current = true
+        setStatus('idle')
+      })
   }, [])
 
   // Reload the note whenever the open paper changes. This cleanup fires both
@@ -96,6 +119,18 @@ export function NotesPanel({ slug }: NotesPanelProps): JSX.Element {
       .notesGet(slug)
       .then((note) => {
         if (cancelled) return
+        const unsaved = unsavedNotes.get(slug)
+        if (unsaved !== undefined) {
+          // A leave-time save of this note failed: show that text, not the
+          // stored note, and offer Retry save.
+          unsavedNotes.delete(slug)
+          setBody(unsaved)
+          bodyRef.current = unsaved
+          setLoad({ slug, status: 'ready' })
+          dirtyRef.current = true
+          setMutationError('save')
+          return
+        }
         setBody(note?.body ?? '')
         setLoad({ slug, status: 'ready' })
         dirtyRef.current = false

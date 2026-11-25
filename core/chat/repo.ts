@@ -152,6 +152,8 @@ export interface ChatSessionSummary {
   title: string
   preview: string | null
   messageCount: number
+  /** Questions the user asked: one question and its answer is one turn. */
+  turnCount: number
   createdAt: string
   lastActiveAt: string
 }
@@ -187,6 +189,7 @@ export function listChatSessions(
       cs.title,
       cs.created_at AS createdAt,
       COUNT(cm.id) AS messageCount,
+      COALESCE(SUM(CASE WHEN cm.role = 'user' THEN 1 ELSE 0 END), 0) AS turnCount,
       MAX(cm.created_at) AS lastMessageAt,
       (
         SELECT content FROM chat_messages 
@@ -236,6 +239,7 @@ export function listChatSessions(
     title: string | null
     createdAt: string
     messageCount: number
+    turnCount: number
     lastMessageAt: string | null
     firstUserMessage: string | null
     lastMessage: string | null
@@ -265,6 +269,7 @@ export function listChatSessions(
       title: displayTitle,
       preview: preview ?? null,
       messageCount: Number(row.messageCount),
+      turnCount: Number(row.turnCount),
       createdAt: row.createdAt,
       lastActiveAt: row.lastMessageAt || row.createdAt,
     }

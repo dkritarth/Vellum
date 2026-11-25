@@ -25,6 +25,7 @@ describe('ChatsList [L2-02]', () => {
       title: 'Explain Transformer architecture',
       preview: 'The Transformer uses self-attention',
       messageCount: 4,
+      turnCount: 2,
       createdAt: '2026-03-01T10:00:00.000Z',
       lastActiveAt: '2026-03-01T10:05:00.000Z',
     },
@@ -36,6 +37,7 @@ describe('ChatsList [L2-02]', () => {
       title: 'Orphaned Chat Discussion',
       preview: 'Testing missing paper',
       messageCount: 1,
+      turnCount: 1,
       createdAt: '2026-03-01T09:00:00.000Z',
       lastActiveAt: '2026-03-01T09:00:00.000Z',
     },
@@ -63,7 +65,9 @@ describe('ChatsList [L2-02]', () => {
     expect(await screen.findByText('Explain Transformer architecture')).toBeInTheDocument()
     expect(screen.getByText(/Attention Is All You Need/)).toBeInTheDocument()
     expect(screen.getByText('Claude')).toBeInTheDocument()
-    expect(screen.getByText('4 turns')).toBeInTheDocument()
+    // Four messages are two questions with their answers: 2 turns (#260).
+    expect(screen.getByText('2 turns')).toBeInTheDocument()
+    expect(screen.getByText('1 turn')).toBeInTheDocument()
 
     // Missing paper fallback
     expect(screen.getByText('Orphaned Chat Discussion')).toBeInTheDocument()

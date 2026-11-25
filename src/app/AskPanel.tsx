@@ -271,6 +271,10 @@ export function AskPanel({
 
     setError(null)
     if (!prompt) setInput('')
+    // Set before this render, not on the ack: Stop shows only for the chat
+    // that owns the active turn, and a ref change alone does not re-render.
+    // A cold session start can take a minute with no events to redraw.
+    activeTurnSessionId.current = sessionId
     setSending(true)
     setMessages((current) => [...current, { id: `local-user-${Date.now()}`, role: 'user', content: text }])
 
@@ -316,6 +320,7 @@ export function AskPanel({
     setSending(false)
     setSwitchingSession(true)
     activeRequestId.current = null
+    activeTurnSessionId.current = null
 
     window.vellum
       .askNewChat({ slug, backend: nextBackend })

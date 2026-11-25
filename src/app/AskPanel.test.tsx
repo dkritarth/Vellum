@@ -653,6 +653,21 @@ describe('Stop control (#254)', () => {
     expect(screen.queryByRole('button', { name: 'Stop' })).not.toBeInTheDocument()
   })
 
+  it('offers Stop during session start of a turn sent after New chat', async () => {
+    const user = userEvent.setup()
+    render(<AskPanel slug="p1" />)
+    await startTurn(user)
+    await act(async () => emit({ requestId: 'req-1', event: { kind: 'done', sequence: 1, message: { id: 5, role: 'assistant', content: 'Done' } } }))
+    await user.click(screen.getByRole('button', { name: 'New chat' }))
+    await waitFor(() => expect(askNewChat).toHaveBeenCalled())
+    // New chat disposes the cached session: the next turn is a cold start
+    // with no events until the adapter answers.
+    askStart.mockReturnValueOnce(new Promise(() => {}))
+    askStart.mockClear()
+    await startTurn(user)
+    expect(await screen.findByRole('button', { name: 'Stop' })).toBeEnabled()
+  })
+
   it('hides Stop while the paper answers in another of its chats', async () => {
     askOpen.mockResolvedValue({
       session: { id: 2, paperSlug: 'p1', backend: 'codex', title: null, createdAt: 't' },

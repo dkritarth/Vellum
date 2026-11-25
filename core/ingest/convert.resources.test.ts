@@ -35,3 +35,15 @@ it('destroys the document when extraction fails', async () => {
   await expect(convertPdfToMarkdown(new Uint8Array([1]))).rejects.toThrow('broken text layer')
   expect(destroy).toHaveBeenCalledOnce()
 })
+
+it.each(['UnknownErrorException', 'FormatError', 'InvalidPDFException'])(
+  'reports a PDF.js %s as a damaged PDF, not by its class name (#274)',
+  async (name) => {
+    const err = Object.assign(new Error('End of file inside dictionary.'), { name })
+    extractTextItems.mockRejectedValue(err)
+    await expect(convertPdfToMarkdown(new Uint8Array([1]))).rejects.toThrow(
+      'This PDF is damaged or incomplete and cannot be read.',
+    )
+    expect(destroy).toHaveBeenCalledOnce()
+  },
+)

@@ -23,13 +23,6 @@ declare const __VELLUM_MAIN_BUNDLE__: boolean
 const H1_RATIO = 1.8
 const H2_RATIO = 1.15
 
-/**
- * Convert PDF bytes to markdown. Headings are inferred from relative font
- * size (see module comment); everything else is emitted as body paragraphs
- * in reading order. Throws if the PDF has no extractable text layer (e.g.
- * empty input or a scanned/image-only PDF — this is text-layer extraction,
- * not OCR).
- */
 /** Below this many non-space characters per page on average, a PDF is
  * treated as scanned: real paper pages carry thousands; a stamp or page
  * number alone carries a few dozen. */
@@ -38,19 +31,30 @@ export const MIN_TEXT_CHARS_PER_PAGE = 100
 const NO_TEXT_MESSAGE =
   'This PDF has no selectable text (it looks scanned). Run OCR on it, then add it again.'
 
-/** PDF.js exceptions (`PasswordException`, `InvalidPDFException`) as
- * messages a user can act on; anything else passes through unchanged. */
+/** PDF.js exceptions as messages a user can act on; other errors pass
+ * through unchanged. */
 function readablePdfError(err: unknown): unknown {
   const name = (err as { name?: unknown } | null)?.name
   if (name === 'PasswordException') {
     return new Error('This PDF is password-protected. Remove the password and add it again.')
   }
-  if (name === 'InvalidPDFException') {
+  // InvalidPDFException covers a missing or broken structure; a file damaged
+  // inside (for example truncated mid-object) surfaces as
+  // UnknownErrorException or FormatError. Any other PDF.js exception is a
+  // read failure too, and its class name means nothing to the user.
+  if (typeof name === 'string' && (name === 'FormatError' || name.endsWith('Exception'))) {
     return new Error('This PDF is damaged or incomplete and cannot be read.')
   }
   return err
 }
 
+/**
+ * Convert PDF bytes to markdown. Headings are inferred from relative font
+ * size (see module comment); everything else is emitted as body paragraphs
+ * in reading order. Throws if the PDF has no extractable text layer (e.g.
+ * empty input or a scanned/image-only PDF — this is text-layer extraction,
+ * not OCR).
+ */
 export async function convertPdfToMarkdown(pdfBytes: Uint8Array): Promise<string> {
   if (pdfBytes.length === 0) {
     throw new Error('convertPdfToMarkdown: empty PDF bytes')

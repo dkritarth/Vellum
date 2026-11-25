@@ -29,6 +29,8 @@ interface OverlayBox {
   kind: 'highlight' | 'search'
   id?: string
   color?: string
+  /** For a search box: index of its hit among this page's hits. */
+  hit?: number
   flash: boolean
   left: number
   top: number
@@ -53,8 +55,10 @@ export interface ReaderPageProps {
   citationFlash: number | null
   /** Submitted search query; hits are marked on this page. */
   searchQuery: string
-  /** Changes when the user steps to a search result on this page, which
-   * reveals that page's first hit. */
+  /** Index on this page of the search hit the user stepped to, or null when
+   * the current hit is on another page. That hit is marked current. */
+  searchFocusHit: number | null
+  /** Changes on every step to a hit on this page, which reveals that hit. */
   searchFocusNonce: number | null
 }
 
@@ -80,6 +84,7 @@ export function ReaderPage({
   flashHighlightId,
   citationFlash,
   searchQuery,
+  searchFocusHit,
   searchFocusNonce,
 }: ReaderPageProps): JSX.Element {
   const canvasHostRef = useRef<HTMLDivElement>(null)
@@ -89,6 +94,10 @@ export function ReaderPage({
   // effects (overlays, citation markers, flashes) key off it.
   const [textVersion, setTextVersion] = useState(0)
   const [overlays, setOverlays] = useState<OverlayBox[]>([])
+  // The search query the rendered overlays were built for. On a new query
+  // the reveal effect can run before the recomputed overlays render; it must
+  // wait for them instead of scrolling to the previous query's mark.
+  const [overlaysQuery, setOverlaysQuery] = useState('')
 
   // Release pdf.js's per-page operator list and decoded resources when the
   // page leaves the render window, so scrolling a long paper doesn't keep
@@ -202,6 +211,7 @@ export function ReaderPage({
     const container = textLayerRef.current
     if (!container || textVersion === 0) {
       setOverlays([])
+      setOverlaysQuery(searchQuery)
       return
     }
     const layerRect = container.getBoundingClientRect()
@@ -239,10 +249,11 @@ export function ReaderPage({
       const range = rangeFromAnchor(container, anchor)
       if (!range) return
       Array.from(range.getClientRects()).forEach((rect, i) => {
-        next.push(toBox(rect, { key: `s-${m}-${i}`, kind: 'search', flash: false }))
+        next.push(toBox(rect, { key: `s-${m}-${i}`, kind: 'search', hit: m, flash: false }))
       })
     })
     setOverlays(next)
+    setOverlaysQuery(searchQuery)
   }, [highlights, flashHighlightId, searchQuery, textVersion])
 
   // Reveal the flashing highlight once its overlay exists.
@@ -262,17 +273,23 @@ export function ReaderPage({
     revealInViewport(viewport, el)
   }, [flashHighlightId, overlays])
 
-  // Reveal the first search hit on this page when the user steps to it
-  // (once per step, even if overlays recompute afterwards).
+  // Reveal the search hit the user stepped to on this page (once per step,
+  // even if overlays recompute afterwards). A hit wrapped across lines has
+  // several boxes; reveal its first. searchDocument counts hits with the same
+  // rule as findTextMatches, so the index should exist; fall back to the
+  // page's first hit rather than not scrolling at all.
   const revealedSearchRef = useRef<number | null>(null)
   useEffect(() => {
     if (searchFocusNonce === null || revealedSearchRef.current === searchFocusNonce) return
-    const el = overlayRef.current?.querySelector('[data-search-hit]')
+    if (overlaysQuery !== searchQuery) return
+    const overlay = overlayRef.current
+    const el =
+      overlay?.querySelector(`[data-search-hit="${searchFocusHit ?? 0}"]`) ?? overlay?.querySelector('[data-search-hit]')
     const viewport = viewportOf(overlayRef.current)
     if (!el || !viewport) return
     revealedSearchRef.current = searchFocusNonce
     revealInViewport(viewport, el)
-  }, [searchFocusNonce, overlays])
+  }, [searchFocusNonce, searchFocusHit, overlays, overlaysQuery, searchQuery])
 
   // [P2-03] Flash + reveal the cited reference's marker on this page.
   useEffect(() => {
@@ -318,9 +335,11 @@ export function ReaderPage({
               <div
                 key={box.key}
                 data-highlight-id={box.kind === 'highlight' ? box.id : undefined}
-                data-search-hit={box.kind === 'search' ? '' : undefined}
+                data-search-hit={box.kind === 'search' ? box.hit : undefined}
+                data-search-current={box.kind === 'search' && box.hit === searchFocusHit ? '' : undefined}
                 className={[
                   box.kind === 'search' ? styles.searchHit : styles.highlightRect,
+                  box.kind === 'search' && box.hit === searchFocusHit ? styles.searchHitCurrent : '',
                   box.flash ? styles.highlightRectFlash : '',
                 ]
                   .filter(Boolean)

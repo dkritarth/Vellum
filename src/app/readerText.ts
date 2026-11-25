@@ -55,7 +55,11 @@ export function rangeFromAnchor(container: Node, anchor: HighlightAnchor): Range
   let node: Node | null = walker.nextNode()
   while (node && !(startSet && endSet)) {
     const length = (node as Text).data.length
-    if (!startSet && anchor.start >= offset && anchor.start <= offset + length) {
+    // Strict `<` for the start: an anchor that begins exactly at a node
+    // boundary starts in the next node. Starting at the end of the previous
+    // node would add a zero-width client rect (a stray highlight box) at the
+    // end of the previous line (#279). The end keeps `<=`.
+    if (!startSet && anchor.start >= offset && anchor.start < offset + length) {
       range.setStart(node, anchor.start - offset)
       startSet = true
     }

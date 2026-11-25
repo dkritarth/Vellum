@@ -310,6 +310,18 @@ describe('anchorFromRange / rangeFromAnchor [P2-02]', () => {
     expect(range!.toString()).toBe('readsPDFs')
   })
 
+  it('rangeFromAnchor starts a boundary anchor in the next node, not at the end of the previous one (#279)', () => {
+    const container = buildContainer(['Vellum reads', 'PDFs offline'])
+    const range = rangeFromAnchor(container, { start: 12, end: 16 })
+    expect(range!.toString()).toBe('PDFs')
+    // Starting at the end of 'Vellum reads' would add a zero-width box there.
+    expect(range!.startContainer.textContent).toBe('PDFs offline')
+    expect(range!.startOffset).toBe(0)
+    // A range ending at a boundary still ends in the earlier node.
+    const end = rangeFromAnchor(container, { start: 7, end: 12 })
+    expect(end!.endContainer.textContent).toBe('Vellum reads')
+  })
+
   it('rangeFromAnchor returns null when the anchor no longer fits the current text', () => {
     const container = buildContainer(['short'])
 

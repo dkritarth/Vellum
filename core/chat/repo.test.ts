@@ -33,7 +33,7 @@ describe('chat repo', () => {
     expect(getLatestChatSession(db, 'no-such-paper')).toBeUndefined()
   })
 
-  it('returns the most recently created session for a paper', () => {
+  it('returns the newer of two sessions with no messages', () => {
     createChatSession(db, { paperSlug: 'attention-is-all-you-need', backend: 'claude' })
     const second = createChatSession(db, { paperSlug: 'attention-is-all-you-need', backend: 'claude' })
 

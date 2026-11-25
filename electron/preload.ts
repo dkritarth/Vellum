@@ -84,8 +84,8 @@ const api = {
   highlightsList: (slug: string): Promise<HighlightRecord[]> => ipcRenderer.invoke('vellum:highlights-list', slug),
   highlightsDelete: (id: string): Promise<void> => ipcRenderer.invoke('vellum:highlights-delete', id),
   // [P1-10] Ask tab — grounded chat over ACP. -----------------------------
-  // Open (or reload) the most recent chat session + history for a paper.
-  // Open (or reload) a chat session + history for a paper.
+  // Open (or reload) a chat session + history for a paper: the requested
+  // one, else the one with the latest activity.
   askOpen: (
     slugOrParams: string | { slug: string; sessionId?: number },
     sessionId?: number,

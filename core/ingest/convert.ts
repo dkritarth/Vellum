@@ -23,6 +23,31 @@ declare const __VELLUM_MAIN_BUNDLE__: boolean
 const H1_RATIO = 1.8
 const H2_RATIO = 1.15
 
+/** Below this many non-space characters per page on average, a PDF is
+ * treated as scanned: real paper pages carry thousands; a stamp or page
+ * number alone carries a few dozen. */
+export const MIN_TEXT_CHARS_PER_PAGE = 100
+
+const NO_TEXT_MESSAGE =
+  'This PDF has no selectable text (it looks scanned). Run OCR on it, then add it again.'
+
+/** PDF.js exceptions as messages a user can act on; other errors pass
+ * through unchanged. */
+function readablePdfError(err: unknown): unknown {
+  const name = (err as { name?: unknown } | null)?.name
+  if (name === 'PasswordException') {
+    return new Error('This PDF is password-protected. Remove the password and add it again.')
+  }
+  // InvalidPDFException covers a missing or broken structure; a file damaged
+  // inside (for example truncated mid-object) surfaces as
+  // UnknownErrorException or FormatError. Any other PDF.js exception is a
+  // read failure too, and its class name means nothing to the user.
+  if (typeof name === 'string' && (name === 'FormatError' || name.endsWith('Exception'))) {
+    return new Error('This PDF is damaged or incomplete and cannot be read.')
+  }
+  return err
+}
+
 /**
  * Convert PDF bytes to markdown. Headings are inferred from relative font
  * size (see module comment); everything else is emitted as body paragraphs
@@ -42,15 +67,19 @@ export async function convertPdfToMarkdown(pdfBytes: Uint8Array): Promise<string
     : fileURLToPath(new URL('../../node_modules/pdfjs-dist/standard_fonts', import.meta.url))
   // unpdf 5.6's NodeBinaryDataFactory passes this string to fs.readFile.
   // It requires a filesystem path, unlike the renderer's DOM resource URLs.
-  const document = await getDocumentProxy(pdfBytes, {
-    standardFontDataUrl: standardFontDirectory + '/',
-    disableFontFace: true,
-  })
   let items: Awaited<ReturnType<typeof extractTextItems>>['items']
   try {
-    items = (await extractTextItems(document)).items
-  } finally {
-    await document.destroy()
+    const document = await getDocumentProxy(pdfBytes, {
+      standardFontDataUrl: standardFontDirectory + '/',
+      disableFontFace: true,
+    })
+    try {
+      items = (await extractTextItems(document)).items
+    } finally {
+      await document.destroy()
+    }
+  } catch (err) {
+    throw readablePdfError(err)
   }
 
   const lines = items
@@ -58,10 +87,13 @@ export async function convertPdfToMarkdown(pdfBytes: Uint8Array): Promise<string
     .map((item) => ({ text: item.str.trim(), fontSize: item.fontSize }))
     .filter((line) => line.text.length > 0)
 
-  if (lines.length === 0) {
-    throw new Error(
-      'convertPdfToMarkdown: no extractable text layer (scanned/image-only PDF is out of scope — this is text extraction, not OCR)',
-    )
+  // A scanned paper often still carries a little text: a download stamp, a
+  // page number, a running header. Grounding Ask on that alone would answer
+  // from the model's general knowledge as if it had read the paper, so a text
+  // layer this thin is treated like no text layer at all.
+  const characters = lines.reduce((total, line) => total + line.text.replace(/\s/g, '').length, 0)
+  if (lines.length === 0 || characters / Math.max(1, items.length) < MIN_TEXT_CHARS_PER_PAGE) {
+    throw new Error(NO_TEXT_MESSAGE)
   }
 
   const bodyFontSize = modeFontSize(lines.map((l) => l.fontSize))

@@ -12,12 +12,13 @@ vi.mock('unpdf', () => ({ getDocumentProxy, extractTextItems }))
 beforeEach(() => {
   vi.clearAllMocks()
   getDocumentProxy.mockResolvedValue(document)
-  extractTextItems.mockResolvedValue({ items: [[{ str: 'Paper text', fontSize: 12 }]] })
+  // Enough text per page to count as a paper, not a scanned page (#274).
+  extractTextItems.mockResolvedValue({ items: [[{ str: 'Paper text '.repeat(20), fontSize: 12 }]] })
 })
 
 it('supplies readable local fonts explicitly and extracts through the owned document', async () => {
   const bytes = new Uint8Array([1])
-  await expect(convertPdfToMarkdown(bytes)).resolves.toBe('Paper text\n')
+  await expect(convertPdfToMarkdown(bytes)).resolves.toBe(`${'Paper text '.repeat(20).trim()}\n`)
   expect(getDocumentProxy).toHaveBeenCalledWith(bytes, {
     standardFontDataUrl: expect.stringMatching(/standard_fonts\/$/),
     disableFontFace: true,
@@ -34,3 +35,15 @@ it('destroys the document when extraction fails', async () => {
   await expect(convertPdfToMarkdown(new Uint8Array([1]))).rejects.toThrow('broken text layer')
   expect(destroy).toHaveBeenCalledOnce()
 })
+
+it.each(['UnknownErrorException', 'FormatError', 'InvalidPDFException'])(
+  'reports a PDF.js %s as a damaged PDF, not by its class name (#274)',
+  async (name) => {
+    const err = Object.assign(new Error('End of file inside dictionary.'), { name })
+    extractTextItems.mockRejectedValue(err)
+    await expect(convertPdfToMarkdown(new Uint8Array([1]))).rejects.toThrow(
+      'This PDF is damaged or incomplete and cannot be read.',
+    )
+    expect(destroy).toHaveBeenCalledOnce()
+  },
+)

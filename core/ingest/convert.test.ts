@@ -49,6 +49,31 @@ describe('convertPdfToMarkdown', () => {
   // Regression guard for #66: sample.pdf and sample2.pdf were byte-identical
   // (same md5), so both ingested to the same title and no live gate could tell
   // the two test papers apart by title.
+  const fixture = async (name: string): Promise<Uint8Array> =>
+    new Uint8Array(await readFile(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url))))
+
+  it('rejects an image-only PDF and says to run OCR (#274)', async () => {
+    await expect(convertPdfToMarkdown(await fixture('scanned.pdf'))).rejects.toThrow(
+      'This PDF has no selectable text (it looks scanned). Run OCR on it, then add it again.',
+    )
+  })
+
+  it('rejects a scanned PDF whose only text is a download stamp (#274)', async () => {
+    await expect(convertPdfToMarkdown(await fixture('scanned-with-stamp.pdf'))).rejects.toThrow('it looks scanned')
+  })
+
+  it('names a password-protected PDF instead of showing PasswordException (#274)', async () => {
+    await expect(convertPdfToMarkdown(await fixture('password-protected.pdf'))).rejects.toThrow(
+      'This PDF is password-protected. Remove the password and add it again.',
+    )
+  })
+
+  it('names a damaged PDF instead of showing InvalidPDFException (#274)', async () => {
+    await expect(convertPdfToMarkdown(await fixture('truncated.pdf'))).rejects.toThrow(
+      'This PDF is damaged or incomplete and cannot be read.',
+    )
+  })
+
   it('keeps the two fixtures distinguishable — distinct H1 titles', async () => {
     const [one, two] = await Promise.all([
       convertPdfToMarkdown(new Uint8Array(await readFile(fixturePath))),

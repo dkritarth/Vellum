@@ -43,7 +43,14 @@ import type { HighlightRecord } from '../../core/highlights/repo'
 import { CitationTooltip } from './CitationTooltip'
 import { ReaderPage } from './ReaderPage'
 import { SelectionMenu } from './SelectionMenu'
-import { anchorFromRange, buildReferenceIndex, type HighlightAnchor, type ReferenceIndex } from './readerText'
+import {
+  anchorFromRange,
+  buildReferenceIndex,
+  findMatchesInText,
+  textLayerText,
+  type HighlightAnchor,
+  type ReferenceIndex,
+} from './readerText'
 import {
   captureZoomAnchor,
   pagesInWindow,
@@ -87,20 +94,6 @@ export function clampScale(scale: number): number {
   return Math.min(Math.max(scale, MIN_SCALE), MAX_SCALE)
 }
 
-/** Case-insensitive count of non-overlapping occurrences of `query` in `text`. */
-export function countOccurrences(text: string, query: string): number {
-  if (!query) return 0
-  const haystack = text.toLowerCase()
-  const needle = query.toLowerCase()
-  let count = 0
-  let index = haystack.indexOf(needle)
-  while (index !== -1) {
-    count += 1
-    index = haystack.indexOf(needle, index + needle.length)
-  }
-  return count
-}
-
 
 export interface OutlineItem {
   title: string
@@ -115,9 +108,10 @@ export interface RawOutlineNode {
   items: RawOutlineNode[]
 }
 
-export interface SearchMatch {
+/** One search hit: the `hitOnPage`-th (0-based) hit marked on `pageNumber`. */
+export interface SearchHit {
   pageNumber: number
-  count: number
+  hitOnPage: number
 }
 
 /**
@@ -172,23 +166,26 @@ async function resolveDestPage(pdf: PDFDocumentProxy, dest: string | unknown[] |
   }
 }
 
-/** Search every page's text content for `query`, returning one entry per page with >0 hits. */
+/**
+ * Every hit of `query` in the document, in reading order. Each page is
+ * searched in the text its text layer will hold, with the rule that marks
+ * hits there (`findTextMatches`), so hit k on a page here is the k-th
+ * `[data-search-hit]` mark ReaderPage draws on that page.
+ */
 export async function searchDocument(
   pdf: PDFDocumentProxy,
   query: string,
   isCancelled: () => boolean = () => false,
-): Promise<SearchMatch[]> {
-  const trimmed = query.trim()
-  if (!trimmed) return []
+): Promise<SearchHit[]> {
+  if (!query.trim()) return []
 
-  const results: SearchMatch[] = []
+  const results: SearchHit[] = []
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
     if (isCancelled()) return results
     const page = await pdf.getPage(pageNumber)
     const textContent = await page.getTextContent()
-    const pageText = textContent.items.map((item) => ('str' in item ? item.str : '')).join(' ')
-    const count = countOccurrences(pageText, trimmed)
-    if (count > 0) results.push({ pageNumber, count })
+    const matches = findMatchesInText(textLayerText(textContent.items), query)
+    matches.forEach((_match, hitOnPage) => results.push({ pageNumber, hitOnPage }))
   }
   return results
 }
@@ -328,7 +325,7 @@ export function Reader({
   const [searchQuery, setSearchQuery] = useState('')
   // The query the current results belong to; hits are marked for it.
   const [submittedQuery, setSubmittedQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<SearchMatch[]>([])
+  const [searchResults, setSearchResults] = useState<SearchHit[]>([])
   const [searchIndex, setSearchIndex] = useState(0)
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
@@ -336,7 +333,8 @@ export function Reader({
   const searchRequestRef = useRef(0)
   /** In-flight search on the current document; teardown waits for it. */
   const searchWorkRef = useRef<Promise<unknown> | null>(null)
-  const [searchFocus, setSearchFocus] = useState<{ page: number; nonce: number } | null>(null)
+  // The hit the user last stepped to; the nonce re-reveals it on every step.
+  const [searchFocus, setSearchFocus] = useState<{ page: number; hit: number; nonce: number } | null>(null)
   const [highlights, setHighlights] = useState<HighlightRecord[]>([])
   const [flashId, setFlashId] = useState<string | null>(null)
   // [P2-03] Built once per loaded doc (see the doc-load effect) from a
@@ -896,9 +894,9 @@ export function Reader({
     setHoveredCitation(null)
   }
 
-  function focusSearchResult(page: number): void {
-    goToPage(page)
-    setSearchFocus((current) => ({ page, nonce: (current?.nonce ?? 0) + 1 }))
+  function focusSearchResult(hit: SearchHit): void {
+    goToPage(hit.pageNumber)
+    setSearchFocus((current) => ({ page: hit.pageNumber, hit: hit.hitOnPage, nonce: (current?.nonce ?? 0) + 1 }))
   }
 
   function clearSearch(): void {
@@ -935,7 +933,7 @@ export function Reader({
       setSubmittedQuery(trimmed)
       setSearchResults(results)
       setSearchIndex(0)
-      if (results.length > 0) focusSearchResult(results[0].pageNumber)
+      if (results.length > 0) focusSearchResult(results[0])
     } catch (err: unknown) {
       if (!isCurrent()) return
       const detail = err instanceof Error ? `: ${err.message}` : ''
@@ -949,7 +947,7 @@ export function Reader({
     if (searchResults.length === 0) return
     const next = (searchIndex + delta + searchResults.length) % searchResults.length
     setSearchIndex(next)
-    focusSearchResult(searchResults[next].pageNumber)
+    focusSearchResult(searchResults[next])
   }
 
   if (!slug) {
@@ -1165,6 +1163,7 @@ export function Reader({
                       flashHighlightId={flashId}
                       citationFlash={citationFlash?.page === n ? citationFlash.number : null}
                       searchQuery={submittedQuery}
+                      searchFocusHit={searchFocus?.page === n ? searchFocus.hit : null}
                       searchFocusNonce={searchFocus?.page === n ? searchFocus.nonce : null}
                     />
                   )

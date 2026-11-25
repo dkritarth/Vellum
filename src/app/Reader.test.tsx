@@ -15,26 +15,40 @@ import {
   buildReferenceIndex,
   clampPage,
   clampScale,
-  countOccurrences,
   expandCitationNumbers,
+  findTextMatches,
   clearReaderViewState,
   injectCitationMarkers,
   rangeFromAnchor,
   Reader,
+  searchDocument,
   type ReferenceIndex,
 } from './Reader'
+import { revealInViewport } from './readerViewport'
+
+// Calls through to the real helper; tests read its calls to see which hit was revealed.
+vi.mock('./readerViewport', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./readerViewport')>()
+  return { ...actual, revealInViewport: vi.fn(actual.revealInViewport) }
+})
+
+interface FakeTextItem {
+  str: string
+  hasEOL?: boolean
+}
 
 interface FakePage {
   getViewport: () => { width: number; height: number }
   render: () => { promise: Promise<void> }
-  getTextContent: () => Promise<{ items: Array<{ str: string }> }>
+  getTextContent: () => Promise<{ items: FakeTextItem[] }>
 }
 
-function fakePage(text: string): FakePage {
+function fakePage(text: string | FakeTextItem[]): FakePage {
+  const items = typeof text === 'string' ? [{ str: text }] : text
   return {
     getViewport: () => ({ width: 100, height: 100 }),
     render: () => ({ promise: Promise.resolve() }),
-    getTextContent: () => Promise.resolve({ items: [{ str: text }] }),
+    getTextContent: () => Promise.resolve({ items }),
   }
 }
 
@@ -51,6 +65,15 @@ function fakePdfDoc(): unknown {
   }
 }
 
+/** A document whose pages hold the given pdf.js text items. */
+function fakePdfDocWithItems(pages: FakeTextItem[][]): unknown {
+  return {
+    ...(fakePdfDoc() as object),
+    numPages: pages.length,
+    getPage: (pageNumber: number) => Promise.resolve(fakePage(pages[pageNumber - 1] ?? [])),
+  }
+}
+
 const getDocumentMock = vi.fn()
 
 // TextLayer's mock actually appends one <span> per text item into the given
@@ -63,9 +86,9 @@ vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
   GlobalWorkerOptions: {},
   TextLayer: class {
     private readonly container: HTMLElement
-    private readonly items: Array<{ str: string }>
+    private readonly items: Array<{ str: string; hasEOL?: boolean }>
 
-    constructor(opts: { textContentSource: { items: Array<{ str: string }> }; container: HTMLElement }) {
+    constructor(opts: { textContentSource: { items: Array<{ str: string; hasEOL?: boolean }> }; container: HTMLElement }) {
       this.container = opts.container
       this.items = opts.textContentSource.items
     }
@@ -77,6 +100,8 @@ vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
         const span = document.createElement('span')
         span.textContent = item.str
         this.container.appendChild(span)
+        // pdf.js 6 marks a line end with a text-free <br> after the item's span.
+        if (item.hasEOL) this.container.appendChild(document.createElement('br'))
       }
       return Promise.resolve()
     }
@@ -139,10 +164,46 @@ describe('pure helpers', () => {
     expect(clampScale(10)).toBe(3)
   })
 
-  it('countOccurrences counts case-insensitive, non-overlapping hits', () => {
-    expect(countOccurrences('Vellum reads PDFs. vellum is local-first.', 'vellum')).toBe(2)
-    expect(countOccurrences('nothing here', 'xyz')).toBe(0)
-    expect(countOccurrences('anything', '')).toBe(0)
+})
+
+describe('searchDocument (#259)', () => {
+  // Page 1 has two hits, page 2 none, page 3 one hit split across items at a
+  // font change, and page 4 a hit followed by a line end, where joining
+  // items with a space would also invent "s pan" and lose "span".
+  const PAGES: FakeTextItem[][] = [
+    [{ str: 'Attention is all', hasEOL: true }, { str: 'you need. Self-attention' }],
+    [{ str: 'Nothing to see here' }],
+    [{ str: 'multi-head atten' }, { str: 'tion layers' }],
+    [{ str: 'attention' }, { str: 's', hasEOL: true }, { str: 'pan' }],
+  ]
+
+  it('returns one entry per hit, in reading order, with its index on the page', async () => {
+    const hits = await searchDocument(fakePdfDocWithItems(PAGES) as never, '  attention ')
+    expect(hits).toEqual([
+      { pageNumber: 1, hitOnPage: 0 },
+      { pageNumber: 1, hitOnPage: 1 },
+      { pageNumber: 3, hitOnPage: 0 },
+      { pageNumber: 4, hitOnPage: 0 },
+    ])
+    expect(await searchDocument(fakePdfDocWithItems(PAGES) as never, '   ')).toEqual([])
+  })
+
+  it('counts exactly the hits the text layer marks on each page', async () => {
+    for (const query of ['attention', 'attentions', 'span', 'all you', 'need. self']) {
+      const hits = await searchDocument(fakePdfDocWithItems(PAGES) as never, query)
+      PAGES.forEach((items, i) => {
+        // The layer pdf.js 6 builds: a span per item, a <br> after line ends.
+        const layer = document.createElement('div')
+        for (const item of items) {
+          const span = document.createElement('span')
+          span.textContent = item.str
+          layer.appendChild(span)
+          if (item.hasEOL) layer.appendChild(document.createElement('br'))
+        }
+        const counted = hits.filter((hit) => hit.pageNumber === i + 1).length
+        expect(counted, `"${query}" on page ${i + 1}`).toBe(findTextMatches(layer, query).length)
+      })
+    }
   })
 })
 
@@ -864,6 +925,62 @@ describe('Reader search hits and clearing', () => {
 
     await user.type(input, '{Escape}')
     expect(input).toHaveValue('')
+  })
+})
+
+describe('Reader search steps through hits (#259)', () => {
+  // Page 1: two hits. Page 2: one hit. Page 3: one hit split across items.
+  const PAGES: FakeTextItem[][] = [
+    [{ str: 'Vellum reads', hasEOL: true }, { str: 'papers. vellum' }],
+    [{ str: 'offline Vellum' }],
+    [{ str: 'local Vel' }, { str: 'lum' }],
+  ]
+
+  /** [page, index on page] of the hit marked current, and of the last revealed hit. */
+  function currentHit(container: HTMLElement): Array<[number, number]> {
+    return [...container.querySelectorAll<HTMLElement>('[data-search-hit][data-search-current]')].map((el) => [
+      Number(el.closest<HTMLElement>('[data-page-number]')?.dataset.pageNumber),
+      Number(el.dataset.searchHit),
+    ])
+  }
+  function lastRevealedHit(): [number, number] | null {
+    const target = vi.mocked(revealInViewport).mock.lastCall?.[1] as HTMLElement | undefined
+    if (!target?.hasAttribute('data-search-hit')) return null
+    return [Number(target.closest<HTMLElement>('[data-page-number]')?.dataset.pageNumber), Number(target.dataset.searchHit)]
+  }
+
+  it('counts hits, and Next/Previous/Enter/Shift+Enter visit every hit in order, wrapping', async () => {
+    getDocumentMock.mockReturnValue({ promise: Promise.resolve(fakePdfDocWithItems(PAGES)), destroy: async () => {} })
+    const user = userEvent.setup()
+    const { container } = render(<Reader slug="my-paper" />)
+    await waitFor(() => expect(getTextLayer(container, 3)?.querySelector('span')).not.toBeNull())
+    vi.mocked(revealInViewport).mockClear()
+
+    const input = screen.getByLabelText('Search in document')
+    await user.type(input, 'vellum{Enter}')
+    const expectAt = async (counter: string, page: number, hit: number): Promise<void> => {
+      await waitFor(() => expect(screen.getByLabelText('Search matches')).toHaveTextContent(counter))
+      await waitFor(() => expect(currentHit(container)).toEqual([[page, hit]]))
+      await waitFor(() => expect(lastRevealedHit()).toEqual([page, hit]))
+      expect(screen.getByLabelText('Page')).toHaveTextContent(`${page} of 3`)
+    }
+    await expectAt('1 / 4', 1, 0)
+    expect(getOverlayContainer(container, 1).querySelectorAll('[data-search-hit]')).toHaveLength(2)
+
+    await user.click(screen.getByRole('button', { name: 'Next match' }))
+    await expectAt('2 / 4', 1, 1)
+    await user.click(screen.getByRole('button', { name: 'Next match' }))
+    await expectAt('3 / 4', 2, 0)
+    await user.type(input, '{Enter}')
+    await expectAt('4 / 4', 3, 0)
+    await user.click(screen.getByRole('button', { name: 'Next match' }))
+    await expectAt('1 / 4', 1, 0)
+    await user.click(screen.getByRole('button', { name: 'Previous match' }))
+    await expectAt('4 / 4', 3, 0)
+    await user.type(input, '{Shift>}{Enter}{/Shift}')
+    await expectAt('3 / 4', 2, 0)
+    await user.type(input, '{Shift>}{Enter}{/Shift}')
+    await expectAt('2 / 4', 1, 1)
   })
 })
 

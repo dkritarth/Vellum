@@ -260,9 +260,26 @@ export function injectCitationMarkers(container: HTMLElement, referenceIndex: Re
  * search hits on each rendered page. Empty for a blank query.
  */
 export function findTextMatches(container: Node, query: string): HighlightAnchor[] {
+  return findMatchesInText(container.textContent ?? '', query)
+}
+
+/**
+ * The text pdf.js's `TextLayer` (v6) puts in a page's text layer for these
+ * text content items: one span per item whose textContent is `item.str`,
+ * plus a text-free `<br>` after items flagged `hasEOL`. So the layer's
+ * textContent is the strings joined with nothing in between. Document search
+ * counts hits in this text so its count matches the hits marked on the page.
+ * Marked-content items carry no `str` and add no text.
+ */
+export function textLayerText(items: ReadonlyArray<object>): string {
+  return items.map((item) => ('str' in item && typeof item.str === 'string' ? item.str : '')).join('')
+}
+
+/** `findTextMatches` over a plain string: the one matching rule search uses. */
+export function findMatchesInText(text: string, query: string): HighlightAnchor[] {
   const needle = query.trim().toLowerCase()
   if (!needle) return []
-  const haystack = (container.textContent ?? '').toLowerCase()
+  const haystack = text.toLowerCase()
   const matches: HighlightAnchor[] = []
   let index = haystack.indexOf(needle)
   while (index !== -1) {
